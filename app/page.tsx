@@ -1105,17 +1105,9 @@ export default function DisneyTracker() {
               Past Visits ({visits.length})
             </h2>
             {visits.length === 0 ? (
-              <p
-                style={{
-                  color: '#A0AEC0',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  marginTop: '20px',
-                  fontStyle: 'italic',
-                }}
-              >
-                Your completed trips will appear here.
-              </p>
+              <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>
+              Your completed trips will appear here.
+            </p>
             ) : (
               visits.map((v) => (
                 <div
@@ -1244,8 +1236,9 @@ export default function DisneyTracker() {
               🏟️ Breakdown By Park
             </h2>
 
-            {Object.keys(parkStats).map((park) => {
-              const stats = parkStats[park];
+            {Object.keys(parkStats).map((parkKey) => {
+  const park = parkKey as keyof typeof parkStats;
+  const stats = parkStats[park];
               const avgAct =
                 stats.visits > 0
                   ? (stats.activities / stats.visits).toFixed(1)
