@@ -1447,7 +1447,7 @@ export default function DisneyTracker() {
                     </div>
 
                     {/* Metric Breakouts */}
-                    <div style={{ textAlign: 'right', shrink: 0 }}>
+<div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div
                         style={{
                           fontSize: '13px',
