@@ -149,7 +149,6 @@ export default function DisneyTracker() {
       .sort((a, b) => b.count - a.count);
   };
 
-  // 🎡 RIDE EVERYTHING METRICS
   const getRideCountsMap = () => {
     const counts: Record<string, number> = {};
     visits.forEach(v => {
@@ -185,6 +184,21 @@ export default function DisneyTracker() {
     setQueueStartTime(timestamp);
     if (timestamp) localStorage.setItem('disney_queue_timer', timestamp);
     else localStorage.removeItem('disney_queue_timer');
+  };
+
+  // 💾 DATA EXPORT FUNCTION FOR MIGRATION
+  const exportLocalData = () => {
+    const exportPayload = {
+      activeVisit,
+      visits
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `disney_tracker_backup_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   const toggleAttendee = (name: string) => {
@@ -364,6 +378,15 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
+          {/* 📦 DATA EXPORT TOOLKIT (TEMPORARY FOR CLOUD MIGRATION) */}
+          <div style={{ background: '#EBF8FF', border: '1px solid #90CDF4', padding: '14px', borderRadius: '16px', marginBottom: '20px' }}>
+            <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px', marginBottom: '4px' }}>💾 EXPORT MY DEVICE DATA</div>
+            <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px 0' }}>Tap below to save a backup of this phone's visit history before we merge with the rest of the group into the cloud.</p>
+            <button onClick={exportLocalData} style={{ width: '100%', padding: '10px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+              📥 Download My Data (JSON)
+            </button>
+          </div>
+
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -714,18 +737,13 @@ export default function DisneyTracker() {
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
-            // Sort attractions alphabetically
             const sortedAttractions = [...attractions].sort((a, b) => a.localeCompare(b));
-            
-            // Calculate completion counts
             const totalInPark = sortedAttractions.length;
             const completedCount = sortedAttractions.filter(att => (rideCountsMap[att] || 0) > 0).length;
             const percentage = totalInPark > 0 ? Math.round((completedCount / totalInPark) * 100) : 0;
 
             return (
               <div key={park} style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-                
-                {/* PARK PROGRESS HEADER */}
                 <div style={{ marginBottom: '14px', borderBottom: '2px solid #F2F2F7', paddingBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: 0 }}>📍 {park}</h2>
@@ -734,13 +752,11 @@ export default function DisneyTracker() {
                     </span>
                   </div>
 
-                  {/* PROGRESS BAR */}
                   <div style={{ width: '100%', height: '8px', background: '#EDF2F7', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ width: `${percentage}%`, height: '100%', background: percentage === 100 ? '#38A169' : 'linear-gradient(90deg, #0066cc, #D4AF37)', borderRadius: '4px', transition: 'width 0.4s ease' }}></div>
                   </div>
                 </div>
 
-                {/* ALPHABETICAL ATTRACTIONS CHECKLIST */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {sortedAttractions.map((attraction) => {
                     const count = rideCountsMap[attraction] || 0;
