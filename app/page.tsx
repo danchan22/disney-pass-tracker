@@ -29,7 +29,7 @@ const PARK_ATTRACTIONS = {
     'For the First Time in Forever: A Frozen Sing-Along Celebration', 'Indiana Jones Epic Stunt Spectacular!',
     'Lightning McQueen’s Racing Academy', 'Mickey & Minnie’s Runaway Railway', 'Millennium Falcon: Smugglers Run',
     'Rock ’n’ Roller Coaster Starring Aerosmith', 'Slinky Dog Dash', 'Star Tours – The Adventures Continue',
-    'Star Wars: Rise of the Resistance', 'The Little Mermaid: A Musical Adventure', 'The Twilight Zone Tower of Terror', 'Toy Story Mania!', 'Vacation Fun',
+    'Star Wars: Rise of the Resistance', 'The Twilight Zone Tower of Terror', 'The Little Mermaid: A Musical Adventure', 'Toy Story Mania!', 'Vacation Fun',
     'Walt Disney Presents'
   ],
   'Animal Kingdom': [
@@ -55,6 +55,13 @@ export default function DisneyTracker() {
 
   // ⏱️ LIVE QUEUE TIMER STATE
   const [queueStartTime, setQueueStartTime] = useState<string | null>(null);
+
+  // ✏️ EDITING RIDE STATE
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null); // Null if editing active visit
+  const [editRideName, setEditRideName] = useState('');
+  const [editWaitTime, setEditWaitTime] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
     if (activeVisit) {
@@ -157,7 +164,6 @@ export default function DisneyTracker() {
     else localStorage.removeItem('disney_active_visit');
   };
 
-  // Live Sync for the Stopwatch timestamp
   const saveQueueTimer = (timestamp: string | null) => {
     setQueueStartTime(timestamp);
     if (timestamp) localStorage.setItem('disney_queue_timer', timestamp);
@@ -205,14 +211,14 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
-  // ⏱️ ACTION: ENTERING QUEUE (Start Timer)
+  // ⏱️ ACTION: ENTERING QUEUE
   const handleStartQueueTimer = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
     saveQueueTimer(timeString);
   };
 
-  // 🏁 ACTION: BOARDING RIDE (Stop Timer and Calculate Match)
+  // 🏁 ACTION: BOARDING RIDE
   const handleEndQueueTimer = () => {
     if (!activeVisit || !queueStartTime) return;
     const now = new Date();
@@ -222,7 +228,7 @@ export default function DisneyTracker() {
     const endMins = parseTimeToMinutes(endTimeString);
     let calculatedWait = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
 
-    if (calculatedWait <= 0) calculatedWait = 1; // Fallback edge case safeguard
+    if (calculatedWait <= 0) calculatedWait = 1;
 
     const newActivity: Activity = {
       id: crypto.randomUUID(),
@@ -234,7 +240,6 @@ export default function DisneyTracker() {
     const updatedSession = { ...activeVisit, activities: [...activeVisit.activities, newActivity] };
     saveActive(updatedSession);
     
-    // Reset Form & Timer variables
     saveQueueTimer(null);
     setCharacterName('');
     setWaitTime('');
@@ -246,6 +251,72 @@ export default function DisneyTracker() {
     }
   };
 
+  // ✏️ EDIT RIDE HANDLERS
+  const startEditing = (activity: Activity, visitId: string | null) => {
+    setEditingActivityId(activity.id);
+    setEditingVisitId(visitId);
+    setEditRideName(activity.rideName);
+    setEditWaitTime(activity.waitTimeMinutes.toString());
+    setEditNotes(activity.notes || '');
+  };
+
+  const cancelEditing = () => {
+    setEditingActivityId(null);
+    setEditingVisitId(null);
+  };
+
+  const saveEditedActivity = (parkNameForList: keyof typeof PARK_ATTRACTIONS) => {
+    if (!editingActivityId) return;
+
+    const updatedActivity: Activity = {
+      id: editingActivityId,
+      rideName: editRideName,
+      waitTimeMinutes: parseInt(editWaitTime) || 0,
+      notes: editNotes.trim() ? editNotes : undefined
+    };
+
+    if (editingVisitId === null) {
+      // Updating Active Visit
+      if (!activeVisit) return;
+      const updatedActivities = activeVisit.activities.map(act => 
+        act.id === editingActivityId ? updatedActivity : act
+      );
+      saveActive({ ...activeVisit, activities: updatedActivities });
+    } else {
+      // Updating Past Visit
+      const updatedVisits = visits.map(v => {
+        if (v.id === editingVisitId) {
+          const updatedActivities = v.activities.map(act => 
+            act.id === editingActivityId ? updatedActivity : act
+          );
+          return { ...v, activities: updatedActivities };
+        }
+        return v;
+      });
+      saveHistory(updatedVisits);
+    }
+
+    cancelEditing();
+  };
+
+  const deleteActivity = (activityId: string, visitId: string | null) => {
+    if (!confirm("Delete this ride entry?")) return;
+
+    if (visitId === null) {
+      if (!activeVisit) return;
+      const updatedActivities = activeVisit.activities.filter(act => act.id !== activityId);
+      saveActive({ ...activeVisit, activities: updatedActivities });
+    } else {
+      const updatedVisits = visits.map(v => {
+        if (v.id === visitId) {
+          return { ...v, activities: v.activities.filter(act => act.id !== activityId) };
+        }
+        return v;
+      });
+      saveHistory(updatedVisits);
+    }
+  };
+
   const handleCheckOut = () => {
     if (!activeVisit) return;
     if (!confirm("Ready to wrap up your park day and save to history?")) return;
@@ -254,7 +325,7 @@ export default function DisneyTracker() {
     const completedVisit: Visit = { ...activeVisit, endTime };
     saveHistory([completedVisit, ...visits]);
     saveActive(null); 
-    saveQueueTimer(null); // Cleanup timer if still running
+    saveQueueTimer(null);
   };
 
   const deleteVisit = (id: string) => {
@@ -321,9 +392,8 @@ export default function DisneyTracker() {
                     </div>
                   )}
 
-                  {/* ⚡ INTERACTIVE TIMER VS MANUAL TOGGLE CONTROL PANELS */}
+                  {/* TIMER VS MANUAL CONTROLS */}
                   {queueStartTime ? (
-                    /* WATCH RUNNING UI SCREEN */
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
                       <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', margin: '4px 0' }}>Entered line at: <strong style={{color:'#004487'}}>{queueStartTime}</strong></div>
@@ -338,9 +408,7 @@ export default function DisneyTracker() {
                       </div>
                     </div>
                   ) : (
-                    /* STANDBY TIMING OPTIONS PANEL */
                     <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px', marginTop: '5px' }}>
-                      {/* OPTION A: RUN THE LIVE STOPWATCH */}
                       <button type="button" onClick={handleStartQueueTimer} style={{ width: '100%', padding: '12px', background: '#004487', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                         ⏱️ Start Line Timer (Just Entered Line)
                       </button>
@@ -350,7 +418,6 @@ export default function DisneyTracker() {
                         <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#E2E8F0', zIndex: 1 }}></div>
                       </div>
 
-                      {/* OPTION B: INPUT VALUE DIRECTLY */}
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }} />
                         <button type="button" onClick={handleAddRideLive} style={{ padding: '11px 22px', background: '#2B6CB0', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
@@ -361,16 +428,53 @@ export default function DisneyTracker() {
                   )}
                 </div>
 
+                {/* LIVE RIDE LOG LIST WITH EDIT CONTROLS */}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
-                    <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '6px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
-                    <ul style={{ margin: 0, paddingLeft: '15px', fontSize: '14px' }}>
-                      {activeVisit.activities.map((act) => (
-                        <li key={act.id} style={{ marginBottom: '4px' }}>
-                          <strong>{act.rideName}</strong>{act.notes ? ` (${act.notes})` : ''} — {act.waitTimeMinutes}m wait
-                        </li>
-                      ))}
-                    </ul>
+                    <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {activeVisit.activities.map((act) => {
+                        const isEditingThis = editingActivityId === act.id && editingVisitId === null;
+                        
+                        return isEditingThis ? (
+                          <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>✏️ EDIT LOGGED ENTRY</div>
+                            <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                              <optgroup label="Park Rides & Shows">
+                                {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
+                                  <option key={attraction} value={attraction}>{attraction}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Events & Activities">
+                                {UNIVERSAL_ACTIVITIES.map((action) => (
+                                  <option key={action} value={action}>{action}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+                            
+                            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                              <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              <button onClick={() => deleteActivity(act.id, null)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                              <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                              <button onClick={() => saveEditedActivity(activeVisit.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7', fontSize: '13px' }}>
+                            <div>
+                              <strong>{act.rideName}</strong>{act.notes ? ` (${act.notes})` : ''} — <span style={{ color: '#718096' }}>{act.waitTimeMinutes}m wait</span>
+                            </div>
+                            <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
+                              ✏️ Edit
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -459,7 +563,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* PAST LOG ENTRIES */}
+          {/* PAST LOG ENTRIES WITH EDIT CONTROLS */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>Past Visits ({visits.length})</h2>
             {visits.length === 0 ? (
@@ -477,17 +581,53 @@ export default function DisneyTracker() {
                   </div>
                   {v.activities.length > 0 && (
                     <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <ul style={{ margin: 0, paddingLeft: '15px', fontSize: '13px' }}>
-                        {v.activities.map((a) => (
-                          <li key={a.id} style={{ marginBottom: '4px' }}>
-                            <strong>{a.rideName}</strong>{a.notes ? ` (${a.notes})` : ''} — <span style={{color: '#718096'}}>{a.waitTimeMinutes} mins</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {v.activities.map((a) => {
+                          const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+
+                          return isEditingThis ? (
+                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>✏️ EDIT LOGGED ENTRY</div>
+                              <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                <optgroup label="Park Rides & Shows">
+                                  {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                    <option key={attraction} value={attraction}>{attraction}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Events & Activities">
+                                  {UNIVERSAL_ACTIVITIES.map((action) => (
+                                    <option key={action} value={action}>{action}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                              
+                              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => deleteActivity(a.id, v.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={() => saveEditedActivity(v.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                              <div>
+                                <strong>{a.rideName}</strong>{a.notes ? ` (${a.notes})` : ''} — <span style={{ color: '#718096' }}>{a.waitTimeMinutes} mins</span>
+                              </div>
+                              <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                ✏️ Edit
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                   <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                    🗑️ Delete Visit Log
+                    🗑️ Delete Entire Visit Log
                   </button>
                 </div>
               ))
@@ -499,7 +639,6 @@ export default function DisneyTracker() {
       {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
-          {/* BREAKDOWN BY PARK */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🏟️ Breakdown By Park</h2>
             {Object.keys(parkStats).map((parkKey) => {
@@ -537,7 +676,6 @@ export default function DisneyTracker() {
             })}
           </div>
 
-          {/* ATTRACTION LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Attraction Leaderboard</h2>
             {rideStats.length === 0 ? (
