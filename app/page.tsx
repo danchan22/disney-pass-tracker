@@ -44,7 +44,7 @@ const PARK_ATTRACTIONS = {
 export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
-  const [activeTab, setActiveTab] = useState<'tracker' | 'analytics'>('tracker');
+  const [activeTab, setActiveTab] = useState<'tracker' | 'analytics' | 'ride-everything'>('tracker');
 
   // Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
@@ -58,7 +58,7 @@ export default function DisneyTracker() {
 
   // ✏️ EDITING RIDE STATE
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
-  const [editingVisitId, setEditingVisitId] = useState<string | null>(null); // Null if editing active visit
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [editRideName, setEditRideName] = useState('');
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
@@ -149,9 +149,26 @@ export default function DisneyTracker() {
       .sort((a, b) => b.count - a.count);
   };
 
+  // 🎡 RIDE EVERYTHING METRICS
+  const getRideCountsMap = () => {
+    const counts: Record<string, number> = {};
+    visits.forEach(v => {
+      v.activities.forEach(act => {
+        counts[act.rideName] = (counts[act.rideName] || 0) + 1;
+      });
+    });
+    if (activeVisit) {
+      activeVisit.activities.forEach(act => {
+        counts[act.rideName] = (counts[act.rideName] || 0) + 1;
+      });
+    }
+    return counts;
+  };
+
   const parkStats = getParkBreakdown();
   const rideStats = getRideBreakdown();
   const topActivity = rideStats[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
+  const rideCountsMap = getRideCountsMap();
 
   const saveHistory = (updated: Visit[]) => {
     setVisits(updated);
@@ -196,7 +213,6 @@ export default function DisneyTracker() {
     setSelectedAttendees([]); 
   };
 
-  // 🏁 ACTION: LOG VIA MANUAL TIME ENTRY
   const handleAddRideLive = () => {
     if (!activeVisit || !rideName) return;
     const newActivity: Activity = {
@@ -211,14 +227,12 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
-  // ⏱️ ACTION: ENTERING QUEUE
   const handleStartQueueTimer = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
     saveQueueTimer(timeString);
   };
 
-  // 🏁 ACTION: BOARDING RIDE
   const handleEndQueueTimer = () => {
     if (!activeVisit || !queueStartTime) return;
     const now = new Date();
@@ -251,7 +265,6 @@ export default function DisneyTracker() {
     }
   };
 
-  // ✏️ EDIT RIDE HANDLERS
   const startEditing = (activity: Activity, visitId: string | null) => {
     setEditingActivityId(activity.id);
     setEditingVisitId(visitId);
@@ -276,14 +289,12 @@ export default function DisneyTracker() {
     };
 
     if (editingVisitId === null) {
-      // Updating Active Visit
       if (!activeVisit) return;
       const updatedActivities = activeVisit.activities.map(act => 
         act.id === editingActivityId ? updatedActivity : act
       );
       saveActive({ ...activeVisit, activities: updatedActivities });
     } else {
-      // Updating Past Visit
       const updatedVisits = visits.map(v => {
         if (v.id === editingVisitId) {
           const updatedActivities = v.activities.map(act => 
@@ -345,8 +356,9 @@ export default function DisneyTracker() {
 
       {/* 🗂️ TAB NAVIGATION */}
       <div style={{ display: 'flex', background: '#E2E8F0', padding: '4px', borderRadius: '12px', marginBottom: '20px' }}>
-        <button onClick={() => setActiveTab('tracker')} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', background: activeTab === 'tracker' ? '#004487' : 'transparent', color: activeTab === 'tracker' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>⏱️ Live Companion</button>
-        <button onClick={() => setActiveTab('analytics')} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', background: activeTab === 'analytics' ? '#004487' : 'transparent', color: activeTab === 'analytics' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>📊 Deep Analytics</button>
+        <button onClick={() => setActiveTab('tracker')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'tracker' ? '#004487' : 'transparent', color: activeTab === 'tracker' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>⏱️ Live Companion</button>
+        <button onClick={() => setActiveTab('analytics')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'analytics' ? '#004487' : 'transparent', color: activeTab === 'analytics' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>📊 Analytics</button>
+        <button onClick={() => setActiveTab('ride-everything')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'ride-everything' ? '#004487' : 'transparent', color: activeTab === 'ride-everything' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>🎡 Ride Everything</button>
       </div>
 
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
@@ -367,7 +379,6 @@ export default function DisneyTracker() {
 
               <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: '#F7FAFC' }}>👥 <strong>With:</strong> {activeVisit.attendees}</p>
 
-              {/* TWO-WAY ACTIVITY LOGGER */}
               <div style={{ background: '#FFF', padding: '15px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#004487' }}>Track an Attraction:</h3>
                 
@@ -392,7 +403,6 @@ export default function DisneyTracker() {
                     </div>
                   )}
 
-                  {/* TIMER VS MANUAL CONTROLS */}
                   {queueStartTime ? (
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
@@ -428,7 +438,6 @@ export default function DisneyTracker() {
                   )}
                 </div>
 
-                {/* LIVE RIDE LOG LIST WITH EDIT CONTROLS */}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                     <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
@@ -701,7 +710,66 @@ export default function DisneyTracker() {
         </div>
       )}
 
+      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
+      {activeTab === 'ride-everything' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
+            // Sort attractions alphabetically
+            const sortedAttractions = [...attractions].sort((a, b) => a.localeCompare(b));
+            
+            // Calculate completion counts
+            const totalInPark = sortedAttractions.length;
+            const completedCount = sortedAttractions.filter(att => (rideCountsMap[att] || 0) > 0).length;
+            const percentage = totalInPark > 0 ? Math.round((completedCount / totalInPark) * 100) : 0;
+
+            return (
+              <div key={park} style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+                
+                {/* PARK PROGRESS HEADER */}
+                <div style={{ marginBottom: '14px', borderBottom: '2px solid #F2F2F7', paddingBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: 0 }}>📍 {park}</h2>
+                    <span style={{ fontSize: '13px', fontWeight: '800', color: '#D4AF37', background: '#FFFDF5', padding: '4px 10px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
+                      {completedCount}/{totalInPark} ({percentage}%)
+                    </span>
+                  </div>
+
+                  {/* PROGRESS BAR */}
+                  <div style={{ width: '100%', height: '8px', background: '#EDF2F7', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${percentage}%`, height: '100%', background: percentage === 100 ? '#38A169' : 'linear-gradient(90deg, #0066cc, #D4AF37)', borderRadius: '4px', transition: 'width 0.4s ease' }}></div>
+                  </div>
+                </div>
+
+                {/* ALPHABETICAL ATTRACTIONS CHECKLIST */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {sortedAttractions.map((attraction) => {
+                    const count = rideCountsMap[attraction] || 0;
+                    const isCompleted = count > 0;
+
+                    return (
+                      <div key={attraction} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: '10px', background: isCompleted ? '#F0FFF4' : '#F8FAFC', border: isCompleted ? '1px solid #C6F6D5' : '1px solid #EDF2F7' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingRight: '8px' }}>
+                          <span style={{ fontSize: '14px', flexShrink: 0 }}>
+                            {isCompleted ? '✅' : '⬜'}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: isCompleted ? '700' : '500', color: isCompleted ? '#22543D' : '#4A5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {attraction}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: isCompleted ? '#276749' : '#A0AEC0', flexShrink: 0 }}>
+                          {isCompleted ? `(${count})` : '0'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      )}
+
     </div>
   );
 }
-
