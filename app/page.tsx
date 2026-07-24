@@ -63,6 +63,10 @@ export default function DisneyTracker() {
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
+  // 💾 EXPORTER STATES
+  const [copied, setCopied] = useState(false);
+  const [showJsonText, setShowJsonText] = useState(false);
+
   useEffect(() => {
     if (activeVisit) {
       setRideName(PARK_ATTRACTIONS[activeVisit.parkName][0] || '');
@@ -186,19 +190,51 @@ export default function DisneyTracker() {
     else localStorage.removeItem('disney_queue_timer');
   };
 
-  // 💾 DATA EXPORT FUNCTION FOR MIGRATION
-  const exportLocalData = () => {
-    const exportPayload = {
-      activeVisit,
-      visits
-    };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `disney_tracker_backup_${new Date().toISOString().slice(0,10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+  // 💾 MOBILE-FRIENDLY EXPORT HANDLERS
+  const getExportDataString = () => JSON.stringify({ activeVisit, visits }, null, 2);
+
+  const handleExport = async () => {
+    const jsonString = getExportDataString();
+    const fileName = `disney_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+    if (navigator.share) {
+      try {
+        const file = new File([jsonString], fileName, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Disney Pass Tracker Backup',
+          });
+          return;
+        } else {
+          await navigator.share({
+            title: 'Disney Pass Tracker Backup',
+            text: jsonString,
+          });
+          return;
+        }
+      } catch (err) {
+        // User cancelled or share blocked
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      setShowJsonText(true);
+    }
+  };
+
+  const copyToClipboardDirect = async () => {
+    try {
+      await navigator.clipboard.writeText(getExportDataString());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      setShowJsonText(true);
+    }
   };
 
   const toggleAttendee = (name: string) => {
@@ -378,13 +414,31 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          {/* 📦 DATA EXPORT TOOLKIT (TEMPORARY FOR CLOUD MIGRATION) */}
+          {/* 📦 MOBILE-FRIENDLY DATA EXPORT TOOLKIT */}
           <div style={{ background: '#EBF8FF', border: '1px solid #90CDF4', padding: '14px', borderRadius: '16px', marginBottom: '20px' }}>
             <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px', marginBottom: '4px' }}>💾 EXPORT MY DEVICE DATA</div>
-            <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px 0' }}>Tap below to save a backup of this phone's visit history before we merge with the rest of the group into the cloud.</p>
-            <button onClick={exportLocalData} style={{ width: '100%', padding: '10px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-              📥 Download My Data (JSON)
-            </button>
+            <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px 0' }}>Save or send your log history before we merge all family devices into the cloud.</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button onClick={handleExport} style={{ width: '100%', padding: '12px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                📲 Share Data / AirDrop / Save to Files
+              </button>
+              
+              <button onClick={copyToClipboardDirect} style={{ width: '100%', padding: '10px', background: '#ED8936', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                {copied ? '✅ Copied to Clipboard!' : '📋 Copy Raw Data to Clipboard'}
+              </button>
+
+              <button onClick={() => setShowJsonText(!showJsonText)} style={{ background: 'none', border: 'none', color: '#4A5568', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer', marginTop: '2px' }}>
+                {showJsonText ? 'Hide Raw Text' : 'Show Raw Text Box'}
+              </button>
+            </div>
+
+            {showJsonText && (
+              <div style={{ marginTop: '10px' }}>
+                <textarea readOnly value={getExportDataString()} rows={6} onClick={(e) => (e.target as HTMLTextAreaElement).select()} style={{ width: '100%', padding: '8px', fontSize: '11px', borderRadius: '8px', border: '1px solid #CBD5E0', fontFamily: 'monospace' }} />
+                <span style={{ fontSize: '10px', color: '#718096' }}>Tap text box to select all and copy manually.</span>
+              </div>
+            )}
           </div>
 
           {activeVisit ? (
