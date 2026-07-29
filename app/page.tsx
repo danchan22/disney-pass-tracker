@@ -158,7 +158,6 @@ export default function DisneyTracker() {
     return `${hrs} ${hrsUnit} ${mins} ${minsUnit}`;
   };
 
-  // 📈 STATS CALCULATIONS
   const totalDays = visits.length;
   const totalActivities = visits.reduce((sum, v) => sum + v.activities.length, 0);
   const totalWaitMinutes = visits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
@@ -209,8 +208,7 @@ export default function DisneyTracker() {
       });
     });
     return Object.keys(rideMap)
-      .map(name => ({ name, ...rideMap[name], avgWait: Math.round(rideMap[name].totalWait / rideMap[name].count) }))
-      .sort((a, b) => b.count - a.count);
+      .map(name => ({ name, ...rideMap[name], avgWait: Math.round(rideMap[name].totalWait / rideMap[name].count) }));
   };
 
   const getRideCountsMap = () => {
@@ -229,8 +227,25 @@ export default function DisneyTracker() {
   };
 
   const parkStats = getParkBreakdown();
-  const rideStats = getRideBreakdown();
-  const topActivity = rideStats[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
+  const rawRideStats = getRideBreakdown();
+
+  // 🏆 ANALYTICS LEADERBOARDS
+  // 1. Most Times Ridden (Top 10): Primary sort by count DESC, tie-breaker by totalWait DESC
+  const mostTimesRidden = [...rawRideStats]
+    .sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait)
+    .slice(0, 10);
+
+  // 2. Longest Wait Times (Top 10): Primary sort by avgWait DESC, tie-breaker by totalWait DESC
+  const longestWaitTimes = [...rawRideStats]
+    .sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.totalWait - a.totalWait)
+    .slice(0, 10);
+
+  // 3. Shortest Wait Times (Top 10): Primary sort by avgWait ASC, tie-breaker by count DESC
+  const shortestWaitTimes = [...rawRideStats]
+    .sort((a, b) => a.avgWait !== b.avgWait ? a.avgWait - b.avgWait : b.count - a.count)
+    .slice(0, 10);
+
+  const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
   const rideCountsMap = getRideCountsMap();
 
   const saveHistory = (updated: Visit[]) => {
@@ -661,7 +676,6 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {/* MAIN CORE SUMMARY MODULE */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>TOTALS</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
@@ -708,7 +722,6 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>Past Visits ({visits.length})</h2>
             {visits.length === 0 ? (
@@ -831,24 +844,85 @@ export default function DisneyTracker() {
             })}
           </div>
 
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Attraction Leaderboard</h2>
-            {rideStats.length === 0 ? (
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🏆 Most Times Ridden (Top 10)</h2>
+            {mostTimesRidden.length === 0 ? (
               <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to construct your performance charts!</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {rideStats.map((ride, index) => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {mostTimesRidden.map((ride, index) => {
                   const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
                   return (
-                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>{index + 1}</div>
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
+                        {index + 1}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>{getParkEmoji(ride.park)} {ride.park}</div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
+                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> (Avg: <strong>{ride.avgWait}m</strong>)
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#004487' }}>{ride.count}x ridden</div>
-                        <div style={{ fontSize: '10px', color: '#4A5568', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
+                      <div style={{ flexShrink: 0, background: '#004487', color: '#FFF', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900' }}>
+                        {ride.count}x
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🐢 Longest Wait Times (Top 10)</h2>
+            {longestWaitTimes.length === 0 ? (
+              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>No queue data available yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {longestWaitTimes.map((ride, index) => {
+                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
+                  return (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ background: index === 0 ? '#C05621' : '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
+                        {index + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
+                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> across <strong>{ride.count}x</strong>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0, background: '#FFF5F5', color: '#C05621', border: '1px solid #FEEBC8', padding: '4px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '800' }}>
+                        {ride.avgWait}m avg
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Wait Times (Top 10)</h2>
+            {shortestWaitTimes.length === 0 ? (
+              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>No queue data available yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {shortestWaitTimes.map((ride, index) => {
+                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
+                  return (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ background: index === 0 ? '#276749' : '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
+                        {index + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
+                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> across <strong>{ride.count}x</strong>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0, background: '#F0FFF4', color: '#276749', border: '1px solid #C6F6D5', padding: '4px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '800' }}>
+                        {ride.avgWait}m avg
                       </div>
                     </div>
                   );
