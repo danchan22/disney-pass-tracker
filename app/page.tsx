@@ -5,6 +5,20 @@ import { Visit, Activity } from './types';
 const ATTENDEE_OPTIONS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
+const PARK_EMOJIS: Record<string, string> = {
+  'Magic Kingdom': '🏰',
+  'Epcot': '🪩',
+  'Hollywood Studios': '🎥',
+  'Animal Kingdom': '🌳',
+};
+
+const PARK_BG_COLORS: Record<string, string> = {
+  'Magic Kingdom': '#F0F7FF',
+  'Epcot': '#F1F5F9',
+  'Hollywood Studios': '#FFF5F5',
+  'Animal Kingdom': '#F0FDF4',
+};
+
 const PARK_ATTRACTIONS = {
   'Magic Kingdom': [
     'Astro Orbiter', 'The Barnstormer', 'Big Thunder Mountain Railroad', 'Buzz Lightyear’s Space Ranger Spin',
@@ -84,6 +98,8 @@ export default function DisneyTracker() {
     if (savedQueueTimer) setQueueStartTime(savedQueueTimer);
   }, []);
 
+  const getParkEmoji = (park: string) => PARK_EMOJIS[park] || '📍';
+
   const parseTimeToMinutes = (timeStr: string) => {
     if (!timeStr) return 0;
     const [hrs, mins] = timeStr.split(':').map(Number);
@@ -96,6 +112,50 @@ export default function DisneyTracker() {
     const remMins = Math.round(totalMins % 60);
     if (hrs === 0) return `${remMins}m`;
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+  };
+
+  const formatDateString = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const shortYear = year.toString().slice(-2);
+      return `${dayOfWeek} ${month + 1}/${day}/${shortYear}`;
+    }
+    return dateStr;
+  };
+
+  const format12HourTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    const [hrsStr, minsStr] = timeStr.split(':');
+    if (hrsStr === undefined || minsStr === undefined) return timeStr;
+    let hrs = parseInt(hrsStr, 10);
+    const mins = minsStr.padStart(2, '0');
+    const ampm = hrs >= 12 ? 'pm' : 'am';
+    hrs = hrs % 12;
+    if (hrs === 0) hrs = 12;
+    return `${hrs}:${mins} ${ampm}`;
+  };
+
+  const calculateDurationStr = (startTimeStr: string, endTimeStr: string) => {
+    if (!startTimeStr || !endTimeStr) return '';
+    const startMins = parseTimeToMinutes(startTimeStr);
+    const endMins = parseTimeToMinutes(endTimeStr);
+    const diff = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
+    
+    const hrs = Math.floor(diff / 60);
+    const mins = Math.round(diff % 60);
+    
+    const hrsUnit = hrs === 1 ? 'hr' : 'hrs';
+    const minsUnit = mins === 1 ? 'min' : 'min';
+    
+    if (hrs === 0) return `${mins} ${minsUnit}`;
+    if (mins === 0) return `${hrs} ${hrsUnit}`;
+    return `${hrs} ${hrsUnit} ${mins} ${minsUnit}`;
   };
 
   // 📈 STATS CALCULATIONS
@@ -190,7 +250,6 @@ export default function DisneyTracker() {
     else localStorage.removeItem('disney_queue_timer');
   };
 
-  // 💾 MOBILE-FRIENDLY EXPORT HANDLERS
   const getExportDataString = () => JSON.stringify({ activeVisit, visits }, null, 2);
 
   const handleExport = async () => {
@@ -214,7 +273,7 @@ export default function DisneyTracker() {
           return;
         }
       } catch (err) {
-        // User cancelled or share blocked
+        // Share cancelled or unavailable
       }
     }
 
@@ -310,9 +369,7 @@ export default function DisneyTracker() {
   };
 
   const handleCancelQueueTimer = () => {
-    if (confirm("Cancel current active waiting timer?")) {
-      saveQueueTimer(null);
-    }
+    saveQueueTimer(null);
   };
 
   const startEditing = (activity: Activity, visitId: string | null) => {
@@ -361,8 +418,6 @@ export default function DisneyTracker() {
   };
 
   const deleteActivity = (activityId: string, visitId: string | null) => {
-    if (!confirm("Delete this ride entry?")) return;
-
     if (visitId === null) {
       if (!activeVisit) return;
       const updatedActivities = activeVisit.activities.filter(act => act.id !== activityId);
@@ -380,7 +435,6 @@ export default function DisneyTracker() {
 
   const handleCheckOut = () => {
     if (!activeVisit) return;
-    if (!confirm("Ready to wrap up your park day and save to history?")) return;
     const now = new Date();
     const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
     const completedVisit: Visit = { ...activeVisit, endTime };
@@ -390,9 +444,7 @@ export default function DisneyTracker() {
   };
 
   const deleteVisit = (id: string) => {
-    if (confirm("Delete this visit history permanently?")) {
-      saveHistory(visits.filter(v => v.id !== id));
-    }
+    saveHistory(visits.filter(v => v.id !== id));
   };
 
   return (
@@ -414,7 +466,7 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          {/* 📦 MOBILE-FRIENDLY DATA EXPORT TOOLKIT */}
+          {/* 📦 MOBILE-FRIENDLY EXPORTER TOOL */}
           <div style={{ background: '#EBF8FF', border: '1px solid #90CDF4', padding: '14px', borderRadius: '16px', marginBottom: '20px' }}>
             <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px', marginBottom: '4px' }}>💾 EXPORT MY DEVICE DATA</div>
             <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px 0' }}>Save or send your log history before we merge all family devices into the cloud.</p>
@@ -446,11 +498,13 @@ export default function DisneyTracker() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div>
                   <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', marginBottom: '6px' }}>✨ CURRENTLY AT</span>
-                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800' }}>{activeVisit.parkName}</h2>
+                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800' }}>
+                    {getParkEmoji(activeVisit.parkName)} {activeVisit.parkName}
+                  </h2>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '13px', color: '#E2E8F0' }}>
-                  <div>📅 {activeVisit.visitDate}</div>
-                  <div style={{ marginTop: '2px' }}>⏰ Entered: <strong>{activeVisit.startTime}</strong></div>
+                  <div>📅 {formatDateString(activeVisit.visitDate)}</div>
+                  <div style={{ marginTop: '2px' }}>⏰ Entered: <strong>{format12HourTime(activeVisit.startTime)}</strong></div>
                 </div>
               </div>
 
@@ -483,7 +537,7 @@ export default function DisneyTracker() {
                   {queueStartTime ? (
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', margin: '4px 0' }}>Entered line at: <strong style={{color:'#004487'}}>{queueStartTime}</strong></div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', margin: '4px 0' }}>Entered line at: <strong style={{color:'#004487'}}>{format12HourTime(queueStartTime)}</strong></div>
                       
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                         <button type="button" onClick={handleCancelQueueTimer} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
@@ -524,7 +578,7 @@ export default function DisneyTracker() {
                         
                         return isEditingThis ? (
                           <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>✏️ EDIT LOGGED ENTRY</div>
+                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT LOGGED ENTRY</div>
                             <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
                               <optgroup label="Park Rides & Shows">
                                 {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
@@ -550,12 +604,17 @@ export default function DisneyTracker() {
                             </div>
                           </div>
                         ) : (
-                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7', fontSize: '13px' }}>
-                            <div>
-                              <strong>{act.rideName}</strong>{act.notes ? ` (${act.notes})` : ''} — <span style={{ color: '#718096' }}>{act.waitTimeMinutes}m wait</span>
+                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
+                            <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                              <div style={{ fontWeight: '700', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {act.rideName}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#718096', marginTop: '1px' }}>
+                                {act.waitTimeMinutes}m wait{act.notes ? ` • ${act.notes}` : ''}
+                              </div>
                             </div>
-                            <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
-                              ✏️ Edit
+                            <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
+                              Edit
                             </button>
                           </div>
                         );
@@ -575,10 +634,10 @@ export default function DisneyTracker() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>SELECT PARK</label>
                 <select value={parkName} onChange={(e) => setParkName(e.target.value as any)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E0', background: '#F8FAFC', fontSize: '16px', fontWeight: '700', color: '#004487' }}>
-                  <option>Magic Kingdom</option>
-                  <option>Epcot</option>
-                  <option>Hollywood Studios</option>
-                  <option>Animal Kingdom</option>
+                  <option value="Magic Kingdom">🏰 Magic Kingdom</option>
+                  <option value="Epcot">🪩 Epcot</option>
+                  <option value="Hollywood Studios">🎥 Hollywood Studios</option>
+                  <option value="Animal Kingdom">🌳 Animal Kingdom</option>
                 </select>
               </div>
 
@@ -649,74 +708,84 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* PAST LOG ENTRIES WITH EDIT CONTROLS */}
+          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>Past Visits ({visits.length})</h2>
             {visits.length === 0 ? (
               <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>Your completed trips will appear here.</p>
             ) : (
-              visits.map((v) => (
-                <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
-                    <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>{v.parkName}</strong>
-                    <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {v.visitDate}</span>
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                    ⏱️ <strong>Hours:</strong> {v.startTime} - {v.endTime} <br />
-                    👥 <strong>Party:</strong> {v.attendees}
-                  </div>
-                  {v.activities.length > 0 && (
-                    <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {v.activities.map((a) => {
-                          const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
-
-                          return isEditingThis ? (
-                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>✏️ EDIT LOGGED ENTRY</div>
-                              <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
-                                <optgroup label="Park Rides & Shows">
-                                  {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
-                                    <option key={attraction} value={attraction}>{attraction}</option>
-                                  ))}
-                                </optgroup>
-                                <optgroup label="Events & Activities">
-                                  {UNIVERSAL_ACTIVITIES.map((action) => (
-                                    <option key={action} value={action}>{action}</option>
-                                  ))}
-                                </optgroup>
-                              </select>
-                              
-                              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                              </div>
-
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => deleteActivity(a.id, v.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
-                                <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                                <button onClick={() => saveEditedActivity(v.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
-                              <div>
-                                <strong>{a.rideName}</strong>{a.notes ? ` (${a.notes})` : ''} — <span style={{ color: '#718096' }}>{a.waitTimeMinutes} mins</span>
-                              </div>
-                              <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}>
-                                ✏️ Edit
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+              visits.map((v) => {
+                const duration = calculateDurationStr(v.startTime, v.endTime);
+                return (
+                  <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
+                      <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
+                        {getParkEmoji(v.parkName)} {v.parkName}
+                      </strong>
+                      <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDateString(v.visitDate)}</span>
                     </div>
-                  )}
-                  <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                    🗑️ Delete Entire Visit Log
-                  </button>
-                </div>
-              ))
+                    <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
+                      ⏱️ <strong>Hours:</strong> {format12HourTime(v.startTime)} - {format12HourTime(v.endTime)}{duration ? ` (${duration})` : ''} <br />
+                      👥 <strong>Party:</strong> {v.attendees}
+                    </div>
+                    {v.activities.length > 0 && (
+                      <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {v.activities.map((a) => {
+                            const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+
+                            return isEditingThis ? (
+                              <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT LOGGED ENTRY</div>
+                                <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                  <optgroup label="Park Rides & Shows">
+                                    {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                      <option key={attraction} value={attraction}>{attraction}</option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Events & Activities">
+                                    {UNIVERSAL_ACTIVITIES.map((action) => (
+                                      <option key={action} value={action}>{action}</option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+                                
+                                <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                  <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                  <button onClick={() => deleteActivity(a.id, v.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                  <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                  <button onClick={() => saveEditedActivity(v.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {a.rideName}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#718096', marginTop: '1px' }}>
+                                    {a.waitTimeMinutes} mins{a.notes ? ` • ${a.notes}` : ''}
+                                  </div>
+                                </div>
+                                <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>
+                                  Edit
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
+                      🗑️ Delete Entire Visit Log
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -736,7 +805,7 @@ export default function DisneyTracker() {
               return (
                 <div key={park} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #EDF2F7' }}>
                   <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>📍 {park}</span>
+                    <span>{getParkEmoji(park)} {park}</span>
                     <span style={{ color: '#004487' }}>{stats.visits} {stats.visits === 1 ? 'visit' : 'visits'}</span>
                   </div>
                   {stats.visits > 0 ? (
@@ -768,19 +837,22 @@ export default function DisneyTracker() {
               <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to construct your performance charts!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {rideStats.map((ride, index) => (
-                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                    <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>{index + 1}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>🎬 {ride.park}</div>
+                {rideStats.map((ride, index) => {
+                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
+                  return (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>{index + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>{getParkEmoji(ride.park)} {ride.park}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#004487' }}>{ride.count}x ridden</div>
+                        <div style={{ fontSize: '10px', color: '#4A5568', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#004487' }}>{ride.count}x ridden</div>
-                      <div style={{ fontSize: '10px', color: '#4A5568', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -800,7 +872,9 @@ export default function DisneyTracker() {
               <div key={park} style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
                 <div style={{ marginBottom: '14px', borderBottom: '2px solid #F2F2F7', paddingBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-                    <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: 0 }}>📍 {park}</h2>
+                    <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: 0 }}>
+                      {getParkEmoji(park)} {park}
+                    </h2>
                     <span style={{ fontSize: '13px', fontWeight: '800', color: '#D4AF37', background: '#FFFDF5', padding: '4px 10px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
                       {completedCount}/{totalInPark} ({percentage}%)
                     </span>
