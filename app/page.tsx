@@ -1,7 +1,29 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Visit, Activity } from './types';
-import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Types definition inline for single-file self-contained deployment
+export interface Activity {
+  id: string;
+  rideName: string;
+  waitTimeMinutes: number;
+  notes?: string;
+}
+
+export interface Visit {
+  id: string;
+  visitDate: string;
+  startTime: string;
+  endTime: string;
+  parkName: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
+  attendees: string;
+  activities: Activity[];
+}
+
+// Inline Supabase client initialization to ensure compatibility across environments
+const supabaseUrl = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) || 'https://placeholder.supabase.co';
+const supabaseAnonKey = (typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) || 'placeholder-anon-key';
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const ATTENDEE_OPTIONS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
@@ -11,6 +33,13 @@ const PARK_EMOJIS: Record<string, string> = {
   'Epcot': '🪩',
   'Hollywood Studios': '🎥',
   'Animal Kingdom': '🌳',
+};
+
+const PARK_BG_COLORS: Record<string, string> = {
+  'Magic Kingdom': '#F0F7FF',
+  'Epcot': '#F1F5F9',
+  'Hollywood Studios': '#FFF5F5',
+  'Animal Kingdom': '#F0FDF4',
 };
 
 const PARK_ATTRACTIONS = {
@@ -33,7 +62,7 @@ const PARK_ATTRACTIONS = {
     'The Seas with Nemo & Friends', 'Turtle Talk with Crush'
   ],
   'Hollywood Studios': [
-    'Alien Swirling Saucers', 'Beauty and the Beast Live on Stage', 'Disney Junior Play & Dance!', 'Fantasmic',
+    'Alien Swirling Saucers', 'Beauty and the Beast Live on Stage', 'Disney Junior Play & Dance!', 'Disney Villains: Unfairly Ever After', 'Fantasmic',
     'For the First Time in Forever: A Frozen Sing-Along Celebration', 'Indiana Jones Epic Stunt Spectacular!',
     'Lightning McQueen’s Racing Academy', 'Mickey & Minnie’s Runaway Railway', 'Millennium Falcon: Smugglers Run',
     'Rock ’n’ Roller Coaster Starring Aerosmith', 'Slinky Dog Dash', 'Star Tours – The Adventures Continue',
@@ -72,9 +101,6 @@ export default function DisneyTracker() {
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
-
-
-  // Load from Supabase on start
   useEffect(() => {
     fetchCloudVisits();
   }, []);
@@ -114,6 +140,13 @@ export default function DisneyTracker() {
         const ongoing = formattedVisits.find(v => !v.endTime);
         const completed = formattedVisits.filter(v => v.endTime);
 
+        // Sort completed visits chronologically (MOST RECENT FIRST)
+        completed.sort((a, b) => {
+          const keyA = `${a.visitDate}T${a.startTime || '00:00'}`;
+          const keyB = `${b.visitDate}T${b.startTime || '00:00'}`;
+          return keyB.localeCompare(keyA);
+        });
+
         setActiveVisit(ongoing || null);
         setVisits(completed);
       }
@@ -126,20 +159,29 @@ export default function DisneyTracker() {
 
   const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-').map(Number);
-    if (!year || !month || !day) return dateStr;
-    const d = new Date(year, month - 1, day);
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return `${days[d.getDay()]} ${month}/${day}/${year.toString().slice(-2)}`;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const shortYear = year.toString().slice(-2);
+      return `${dayOfWeek} ${month + 1}/${day}/${shortYear}`;
+    }
+    return dateStr;
   };
 
   const format12Hour = (timeStr: string) => {
     if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
-    if (isNaN(h) || isNaN(m)) return timeStr;
-    const period = h >= 12 ? 'PM' : 'AM';
-    const hour12 = h % 12 === 0 ? 12 : h % 12;
-    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+    const [hrsStr, minsStr] = timeStr.split(':');
+    if (hrsStr === undefined || minsStr === undefined) return timeStr;
+    let hrs = parseInt(hrsStr, 10);
+    const mins = minsStr.padStart(2, '0');
+    const ampm = hrs >= 12 ? 'pm' : 'am';
+    hrs = hrs % 12;
+    if (hrs === 0) hrs = 12;
+    return `${hrs}:${mins} ${ampm}`;
   };
 
   const parseTimeToMinutes = (timeStr: string) => {
@@ -155,8 +197,10 @@ export default function DisneyTracker() {
     const diff = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
     const hrs = Math.floor(diff / 60);
     const mins = diff % 60;
-    if (hrs === 0) return `(${mins} min)`;
-    return mins > 0 ? `(${hrs} hrs ${mins} min)` : `(${hrs} hrs)`;
+    const hrsUnit = hrs === 1 ? 'hr' : 'hrs';
+    const minsUnit = mins === 1 ? 'min' : 'min';
+    if (hrs === 0) return `(${mins} ${minsUnit})`;
+    return mins > 0 ? `(${hrs} ${hrsUnit} ${mins} ${minsUnit})` : `(${hrs} ${hrsUnit})`;
   };
 
   const formatMinutes = (totalMins: number) => {
@@ -167,7 +211,6 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
-  // 📈 STATS
   const totalDays = visits.length;
   const totalActivities = visits.reduce((sum, v) => sum + v.activities.length, 0);
   const totalWaitMinutes = visits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
@@ -221,17 +264,17 @@ export default function DisneyTracker() {
   };
 
   const parkStats = getParkBreakdown();
-  const rideStats = getRideBreakdown();
+  const rawRideStats = getRideBreakdown();
 
-  const mostTimesRidden = [...rideStats]
+  const mostTimesRidden = [...rawRideStats]
     .sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait)
     .slice(0, 10);
 
-  const longestWaitTimes = [...rideStats]
-    .sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.count - a.count)
+  const longestWaitTimes = [...rawRideStats]
+    .sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.totalWait - a.totalWait)
     .slice(0, 10);
 
-  const shortestWaitTimes = [...rideStats]
+  const shortestWaitTimes = [...rawRideStats]
     .sort((a, b) => a.avgWait !== b.avgWait ? a.avgWait - b.avgWait : b.count - a.count)
     .slice(0, 10);
 
@@ -252,8 +295,6 @@ export default function DisneyTracker() {
     return counts;
   };
   const rideCountsMap = getRideCountsMap();
-
-
 
   const toggleAttendee = (name: string) => {
     if (selectedAttendees.includes(name)) {
@@ -467,7 +508,7 @@ export default function DisneyTracker() {
       {/* 🏰 HERO HEADER */}
       <header style={{ textAlign: 'center', marginBottom: '15px', padding: '10px 0' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0 0 4px 0' }}>🏰 My Annual Pass Tracker</h1>
-        <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>Shared Cloud Sync Active ☁️</p>
+        <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>The happiest dashboard on earth.</p>
       </header>
 
       {/* 🗂️ TAB NAVIGATION */}
@@ -480,9 +521,6 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          
-         
-
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -694,7 +732,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* PAST LOG ENTRIES */}
+          {/* PAST LOG ENTRIES (MOST RECENT FIRST) */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>Past Visits ({visits.length})</h2>
             {loading ? (
@@ -822,18 +860,21 @@ export default function DisneyTracker() {
               <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to build your charts!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {mostTimesRidden.map((ride, index) => (
-                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                    <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
+                {mostTimesRidden.map((ride, index) => {
+                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
+                  return (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
+                      </div>
+                      <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
+                        {ride.count}x
+                      </div>
                     </div>
-                    <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
-                      {ride.count}x
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -842,18 +883,21 @@ export default function DisneyTracker() {
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {longestWaitTimes.map((ride, index) => (
-                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFAF0', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
-                  <div style={{ background: '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+              {longestWaitTimes.map((ride, index) => {
+                const cardBg = PARK_BG_COLORS[ride.park] || '#FFFAF0';
+                return (
+                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
+                    <div style={{ background: '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+                    </div>
+                    <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                      {ride.avgWait}m avg
+                    </div>
                   </div>
-                  <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                    {ride.avgWait}m avg
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -861,18 +905,21 @@ export default function DisneyTracker() {
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {shortestWaitTimes.map((ride, index) => (
-                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F0FFF4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
-                  <div style={{ background: '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+              {shortestWaitTimes.map((ride, index) => {
+                const cardBg = PARK_BG_COLORS[ride.park] || '#F0FFF4';
+                return (
+                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
+                    <div style={{ background: '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+                    </div>
+                    <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                      {ride.avgWait}m avg
+                    </div>
                   </div>
-                  <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                    {ride.avgWait}m avg
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
