@@ -72,10 +72,7 @@ export default function DisneyTracker() {
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
-  // 📥 JSON IMPORT STATE
-  const [importJsonText, setImportJsonText] = useState('');
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [showImporter, setShowImporter] = useState(false);
+
 
   // Load from Supabase on start
   useEffect(() => {
@@ -256,75 +253,7 @@ export default function DisneyTracker() {
   };
   const rideCountsMap = getRideCountsMap();
 
-  // 📥 JSON IMPORT AND MERGE HANDLER
-  const handleImportJson = async () => {
-    if (!importJsonText.trim()) return;
-    setImportStatus("⏳ Importing and merging with cloud database...");
 
-    try {
-      const parsed = JSON.parse(importJsonText);
-      const incomingVisits: Visit[] = [];
-
-      if (parsed.activeVisit) incomingVisits.push(parsed.activeVisit);
-      if (Array.isArray(parsed.visits)) incomingVisits.push(...parsed.visits);
-
-      let importedVisitsCount = 0;
-      let importedActivitiesCount = 0;
-
-      for (const incVisit of incomingVisits) {
-        if (!incVisit.visitDate || !incVisit.parkName) continue;
-
-        // Check if visit on same date & park exists in database
-        const { data: existing } = await supabase
-          .from('visits')
-          .select('id, attendees, activities(*)')
-          .eq('visitDate', incVisit.visitDate)
-          .eq('parkName', incVisit.parkName)
-          .single();
-
-        let visitId = existing?.id;
-
-        if (!visitId) {
-          // Create new visit record
-          const { data: newV, error: vErr } = await supabase
-            .from('visits')
-            .insert({
-              visitDate: incVisit.visitDate,
-              startTime: incVisit.startTime || '09:00',
-              endTime: incVisit.endTime || '21:00',
-              parkName: incVisit.parkName,
-              attendees: incVisit.attendees || 'Group'
-            })
-            .select()
-            .single();
-
-          if (vErr) throw vErr;
-          visitId = newV.id;
-          importedVisitsCount++;
-        }
-
-        // Insert activities
-        if (incVisit.activities && incVisit.activities.length > 0) {
-          const actsToInsert = incVisit.activities.map(a => ({
-            visit_id: visitId,
-            rideName: a.rideName,
-            waitTimeMinutes: a.waitTimeMinutes || 0,
-            notes: a.notes || null
-          }));
-
-          const { error: aErr } = await supabase.from('activities').insert(actsToInsert);
-          if (aErr) throw aErr;
-          importedActivitiesCount += actsToInsert.length;
-        }
-      }
-
-      setImportStatus(`✅ Success! Imported ${importedVisitsCount} new visit(s) and ${importedActivitiesCount} activity entries into Supabase!`);
-      setImportJsonText('');
-      await fetchCloudVisits();
-    } catch (err: any) {
-      setImportStatus(`❌ Error importing: ${err.message || 'Invalid JSON format'}`);
-    }
-  };
 
   const toggleAttendee = (name: string) => {
     if (selectedAttendees.includes(name)) {
@@ -551,36 +480,8 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          {/* 📥 JSON DATA MERGER TOOLKIT */}
-          <div style={{ background: '#EBF8FF', border: '1px solid #90CDF4', padding: '14px', borderRadius: '16px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px' }}>📥 IMPORT & MERGE FAMILY JSON FILES</div>
-              <button onClick={() => setShowImporter(!showImporter)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
-                {showImporter ? 'Hide' : 'Open'}
-              </button>
-            </div>
-            
-            {showImporter && (
-              <div style={{ marginTop: '10px' }}>
-                <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 8px 0' }}>Paste raw JSON backup text from Mandie, Elijah, Andrew, etc. below to merge into Supabase:</p>
-                <textarea
-                  value={importJsonText}
-                  onChange={(e) => setImportJsonText(e.target.value)}
-                  placeholder="Paste JSON text here..."
-                  rows={4}
-                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '11px', fontFamily: 'monospace', marginBottom: '8px' }}
-                />
-                <button onClick={handleImportJson} style={{ width: '100%', padding: '10px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-                  🚀 Upload & Merge File to Database
-                </button>
-                {importStatus && (
-                  <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 'bold', color: importStatus.includes('Error') ? '#E53E3E' : '#2F855A' }}>
-                    {importStatus}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          
+         
 
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
