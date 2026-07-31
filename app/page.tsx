@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Visit, Activity } from './types';
+import { supabase } from '../lib/supabase';
 
 const ATTENDEE_OPTIONS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
@@ -10,13 +11,6 @@ const PARK_EMOJIS: Record<string, string> = {
   'Epcot': '🪩',
   'Hollywood Studios': '🎥',
   'Animal Kingdom': '🌳',
-};
-
-const PARK_BG_COLORS: Record<string, string> = {
-  'Magic Kingdom': '#F0F7FF',
-  'Epcot': '#F1F5F9',
-  'Hollywood Studios': '#FFF5F5',
-  'Animal Kingdom': '#F0FDF4',
 };
 
 const PARK_ATTRACTIONS = {
@@ -59,6 +53,7 @@ export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState<'tracker' | 'analytics' | 'ride-everything'>('tracker');
+  const [loading, setLoading] = useState(true);
 
   // Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
@@ -77,9 +72,15 @@ export default function DisneyTracker() {
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
-  // 💾 EXPORTER STATES
-  const [copied, setCopied] = useState(false);
-  const [showJsonText, setShowJsonText] = useState(false);
+  // 📥 JSON IMPORT STATE
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [showImporter, setShowImporter] = useState(false);
+
+  // Load from Supabase on start
+  useEffect(() => {
+    fetchCloudVisits();
+  }, []);
 
   useEffect(() => {
     if (activeVisit) {
@@ -87,23 +88,78 @@ export default function DisneyTracker() {
     }
   }, [activeVisit]);
 
-  useEffect(() => {
-    const savedVisits = localStorage.getItem('disney_visits');
-    if (savedVisits) setVisits(JSON.parse(savedVisits));
+  const fetchCloudVisits = async () => {
+    setLoading(true);
+    try {
+      const { data: visitsData, error: visitsError } = await supabase
+        .from('visits')
+        .select('*, activities(*)');
 
-    const savedActive = localStorage.getItem('disney_active_visit');
-    if (savedActive) setActiveVisit(JSON.parse(savedActive));
+      if (visitsError) throw visitsError;
 
-    const savedQueueTimer = localStorage.getItem('disney_queue_timer');
-    if (savedQueueTimer) setQueueStartTime(savedQueueTimer);
-  }, []);
+      if (visitsData) {
+        const formattedVisits: Visit[] = visitsData.map((v: any) => ({
+          id: v.id,
+          visitDate: v.visitDate || v.visitdate,
+          startTime: v.startTime || v.starttime,
+          endTime: v.endTime || v.endtime || '',
+          parkName: v.parkName || v.parkname,
+          attendees: v.attendees || '',
+          activities: (v.activities || []).map((a: any) => ({
+            id: a.id,
+            rideName: a.rideName || a.ridename,
+            waitTimeMinutes: a.waitTimeMinutes || a.waittimeminutes || 0,
+            notes: a.notes
+          }))
+        }));
 
-  const getParkEmoji = (park: string) => PARK_EMOJIS[park] || '📍';
+        // Separate active visit (unfinished) vs past visits
+        const ongoing = formattedVisits.find(v => !v.endTime);
+        const completed = formattedVisits.filter(v => v.endTime);
+
+        setActiveVisit(ongoing || null);
+        setVisits(completed);
+      }
+    } catch (err) {
+      console.error("Error fetching Supabase data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return dateStr;
+    const d = new Date(year, month - 1, day);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return `${days[d.getDay()]} ${month}/${day}/${year.toString().slice(-2)}`;
+  };
+
+  const format12Hour = (timeStr: string) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return timeStr;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+  };
 
   const parseTimeToMinutes = (timeStr: string) => {
     if (!timeStr) return 0;
     const [hrs, mins] = timeStr.split(':').map(Number);
     return (hrs * 60) + mins;
+  };
+
+  const calculateVisitDuration = (startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return '';
+    const startMins = parseTimeToMinutes(startTime);
+    const endMins = parseTimeToMinutes(endTime);
+    const diff = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
+    const hrs = Math.floor(diff / 60);
+    const mins = diff % 60;
+    if (hrs === 0) return `(${mins} min)`;
+    return mins > 0 ? `(${hrs} hrs ${mins} min)` : `(${hrs} hrs)`;
   };
 
   const formatMinutes = (totalMins: number) => {
@@ -114,50 +170,7 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
-  const formatDateString = (dateStr: string) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      const d = new Date(year, month, day);
-      const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const shortYear = year.toString().slice(-2);
-      return `${dayOfWeek} ${month + 1}/${day}/${shortYear}`;
-    }
-    return dateStr;
-  };
-
-  const format12HourTime = (timeStr: string) => {
-    if (!timeStr) return '';
-    const [hrsStr, minsStr] = timeStr.split(':');
-    if (hrsStr === undefined || minsStr === undefined) return timeStr;
-    let hrs = parseInt(hrsStr, 10);
-    const mins = minsStr.padStart(2, '0');
-    const ampm = hrs >= 12 ? 'pm' : 'am';
-    hrs = hrs % 12;
-    if (hrs === 0) hrs = 12;
-    return `${hrs}:${mins} ${ampm}`;
-  };
-
-  const calculateDurationStr = (startTimeStr: string, endTimeStr: string) => {
-    if (!startTimeStr || !endTimeStr) return '';
-    const startMins = parseTimeToMinutes(startTimeStr);
-    const endMins = parseTimeToMinutes(endTimeStr);
-    const diff = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
-    
-    const hrs = Math.floor(diff / 60);
-    const mins = Math.round(diff % 60);
-    
-    const hrsUnit = hrs === 1 ? 'hr' : 'hrs';
-    const minsUnit = mins === 1 ? 'min' : 'min';
-    
-    if (hrs === 0) return `${mins} ${minsUnit}`;
-    if (mins === 0) return `${hrs} ${hrsUnit}`;
-    return `${hrs} ${hrsUnit} ${mins} ${minsUnit}`;
-  };
-
+  // 📈 STATS
   const totalDays = visits.length;
   const totalActivities = visits.reduce((sum, v) => sum + v.activities.length, 0);
   const totalWaitMinutes = visits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
@@ -166,8 +179,7 @@ export default function DisneyTracker() {
     if (!v.startTime || !v.endTime) return sum;
     const start = parseTimeToMinutes(v.startTime);
     const end = parseTimeToMinutes(v.endTime);
-    const diff = end >= start ? (end - start) : ((1440 - start) + end);
-    return sum + diff;
+    return sum + (end >= start ? (end - start) : ((1440 - start) + end));
   }, 0);
 
   const avgActivitiesPerDay = totalDays > 0 ? (totalActivities / totalDays).toFixed(1) : '0';
@@ -211,6 +223,23 @@ export default function DisneyTracker() {
       .map(name => ({ name, ...rideMap[name], avgWait: Math.round(rideMap[name].totalWait / rideMap[name].count) }));
   };
 
+  const parkStats = getParkBreakdown();
+  const rideStats = getRideBreakdown();
+
+  const mostTimesRidden = [...rideStats]
+    .sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait)
+    .slice(0, 10);
+
+  const longestWaitTimes = [...rideStats]
+    .sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.count - a.count)
+    .slice(0, 10);
+
+  const shortestWaitTimes = [...rideStats]
+    .sort((a, b) => a.avgWait !== b.avgWait ? a.avgWait - b.avgWait : b.count - a.count)
+    .slice(0, 10);
+
+  const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
+
   const getRideCountsMap = () => {
     const counts: Record<string, number> = {};
     visits.forEach(v => {
@@ -225,89 +254,75 @@ export default function DisneyTracker() {
     }
     return counts;
   };
-
-  const parkStats = getParkBreakdown();
-  const rawRideStats = getRideBreakdown();
-
-  // 🏆 ANALYTICS LEADERBOARDS
-  // 1. Most Times Ridden (Top 10): Primary sort by count DESC, tie-breaker by totalWait DESC
-  const mostTimesRidden = [...rawRideStats]
-    .sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait)
-    .slice(0, 10);
-
-  // 2. Longest Wait Times (Top 10): Primary sort by avgWait DESC, tie-breaker by totalWait DESC
-  const longestWaitTimes = [...rawRideStats]
-    .sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.totalWait - a.totalWait)
-    .slice(0, 10);
-
-  // 3. Shortest Wait Times (Top 10): Primary sort by avgWait ASC, tie-breaker by count DESC
-  const shortestWaitTimes = [...rawRideStats]
-    .sort((a, b) => a.avgWait !== b.avgWait ? a.avgWait - b.avgWait : b.count - a.count)
-    .slice(0, 10);
-
-  const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
   const rideCountsMap = getRideCountsMap();
 
-  const saveHistory = (updated: Visit[]) => {
-    setVisits(updated);
-    localStorage.setItem('disney_visits', JSON.stringify(updated));
-  };
+  // 📥 JSON IMPORT AND MERGE HANDLER
+  const handleImportJson = async () => {
+    if (!importJsonText.trim()) return;
+    setImportStatus("⏳ Importing and merging with cloud database...");
 
-  const saveActive = (visit: Visit | null) => {
-    setActiveVisit(visit);
-    if (visit) localStorage.setItem('disney_active_visit', JSON.stringify(visit));
-    else localStorage.removeItem('disney_active_visit');
-  };
+    try {
+      const parsed = JSON.parse(importJsonText);
+      const incomingVisits: Visit[] = [];
 
-  const saveQueueTimer = (timestamp: string | null) => {
-    setQueueStartTime(timestamp);
-    if (timestamp) localStorage.setItem('disney_queue_timer', timestamp);
-    else localStorage.removeItem('disney_queue_timer');
-  };
+      if (parsed.activeVisit) incomingVisits.push(parsed.activeVisit);
+      if (Array.isArray(parsed.visits)) incomingVisits.push(...parsed.visits);
 
-  const getExportDataString = () => JSON.stringify({ activeVisit, visits }, null, 2);
+      let importedVisitsCount = 0;
+      let importedActivitiesCount = 0;
 
-  const handleExport = async () => {
-    const jsonString = getExportDataString();
-    const fileName = `disney_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      for (const incVisit of incomingVisits) {
+        if (!incVisit.visitDate || !incVisit.parkName) continue;
 
-    if (navigator.share) {
-      try {
-        const file = new File([jsonString], fileName, { type: 'application/json' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'Disney Pass Tracker Backup',
-          });
-          return;
-        } else {
-          await navigator.share({
-            title: 'Disney Pass Tracker Backup',
-            text: jsonString,
-          });
-          return;
+        // Check if visit on same date & park exists in database
+        const { data: existing } = await supabase
+          .from('visits')
+          .select('id, attendees, activities(*)')
+          .eq('visitDate', incVisit.visitDate)
+          .eq('parkName', incVisit.parkName)
+          .single();
+
+        let visitId = existing?.id;
+
+        if (!visitId) {
+          // Create new visit record
+          const { data: newV, error: vErr } = await supabase
+            .from('visits')
+            .insert({
+              visitDate: incVisit.visitDate,
+              startTime: incVisit.startTime || '09:00',
+              endTime: incVisit.endTime || '21:00',
+              parkName: incVisit.parkName,
+              attendees: incVisit.attendees || 'Group'
+            })
+            .select()
+            .single();
+
+          if (vErr) throw vErr;
+          visitId = newV.id;
+          importedVisitsCount++;
         }
-      } catch (err) {
-        // Share cancelled or unavailable
+
+        // Insert activities
+        if (incVisit.activities && incVisit.activities.length > 0) {
+          const actsToInsert = incVisit.activities.map(a => ({
+            visit_id: visitId,
+            rideName: a.rideName,
+            waitTimeMinutes: a.waitTimeMinutes || 0,
+            notes: a.notes || null
+          }));
+
+          const { error: aErr } = await supabase.from('activities').insert(actsToInsert);
+          if (aErr) throw aErr;
+          importedActivitiesCount += actsToInsert.length;
+        }
       }
-    }
 
-    try {
-      await navigator.clipboard.writeText(jsonString);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch (err) {
-      setShowJsonText(true);
-    }
-  };
-
-  const copyToClipboardDirect = async () => {
-    try {
-      await navigator.clipboard.writeText(getExportDataString());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch (err) {
-      setShowJsonText(true);
+      setImportStatus(`✅ Success! Imported ${importedVisitsCount} new visit(s) and ${importedActivitiesCount} activity entries into Supabase!`);
+      setImportJsonText('');
+      await fetchCloudVisits();
+    } catch (err: any) {
+      setImportStatus(`❌ Error importing: ${err.message || 'Invalid JSON format'}`);
     }
   };
 
@@ -319,72 +334,122 @@ export default function DisneyTracker() {
     }
   };
 
-  const handleCheckIn = (e: React.FormEvent) => {
+  const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     const now = new Date();
-    const localDate = now.toLocaleDateString('en-CA'); 
+    const localDate = now.toLocaleDateString('en-CA');
     const localTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    const newSession: Visit = {
-      id: crypto.randomUUID(),
+
+    const newAttendees = selectedAttendees.length > 0 ? selectedAttendees.join(', ') : 'Just Me';
+
+    const { data, error } = await supabase
+      .from('visits')
+      .insert({
+        visitDate: localDate,
+        startTime: localTime,
+        endTime: '',
+        parkName,
+        attendees: newAttendees
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Error checking in to park: " + error.message);
+      return;
+    }
+
+    setActiveVisit({
+      id: data.id,
       visitDate: localDate,
       startTime: localTime,
       endTime: '',
       parkName,
-      attendees: selectedAttendees.length > 0 ? selectedAttendees.join(', ') : 'Just Me',
+      attendees: newAttendees,
       activities: []
-    };
-    saveActive(newSession);
-    setSelectedAttendees([]); 
+    });
+
+    setSelectedAttendees([]);
   };
 
-  const handleAddRideLive = () => {
+  const handleAddRideLive = async () => {
     if (!activeVisit || !rideName) return;
+    const waitMins = parseInt(waitTime) || 0;
+    const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+
+    const { data, error } = await supabase
+      .from('activities')
+      .insert({
+        visit_id: activeVisit.id,
+        rideName,
+        waitTimeMinutes: waitMins,
+        notes: notesVal
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Error adding attraction: " + error.message);
+      return;
+    }
+
     const newActivity: Activity = {
-      id: crypto.randomUUID(),
+      id: data.id,
       rideName,
-      waitTimeMinutes: parseInt(waitTime) || 0,
-      notes: rideName === 'Character Meeting' && characterName ? characterName : undefined
+      waitTimeMinutes: waitMins,
+      notes: notesVal
     };
-    const updatedSession = { ...activeVisit, activities: [...activeVisit.activities, newActivity] };
-    saveActive(updatedSession);
-    setWaitTime(''); 
+
+    setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, newActivity] });
+    setWaitTime('');
     setCharacterName('');
   };
 
   const handleStartQueueTimer = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    saveQueueTimer(timeString);
+    setQueueStartTime(timeString);
   };
 
-  const handleEndQueueTimer = () => {
+  const handleEndQueueTimer = async () => {
     if (!activeVisit || !queueStartTime) return;
     const now = new Date();
     const endTimeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    
+
     const startMins = parseTimeToMinutes(queueStartTime);
     const endMins = parseTimeToMinutes(endTimeString);
     let calculatedWait = endMins >= startMins ? (endMins - startMins) : ((1440 - startMins) + endMins);
-
     if (calculatedWait <= 0) calculatedWait = 1;
 
+    const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+
+    const { data, error } = await supabase
+      .from('activities')
+      .insert({
+        visit_id: activeVisit.id,
+        rideName,
+        waitTimeMinutes: calculatedWait,
+        notes: notesVal
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Error logging timer activity: " + error.message);
+      return;
+    }
+
     const newActivity: Activity = {
-      id: crypto.randomUUID(),
+      id: data.id,
       rideName,
       waitTimeMinutes: calculatedWait,
-      notes: rideName === 'Character Meeting' && characterName ? characterName : undefined
+      notes: notesVal
     };
 
-    const updatedSession = { ...activeVisit, activities: [...activeVisit.activities, newActivity] };
-    saveActive(updatedSession);
-    
-    saveQueueTimer(null);
+    setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, newActivity] });
+    setQueueStartTime(null);
     setCharacterName('');
     setWaitTime('');
-  };
-
-  const handleCancelQueueTimer = () => {
-    saveQueueTimer(null);
   };
 
   const startEditing = (activity: Activity, visitId: string | null) => {
@@ -400,66 +465,71 @@ export default function DisneyTracker() {
     setEditingVisitId(null);
   };
 
-  const saveEditedActivity = (parkNameForList: keyof typeof PARK_ATTRACTIONS) => {
+  const saveEditedActivity = async () => {
     if (!editingActivityId) return;
 
-    const updatedActivity: Activity = {
-      id: editingActivityId,
-      rideName: editRideName,
-      waitTimeMinutes: parseInt(editWaitTime) || 0,
-      notes: editNotes.trim() ? editNotes : undefined
-    };
+    const waitMins = parseInt(editWaitTime) || 0;
+    const notesVal = editNotes.trim() ? editNotes : null;
 
-    if (editingVisitId === null) {
-      if (!activeVisit) return;
-      const updatedActivities = activeVisit.activities.map(act => 
-        act.id === editingActivityId ? updatedActivity : act
-      );
-      saveActive({ ...activeVisit, activities: updatedActivities });
-    } else {
-      const updatedVisits = visits.map(v => {
-        if (v.id === editingVisitId) {
-          const updatedActivities = v.activities.map(act => 
-            act.id === editingActivityId ? updatedActivity : act
-          );
-          return { ...v, activities: updatedActivities };
-        }
-        return v;
-      });
-      saveHistory(updatedVisits);
+    const { error } = await supabase
+      .from('activities')
+      .update({
+        rideName: editRideName,
+        waitTimeMinutes: waitMins,
+        notes: notesVal
+      })
+      .eq('id', editingActivityId);
+
+    if (error) {
+      alert("Error saving edits: " + error.message);
+      return;
     }
 
+    await fetchCloudVisits();
     cancelEditing();
   };
 
-  const deleteActivity = (activityId: string, visitId: string | null) => {
-    if (visitId === null) {
-      if (!activeVisit) return;
-      const updatedActivities = activeVisit.activities.filter(act => act.id !== activityId);
-      saveActive({ ...activeVisit, activities: updatedActivities });
-    } else {
-      const updatedVisits = visits.map(v => {
-        if (v.id === visitId) {
-          return { ...v, activities: v.activities.filter(act => act.id !== activityId) };
-        }
-        return v;
-      });
-      saveHistory(updatedVisits);
+  const deleteActivity = async (activityId: string) => {
+    if (!confirm("Delete this ride entry?")) return;
+
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
+    if (error) {
+      alert("Error deleting entry: " + error.message);
+      return;
     }
+
+    await fetchCloudVisits();
   };
 
-  const handleCheckOut = () => {
+  const handleCheckOut = async () => {
     if (!activeVisit) return;
+    if (!confirm("Ready to wrap up your park day and save to history?")) return;
     const now = new Date();
     const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-    const completedVisit: Visit = { ...activeVisit, endTime };
-    saveHistory([completedVisit, ...visits]);
-    saveActive(null); 
-    saveQueueTimer(null);
+
+    const { error } = await supabase
+      .from('visits')
+      .update({ endTime })
+      .eq('id', activeVisit.id);
+
+    if (error) {
+      alert("Error checking out: " + error.message);
+      return;
+    }
+
+    await fetchCloudVisits();
+    setQueueStartTime(null);
   };
 
-  const deleteVisit = (id: string) => {
-    saveHistory(visits.filter(v => v.id !== id));
+  const deleteVisit = async (id: string) => {
+    if (confirm("Delete this visit history permanently?")) {
+      const { error } = await supabase.from('visits').delete().eq('id', id);
+      if (error) {
+        alert("Error deleting visit: " + error.message);
+        return;
+      }
+      await fetchCloudVisits();
+    }
   };
 
   return (
@@ -468,7 +538,7 @@ export default function DisneyTracker() {
       {/* 🏰 HERO HEADER */}
       <header style={{ textAlign: 'center', marginBottom: '15px', padding: '10px 0' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0 0 4px 0' }}>🏰 My Annual Pass Tracker</h1>
-        <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>The happiest dashboard on earth.</p>
+        <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>Shared Cloud Sync Active ☁️</p>
       </header>
 
       {/* 🗂️ TAB NAVIGATION */}
@@ -481,29 +551,33 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          {/* 📦 MOBILE-FRIENDLY EXPORTER TOOL */}
+          {/* 📥 JSON DATA MERGER TOOLKIT */}
           <div style={{ background: '#EBF8FF', border: '1px solid #90CDF4', padding: '14px', borderRadius: '16px', marginBottom: '20px' }}>
-            <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px', marginBottom: '4px' }}>💾 EXPORT MY DEVICE DATA</div>
-            <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 10px 0' }}>Save or send your log history before we merge all family devices into the cloud.</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={handleExport} style={{ width: '100%', padding: '12px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-                📲 Share Data / AirDrop / Save to Files
-              </button>
-              
-              <button onClick={copyToClipboardDirect} style={{ width: '100%', padding: '10px', background: '#ED8936', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-                {copied ? '✅ Copied to Clipboard!' : '📋 Copy Raw Data to Clipboard'}
-              </button>
-
-              <button onClick={() => setShowJsonText(!showJsonText)} style={{ background: 'none', border: 'none', color: '#4A5568', fontSize: '11px', textDecoration: 'underline', cursor: 'pointer', marginTop: '2px' }}>
-                {showJsonText ? 'Hide Raw Text' : 'Show Raw Text Box'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: '800', color: '#2B6CB0', fontSize: '13px' }}>📥 IMPORT & MERGE FAMILY JSON FILES</div>
+              <button onClick={() => setShowImporter(!showImporter)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                {showImporter ? 'Hide' : 'Open'}
               </button>
             </div>
-
-            {showJsonText && (
+            
+            {showImporter && (
               <div style={{ marginTop: '10px' }}>
-                <textarea readOnly value={getExportDataString()} rows={6} onClick={(e) => (e.target as HTMLTextAreaElement).select()} style={{ width: '100%', padding: '8px', fontSize: '11px', borderRadius: '8px', border: '1px solid #CBD5E0', fontFamily: 'monospace' }} />
-                <span style={{ fontSize: '10px', color: '#718096' }}>Tap text box to select all and copy manually.</span>
+                <p style={{ fontSize: '12px', color: '#4A5568', margin: '0 0 8px 0' }}>Paste raw JSON backup text from Mandie, Elijah, Andrew, etc. below to merge into Supabase:</p>
+                <textarea
+                  value={importJsonText}
+                  onChange={(e) => setImportJsonText(e.target.value)}
+                  placeholder="Paste JSON text here..."
+                  rows={4}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '11px', fontFamily: 'monospace', marginBottom: '8px' }}
+                />
+                <button onClick={handleImportJson} style={{ width: '100%', padding: '10px', background: '#3182CE', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                  🚀 Upload & Merge File to Database
+                </button>
+                {importStatus && (
+                  <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 'bold', color: importStatus.includes('Error') ? '#E53E3E' : '#2F855A' }}>
+                    {importStatus}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -513,13 +587,11 @@ export default function DisneyTracker() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div>
                   <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', marginBottom: '6px' }}>✨ CURRENTLY AT</span>
-                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800' }}>
-                    {getParkEmoji(activeVisit.parkName)} {activeVisit.parkName}
-                  </h2>
+                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800' }}>{PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}</h2>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '13px', color: '#E2E8F0' }}>
-                  <div>📅 {formatDateString(activeVisit.visitDate)}</div>
-                  <div style={{ marginTop: '2px' }}>⏰ Entered: <strong>{format12HourTime(activeVisit.startTime)}</strong></div>
+                  <div>📅 {formatDisplayDate(activeVisit.visitDate)}</div>
+                  <div style={{ marginTop: '2px' }}>⏰ Entered: <strong>{format12Hour(activeVisit.startTime)}</strong></div>
                 </div>
               </div>
 
@@ -552,10 +624,10 @@ export default function DisneyTracker() {
                   {queueStartTime ? (
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', margin: '4px 0' }}>Entered line at: <strong style={{color:'#004487'}}>{format12HourTime(queueStartTime)}</strong></div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', margin: '4px 0' }}>Entered line at: <strong style={{color:'#004487'}}>{format12Hour(queueStartTime)}</strong></div>
                       
                       <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                        <button type="button" onClick={handleCancelQueueTimer} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                        <button type="button" onClick={() => setQueueStartTime(null)} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                           Cancel
                         </button>
                         <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
@@ -593,7 +665,7 @@ export default function DisneyTracker() {
                         
                         return isEditingThis ? (
                           <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT LOGGED ENTRY</div>
+                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
                             <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
                               <optgroup label="Park Rides & Shows">
                                 {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
@@ -613,19 +685,17 @@ export default function DisneyTracker() {
                             </div>
 
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                              <button onClick={() => deleteActivity(act.id, null)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                              <button onClick={() => deleteActivity(act.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
                               <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                              <button onClick={() => saveEditedActivity(activeVisit.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                              <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
                             </div>
                           </div>
                         ) : (
                           <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
                             <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                              <div style={{ fontWeight: '700', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {act.rideName}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#718096', marginTop: '1px' }}>
-                                {act.waitTimeMinutes}m wait{act.notes ? ` • ${act.notes}` : ''}
+                              <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.rideName}</div>
+                              <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                                ⏱️ {act.waitTimeMinutes} mins wait{act.notes ? ` • ${act.notes}` : ''}
                               </div>
                             </div>
                             <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
@@ -676,6 +746,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
+          {/* MAIN CORE SUMMARY MODULE */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>TOTALS</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
@@ -722,83 +793,81 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>Past Visits ({visits.length})</h2>
-            {visits.length === 0 ? (
+            {loading ? (
+              <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', margin: '20px 0' }}>Syncing with Supabase cloud...</p>
+            ) : visits.length === 0 ? (
               <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>Your completed trips will appear here.</p>
             ) : (
-              visits.map((v) => {
-                const duration = calculateDurationStr(v.startTime, v.endTime);
-                return (
-                  <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
-                      <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
-                        {getParkEmoji(v.parkName)} {v.parkName}
-                      </strong>
-                      <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDateString(v.visitDate)}</span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                      ⏱️ <strong>Hours:</strong> {format12HourTime(v.startTime)} - {format12HourTime(v.endTime)}{duration ? ` (${duration})` : ''} <br />
-                      👥 <strong>Party:</strong> {v.attendees}
-                    </div>
-                    {v.activities.length > 0 && (
-                      <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {v.activities.map((a) => {
-                            const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
-
-                            return isEditingThis ? (
-                              <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT LOGGED ENTRY</div>
-                                <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
-                                  <optgroup label="Park Rides & Shows">
-                                    {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
-                                      <option key={attraction} value={attraction}>{attraction}</option>
-                                    ))}
-                                  </optgroup>
-                                  <optgroup label="Events & Activities">
-                                    {UNIVERSAL_ACTIVITIES.map((action) => (
-                                      <option key={action} value={action}>{action}</option>
-                                    ))}
-                                  </optgroup>
-                                </select>
-                                
-                                <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                                  <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                  <button onClick={() => deleteActivity(a.id, v.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
-                                  <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                                  <button onClick={() => saveEditedActivity(v.parkName)} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {a.rideName}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: '#718096', marginTop: '1px' }}>
-                                    {a.waitTimeMinutes} mins{a.notes ? ` • ${a.notes}` : ''}
-                                  </div>
-                                </div>
-                                <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>
-                                  Edit
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                      🗑️ Delete Entire Visit Log
-                    </button>
+              visits.map((v) => (
+                <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
+                    <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
+                      {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                    </strong>
+                    <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
                   </div>
-                );
-              })
+                  <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
+                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span> <br />
+                    👥 <strong>Party:</strong> {v.attendees}
+                  </div>
+                  {v.activities.length > 0 && (
+                    <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {v.activities.map((a) => {
+                          const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+
+                          return isEditingThis ? (
+                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
+                              <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                <optgroup label="Park Rides & Shows">
+                                  {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                    <option key={attraction} value={attraction}>{attraction}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Events & Activities">
+                                  {UNIVERSAL_ACTIVITIES.map((action) => (
+                                    <option key={action} value={action}>{action}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                              
+                              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => deleteActivity(a.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
+                                <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                                  ⏱️ {a.waitTimeMinutes} mins wait{a.notes ? ` • ${a.notes}` : ''}
+                                </div>
+                              </div>
+                              <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
+                                Edit
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
+                    🗑️ Delete Entire Visit Log
+                  </button>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -807,6 +876,7 @@ export default function DisneyTracker() {
       {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
+          {/* PARK BREAKDOWN */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🏟️ Breakdown By Park</h2>
             {Object.keys(parkStats).map((parkKey) => {
@@ -818,7 +888,7 @@ export default function DisneyTracker() {
               return (
                 <div key={park} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #EDF2F7' }}>
                   <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{getParkEmoji(park)} {park}</span>
+                    <span>{PARK_EMOJIS[park]} {park}</span>
                     <span style={{ color: '#004487' }}>{stats.visits} {stats.visits === 1 ? 'visit' : 'visits'}</span>
                   </div>
                   {stats.visits > 0 ? (
@@ -844,91 +914,65 @@ export default function DisneyTracker() {
             })}
           </div>
 
+          {/* MOST TIMES RIDDEN */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🏆 Most Times Ridden (Top 10)</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
             {mostTimesRidden.length === 0 ? (
-              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to construct your performance charts!</p>
+              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to build your charts!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {mostTimesRidden.map((ride, index) => {
-                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
-                  return (
-                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
-                        {index + 1}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
-                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> (Avg: <strong>{ride.avgWait}m</strong>)
-                        </div>
-                      </div>
-                      <div style={{ flexShrink: 0, background: '#004487', color: '#FFF', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900' }}>
-                        {ride.count}x
-                      </div>
+                {mostTimesRidden.map((ride, index) => (
+                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>⏱️ Total: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg: <strong>{ride.avgWait}m</strong></div>
                     </div>
-                  );
-                })}
+                    <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
+                      {ride.count}x
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
+          {/* LONGEST WAIT TIMES */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🐢 Longest Wait Times (Top 10)</h2>
-            {longestWaitTimes.length === 0 ? (
-              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>No queue data available yet.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {longestWaitTimes.map((ride, index) => {
-                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
-                  return (
-                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ background: index === 0 ? '#C05621' : '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
-                        {index + 1}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
-                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> across <strong>{ride.count}x</strong>
-                        </div>
-                      </div>
-                      <div style={{ flexShrink: 0, background: '#FFF5F5', color: '#C05621', border: '1px solid #FEEBC8', padding: '4px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '800' }}>
-                        {ride.avgWait}m avg
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {longestWaitTimes.map((ride, index) => (
+                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFAF0', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
+                  <div style={{ background: '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+                  </div>
+                  <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                    {ride.avgWait}m avg
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* SHORTEST WAIT TIMES */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Wait Times (Top 10)</h2>
-            {shortestWaitTimes.length === 0 ? (
-              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>No queue data available yet.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {shortestWaitTimes.map((ride, index) => {
-                  const cardBg = PARK_BG_COLORS[ride.park] || '#F8FAFC';
-                  return (
-                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: cardBg, padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ background: index === 0 ? '#276749' : '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>
-                        {index + 1}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
-                          {getParkEmoji(ride.park)} {ride.park} • Total wait: <strong>{formatMinutes(ride.totalWait)}</strong> across <strong>{ride.count}x</strong>
-                        </div>
-                      </div>
-                      <div style={{ flexShrink: 0, background: '#F0FFF4', color: '#276749', border: '1px solid #C6F6D5', padding: '4px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '800' }}>
-                        {ride.avgWait}m avg
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {shortestWaitTimes.map((ride, index) => (
+                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F0FFF4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
+                  <div style={{ background: '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>Ridden {ride.count}x | Total Wait: <strong>{formatMinutes(ride.totalWait)}</strong></div>
+                  </div>
+                  <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                    {ride.avgWait}m avg
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -947,7 +991,7 @@ export default function DisneyTracker() {
                 <div style={{ marginBottom: '14px', borderBottom: '2px solid #F2F2F7', paddingBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: 0 }}>
-                      {getParkEmoji(park)} {park}
+                      {PARK_EMOJIS[park]} {park}
                     </h2>
                     <span style={{ fontSize: '13px', fontWeight: '800', color: '#D4AF37', background: '#FFFDF5', padding: '4px 10px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
                       {completedCount}/{totalInPark} ({percentage}%)
