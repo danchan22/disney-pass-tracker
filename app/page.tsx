@@ -37,6 +37,7 @@ const getSupabase = async () => {
   };
 };
 
+// --- TYPES ---
 interface Activity {
   id: string;
   visit_id: string;
@@ -58,6 +59,7 @@ interface Visit {
   activities: Activity[];
 }
 
+// --- FIXED FAMILY MEMBERS ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -105,6 +107,7 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
+// --- IMAGINEERING RIDE TRIVIA DATABASE ---
 const RIDE_TRIVIA_DB: Record<string, string[]> = {
   'Space Mountain': [
     'Did you know? Astronaut Gordon Cooper served as a consultant on Space Mountain to make the launch feel like real spaceflight!',
@@ -184,6 +187,82 @@ const RIDE_TRIVIA_DB: Record<string, string[]> = {
   ]
 };
 
+// --- HIDDEN MICKEYS LOCATION DATABASE ---
+const HIDDEN_MICKEYS_DB: Record<string, string[]> = {
+  'Space Mountain': [
+    'Look closely at the giant star map in the exit corridor: three circular asteroids form a classic Mickey head!',
+    'In the post-show moving walkway, look at the constellation projections on the far wall.'
+  ],
+  'Haunted Mansion': [
+    'In the grand ballroom banquet hall scene, look down at the long dining table: three plates are arranged to form a classic Mickey!',
+    'On the exterior queue graveyard, look at the guitar held by the carved bust.'
+  ],
+  'Big Thunder Mountain Railroad': [
+    'Near the end of the coaster track, look at three rusted gears lying on the ground on the right side.',
+    'Inside the cavern lift hill, look at the arrangement of rock formations near the ceiling.'
+  ],
+  'Pirates of the Caribbean': [
+    'In the treasure room scene, look at the iron lock mechanism on the dungeon door.',
+    'Check the shadow cast by the hanging lantern on the wall in the jail cell scene.'
+  ],
+  'TRON Lightcycle / Run': [
+    'Watch the color-shifting LED canopy overhead during night launch sequences for subtle light clusters.',
+    'In the digitizer pre-show room, look at the circuit board patterns on the side walls.'
+  ],
+  'Seven Dwarfs Mine Train': [
+    'Inside the glistening jewel mine, look for carved jewels in the rock wall directly above Dopey.',
+    'Near the vultures at the top of the second lift hill, check the arrangement of wooden beam rivets.'
+  ],
+  'Guardians of the Galaxy: Cosmic Rewind': [
+    'In the Wonders of Xandar Galaxarium pre-show, watch the celestial star maps closely as earth constellations transition.',
+    'Look at the light fixtures in the Treasures of Xandar exit shop.'
+  ],
+  'Spaceship Earth': [
+    'In the Renaissance painting scene, look at the paint splatters on the artist’s wooden palette.',
+    'In the sleeping child’s bedroom scene, look at the alarm clock and decorative items on the desk.'
+  ],
+  'Soarin': [
+    'During the Fiji island scene, watch the golf ball launched toward the camera—a shadow of Mickey appears on it!',
+    'During the fireworks finale over Epcot, look at the burst pattern over Spaceship Earth.'
+  ],
+  'Frozen Ever After': [
+    'In Wandering Oaken’s Trading Post queue, look at the sauna window steam outline.',
+    'In the troll valley scene, look at the arrangement of mossy rocks on the bank.'
+  ],
+  'Star Wars: Rise of the Resistance': [
+    'In the Star Destroyer hangar bay, look at the ventilation grates on the lower walkway walls.',
+    'In the AT-AT room, check the laser burn marks on the metal support pillars.'
+  ],
+  'Millennium Falcon: Smugglers Run': [
+    'In the main hold room, look at the ventilation grates above the Dejarik holochess table.',
+    'In the engine room queue, check the arrangement of pipe valves on the right wall.'
+  ],
+  'The Twilight Zone Tower of Terror': [
+    'In the boiler room queue, look at water stain shapes on the brick walls near the elevator doors.',
+    'In the library pre-show video, look at the sheet music held by the musician in the film.'
+  ],
+  'Slinky Dog Dash': [
+    'Look at Andy’s coaster blueprint drawing near the queue entrance: check the red crayon doodles.',
+    'Check the Jenga block tower support pillars near Rex.'
+  ],
+  'Mickey & Minnie’s Runaway Railway': [
+    'Look at the cloud shapes in the opening park scene: there are dozens of Hidden Mickeys throughout this ride!',
+    'In the carnival scene, look at the arrangement of balloons on the game booths.'
+  ],
+  'Avatar Flight of Passage': [
+    'In the bioluminescent forest queue, look at the moss pattern on the large tree trunk near the cave entrance.',
+    'In the RDA lab tank room, check the handprints on the glass.'
+  ],
+  'Expedition Everest': [
+    'Look at the shadow cast on the mountain rock wall during the Yeti silhouette scene.',
+    'In the shrine queue, check the arrangement of stone carvings near the prayer flags.'
+  ],
+  'Kilimanjaro Safaris': [
+    'Look at the island in the flamingo pond from above—the island itself is shaped like a giant Mickey head!',
+    'Check the rock formations around the lion kopje.'
+  ]
+};
+
 const getRideTriviaFact = (rideName: string, parkName: string): string => {
   if (RIDE_TRIVIA_DB[rideName] && RIDE_TRIVIA_DB[rideName].length > 0) {
     const facts = RIDE_TRIVIA_DB[rideName];
@@ -215,6 +294,15 @@ const getRideTriviaFact = (rideName: string, parkName: string): string => {
   return list[Math.floor(Math.random() * list.length)];
 };
 
+const getHiddenMickeyFact = (rideName: string, parkName: string): string => {
+  if (HIDDEN_MICKEYS_DB[rideName] && HIDDEN_MICKEYS_DB[rideName].length > 0) {
+    const list = HIDDEN_MICKEYS_DB[rideName];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  return `Keep an eye on queue walls, rusty gears, and floor tile patterns near the loading area for three circles forming a Mickey head!`;
+};
+
+// Helper: Parse attendees/riders string or array safely
 const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
@@ -222,6 +310,7 @@ const parseAttendees = (raw: string | string[] | undefined): string[] => {
   return attendeesPart.split(',').map(s => s.trim()).filter(Boolean);
 };
 
+// Helper: Parse memberEndTimes dictionary safely
 const parseMemberEndTimes = (raw: any, notes?: string): Record<string, string> => {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
   if (typeof raw === 'string') {
@@ -248,22 +337,31 @@ export default function DisneyTracker() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Global Attendee Filter State
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
+  // Check-In Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   
+  // Track Attraction States
   const [rideName, setRideName] = useState('');
   const [waitTime, setWaitTime] = useState('');
   const [characterName, setCharacterName] = useState('');
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
 
+  // ⏱️ LIVE QUEUE TIMER STATE
   const [queueStartTimestamp, setQueueStartTimestamp] = useState<number | null>(null);
   const [queueStartTimeStr, setQueueStartTimeStr] = useState<string | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
   const [rideTrivia, setRideTrivia] = useState<string | null>(null);
   const [triviaLoading, setTriviaLoading] = useState<boolean>(false);
 
+  // 👀 HIDDEN MICKEY STATE
+  const [hiddenMickey, setHiddenMickey] = useState<string | null>(null);
+  const [mickeyLoading, setMickeyLoading] = useState<boolean>(false);
+
+  // ✏️ EDITING RIDE STATE
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [editRideName, setEditRideName] = useState('');
@@ -271,9 +369,11 @@ export default function DisneyTracker() {
   const [editNotes, setEditNotes] = useState('');
   const [editRiders, setEditRiders] = useState<string[]>([]);
 
+  // 👋 STAGGERED CHECK-OUT MODAL STATE
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
 
+  // Active party members currently in the park (have not checked out yet)
   const activePartyList = useMemo(() => {
     if (!activeVisit) return [];
     const allParty = parseAttendees(activeVisit.attendees);
@@ -281,6 +381,7 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
+  // Sync selectedRiders when activePartyList changes
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
@@ -289,6 +390,7 @@ export default function DisneyTracker() {
     }
   }, [activeVisit, activePartyList.length]);
 
+  // Ticking timer effect for live queue time calculation
   useEffect(() => {
     let interval: any;
     if (queueStartTimestamp) {
@@ -299,6 +401,7 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
+  // Load from Supabase on start
   useEffect(() => {
     fetchCloudVisits();
   }, []);
@@ -321,7 +424,7 @@ export default function DisneyTracker() {
           endTime: v.endTime || v.endtime || '',
           parkName: v.parkName || v.parkname,
           attendees: parseAttendees(v.attendees),
-          memberEndTimes: parseMemberEndTimes(v.attendees || v.memberEndTimes || v.member_end_times, v.notes),
+          memberEndTimes: parseMemberEndTimes(v.memberEndTimes || v.member_end_times || v.attendees, v.notes),
           notes: v.notes,
           activities: (v.activities || []).map((a: any) => ({
             id: a.id,
@@ -333,6 +436,7 @@ export default function DisneyTracker() {
           }))
         }));
 
+        // Sort visits reverse chronologically
         formattedVisits.sort((a, b) => {
           const dateA = new Date(`${a.visitDate}T${a.startTime || '00:00'}`).getTime();
           const dateB = new Date(`${b.visitDate}T${b.startTime || '00:00'}`).getTime();
@@ -347,6 +451,7 @@ export default function DisneyTracker() {
       }
     } catch (err: any) {
       console.error("Error fetching Supabase data:", err);
+      setErrorMessage("Could not load cloud visits. " + (err.message || ''));
     } finally {
       setLoading(false);
     }
@@ -395,6 +500,7 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
+  // Helper: Get departure time for a specific person in a visit
   const getPersonEndTime = (v: Visit, person: string) => {
     if (v.memberEndTimes && v.memberEndTimes[person]) {
       return v.memberEndTimes[person];
@@ -402,6 +508,7 @@ export default function DisneyTracker() {
     return v.endTime || '';
   };
 
+  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -410,6 +517,7 @@ export default function DisneyTracker() {
     });
   }, [visits, selectedAttendee]);
 
+  // Helper: check if person actually rode activity
   const isPersonRider = (activity: Activity, visit: Visit, person: string) => {
     const activityRiders = parseAttendees(activity.riders);
     if (activityRiders.length > 0) {
@@ -418,6 +526,7 @@ export default function DisneyTracker() {
     return parseAttendees(visit.attendees).includes(person);
   };
 
+  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
   
   const totalActivities = useMemo(() => {
@@ -691,6 +800,7 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
+  // FETCH RIDE TRIVIA
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
 
@@ -705,7 +815,7 @@ export default function DisneyTracker() {
 
     try {
       const promptText = `Provide 1 short, fun, surprising Disney Imagineering secret fact or hidden detail for waiting in line at "${attractionName}" in ${park}. Keep it cheerful and under 50 words.`;
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -726,6 +836,42 @@ export default function DisneyTracker() {
     }
   };
 
+  // FETCH HIDDEN MICKEY
+  const fetchHiddenMickey = async (attractionName: string, park: string) => {
+    setMickeyLoading(true);
+
+    const localMickey = getHiddenMickeyFact(attractionName, park);
+    setHiddenMickey(localMickey);
+
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    if (!apiKey) {
+      setMickeyLoading(false);
+      return;
+    }
+
+    try {
+      const promptText = `Where is a specific Hidden Mickey in "${attractionName}" at ${park} in Walt Disney World? Provide 1 specific, concise, fun location hint under 40 words.`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          setHiddenMickey(text);
+        }
+      }
+    } catch (err) {
+      // Keeps localMickey on API failure
+    } finally {
+      setMickeyLoading(false);
+    }
+  };
+
   const handleStartQueueTimer = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
@@ -733,6 +879,7 @@ export default function DisneyTracker() {
     setQueueStartTimeStr(timeString);
     if (activeVisit) {
       fetchRideTrivia(rideName, activeVisit.parkName);
+      fetchHiddenMickey(rideName, activeVisit.parkName);
     }
   };
 
@@ -776,7 +923,7 @@ export default function DisneyTracker() {
     }
 
     if (error) {
-      setErrorMessage("Error logging timer activity: " + error.message);
+      alert("Error logging timer activity: " + error.message);
       return;
     }
 
@@ -795,6 +942,7 @@ export default function DisneyTracker() {
     setCharacterName('');
     setWaitTime('');
     setRideTrivia(null);
+    setHiddenMickey(null);
   };
 
   const startEditing = (activity: Activity, visitId: string | null) => {
@@ -915,6 +1063,7 @@ export default function DisneyTracker() {
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setRideTrivia(null);
+    setHiddenMickey(null);
   };
 
   const deleteVisit = async (id: string) => {
@@ -980,7 +1129,6 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
-          {}
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               
@@ -1073,9 +1221,10 @@ export default function DisneyTracker() {
                         Time in line: {getElapsedQueueTimeString()}
                       </div>
 
+                      {/* ✨ DISNEY FUN FACT BOX */}
                       <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
                         <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ✨ Queue Imagineering Secret:
+                          ✨ Disney Fun Fact:
                         </div>
                         {triviaLoading ? (
                           <div style={{ fontStyle: 'italic', color: '#718096' }}>Searching Imagineering vault for facts...</div>
@@ -1084,8 +1233,20 @@ export default function DisneyTracker() {
                         )}
                       </div>
 
+                      {/* 👀 HIDDEN MICKEYS BOX */}
+                      <div style={{ background: '#F0F5FF', border: '1px solid #C3DAFE', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#1A365D' }}>
+                        <div style={{ fontWeight: '800', color: '#2B6CB0', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          👀 Hidden Mickeys:
+                        </div>
+                        {mickeyLoading ? (
+                          <div style={{ fontStyle: 'italic', color: '#718096' }}>Scanning queue for Hidden Mickeys...</div>
+                        ) : (
+                          <div>{hiddenMickey}</div>
+                        )}
+                      </div>
+
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                        <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); setHiddenMickey(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                           Cancel
                         </button>
                         <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
@@ -1114,7 +1275,6 @@ export default function DisneyTracker() {
                   )}
                 </div>
 
-                {}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                     <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
@@ -1222,7 +1382,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {}
+          {/* MAIN CORE SUMMARY MODULE */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -1272,7 +1432,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
+          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -1404,7 +1564,7 @@ export default function DisneyTracker() {
       {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
-          {}
+          {/* PARK AVERAGES */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>
               🏟️ Park Averages
@@ -1520,7 +1680,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
+          {/* 👥 ATTENDEE CARDS SECTION */}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
               👥 Attendee Cards
@@ -1640,7 +1800,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
@@ -1681,7 +1841,7 @@ export default function DisneyTracker() {
                             {attraction}
                           </span>
                         </div>
-                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#276749', flexShrink: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: isCompleted ? '#276749' : '#A0AEC0', flexShrink: 0 }}>
                           {isCompleted ? `(${count})` : '0'}
                         </div>
                       </div>
@@ -1695,7 +1855,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* 👋 STAGGERED CHECK-OUT MODAL */}
       {showCheckoutModal && activeVisit && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
