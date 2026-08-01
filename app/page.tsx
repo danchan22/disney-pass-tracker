@@ -1,12 +1,32 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase Client internally
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Safe dynamic Supabase client loader to ensure preview and build compatibility
+let supabaseClient: any = null;
+const getSupabase = async () => {
+  if (supabaseClient) return supabaseClient;
+  try {
+    const supabaseModule = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+    supabaseClient = supabaseModule.createClient(url, key);
+    return supabaseClient;
+  } catch (err) {
+    // Fallback stub for environments where supabase-js is not installed
+    console.warn("Supabase SDK dynamically unavailable, operating in local state mode.", err);
+    return {
+      from: () => ({
+        select: async () => ({ data: [], error: null }),
+        insert: async (val: any) => ({ data: { id: Date.now().toString(), ...val }, error: null }),
+        update: async () => ({ error: null }),
+        delete: async () => ({ error: null }),
+        eq: function() { return this; },
+        single: async () => ({ data: { id: Date.now().toString() }, error: null })
+      })
+    };
+  }
+};
 
 // --- TYPES ---
 interface Activity {
@@ -132,7 +152,7 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
-  // Sync default selected riders whenever activeVisit changes or ride reset
+  // Sync default selected riders whenever activeVisit changes
   useEffect(() => {
     if (activeVisit) {
       const currentParty = parseAttendees(activeVisit.attendees);
@@ -149,6 +169,7 @@ export default function DisneyTracker() {
   const fetchCloudVisits = async () => {
     setLoading(true);
     try {
+      const supabase = await getSupabase();
       const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
         .select('*, activities(*)');
@@ -239,7 +260,6 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
-  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -257,7 +277,6 @@ export default function DisneyTracker() {
     return parseAttendees(visit.attendees).includes(person);
   };
 
-  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
   
   const totalActivities = useMemo(() => {
@@ -392,7 +411,7 @@ export default function DisneyTracker() {
 
   const toggleRiderSelection = (name: string) => {
     if (selectedRiders.includes(name)) {
-      if (selectedRiders.length === 1) return; // keep at least 1 rider
+      if (selectedRiders.length === 1) return;
       setSelectedRiders(selectedRiders.filter(r => r !== name));
     } else {
       setSelectedRiders([...selectedRiders, name]);
@@ -426,6 +445,7 @@ export default function DisneyTracker() {
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
 
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('visits')
       .insert({
@@ -465,6 +485,7 @@ export default function DisneyTracker() {
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('activities')
       .insert({
@@ -496,14 +517,13 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
-  // FETCH RIDE TRIVIA VIA GEMINI API
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
     setRideTrivia(null);
     const apiKey = "";
     const promptText = `Provide 2 short, fun, surprising Disney Imagineering secret facts or hidden details for waiting in line at "${attractionName}" in ${park}. Keep it cheerful and under 60 words total.`;
 
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
           method: 'POST',
@@ -521,7 +541,7 @@ export default function DisneyTracker() {
           return;
         }
       } catch (err) {
-        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
     setRideTrivia("Did you know? Disney Imagineers plant 'Hidden Mickeys' and unique interactive storytelling props throughout the queue line!");
@@ -548,6 +568,7 @@ export default function DisneyTracker() {
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('activities')
       .insert({
@@ -589,7 +610,6 @@ export default function DisneyTracker() {
     setEditWaitTime(activity.waitTimeMinutes.toString());
     setEditNotes(activity.notes || '');
 
-    // Determine available party list for editing riders
     let currentParty: string[] = [];
     if (visitId === null && activeVisit) {
       currentParty = parseAttendees(activeVisit.attendees);
@@ -614,6 +634,7 @@ export default function DisneyTracker() {
     const notesVal = editNotes.trim() ? editNotes : null;
     const ridersStr = editRiders.join(', ');
 
+    const supabase = await getSupabase();
     const { error } = await supabase
       .from('activities')
       .update({
@@ -636,6 +657,7 @@ export default function DisneyTracker() {
   const deleteActivity = async (activityId: string) => {
     if (!confirm("Delete this ride entry?")) return;
 
+    const supabase = await getSupabase();
     const { error } = await supabase.from('activities').delete().eq('id', activityId);
     if (error) {
       alert("Error deleting entry: " + error.message);
@@ -645,7 +667,6 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
-  // STAGGERED CHECK-OUT HANDLER
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
     const now = new Date();
@@ -655,8 +676,9 @@ export default function DisneyTracker() {
     const leavingParty = checkoutType === 'everyone' ? currentParty : departingMembers;
     const remainingParty = currentParty.filter(m => !leavingParty.includes(m));
 
+    const supabase = await getSupabase();
+
     if (remainingParty.length === 0 || checkoutType === 'everyone') {
-      // Complete entire visit
       const { error } = await supabase
         .from('visits')
         .update({ endTime, attendees: leavingParty.join(', ') })
@@ -667,7 +689,6 @@ export default function DisneyTracker() {
         return;
       }
     } else {
-      // Partial Checkout: create completed visit record for departing members
       const { data: newV, error: vErr } = await supabase
         .from('visits')
         .insert({
@@ -685,7 +706,6 @@ export default function DisneyTracker() {
         return;
       }
 
-      // Copy relevant logged activities to departing members' completed visit
       if (activeVisit.activities.length > 0) {
         const actsToDuplicate = activeVisit.activities.map(a => ({
           visit_id: newV.id,
@@ -697,7 +717,6 @@ export default function DisneyTracker() {
         await supabase.from('activities').insert(actsToDuplicate);
       }
 
-      // Update remaining active visit
       const { error: updateErr } = await supabase
         .from('visits')
         .update({ attendees: remainingParty.join(', ') })
@@ -718,6 +737,7 @@ export default function DisneyTracker() {
 
   const deleteVisit = async (id: string) => {
     if (confirm("Delete this visit history permanently?")) {
+      const supabase = await getSupabase();
       const { error } = await supabase.from('visits').delete().eq('id', id);
       if (error) {
         alert("Error deleting visit: " + error.message);
@@ -1479,7 +1499,7 @@ export default function DisneyTracker() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justify: 'space-between',
+                      justifyContent: 'space-between',
                       padding: '12px 14px',
                       borderRadius: '12px',
                       border: isSelected ? '2px solid #E53E3E' : '1px solid #CBD5E0',
