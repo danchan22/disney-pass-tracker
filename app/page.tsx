@@ -220,7 +220,7 @@ export default function DisneyTracker() {
     return `${days[d.getDay()]} ${month}/${day}/${year.toString().slice(-2)}`;
   };
 
-  const format12Hour = (timeStr: string) => {
+  const format12Hour = (timeStr?: string) => {
     if (!timeStr) return '';
     const [h, m] = timeStr.split(':').map(Number);
     if (isNaN(h) || isNaN(m)) return timeStr;
@@ -235,7 +235,7 @@ export default function DisneyTracker() {
     return (hrs * 60) + mins;
   };
 
-  const calculateVisitDuration = (startTime: string, endTime: string) => {
+  const calculateVisitDuration = (startTime: string, endTime?: string) => {
     if (!startTime || !endTime) return '';
     const startMins = parseTimeToMinutes(startTime);
     const endMins = parseTimeToMinutes(endTime);
@@ -892,7 +892,7 @@ export default function DisneyTracker() {
                     <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
                   </div>
                   <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span> <br />
+                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime || '')}</span> <br />
                     👥 <strong>Party:</strong> {parseAttendees(v.attendees).join(', ')}
                   </div>
                   {v.activities.length > 0 && (
