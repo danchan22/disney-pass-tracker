@@ -1,32 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-// Safe dynamic Supabase client loader to ensure preview and build compatibility
-let supabaseClient: any = null;
-const getSupabase = async () => {
-  if (supabaseClient) return supabaseClient;
-  try {
-    const supabaseModule = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-    supabaseClient = supabaseModule.createClient(url, key);
-    return supabaseClient;
-  } catch (err) {
-    // Fallback stub for environments where supabase-js is not installed
-    console.warn("Supabase SDK dynamically unavailable, operating in local state mode.", err);
-    return {
-      from: () => ({
-        select: async () => ({ data: [], error: null }),
-        insert: async (val: any) => ({ data: { id: Date.now().toString(), ...val }, error: null }),
-        update: async () => ({ error: null }),
-        delete: async () => ({ error: null }),
-        eq: function() { return this; },
-        single: async () => ({ data: { id: Date.now().toString() }, error: null })
-      })
-    };
-  }
-};
+// Initialize Supabase Client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- TYPES ---
 interface Activity {
@@ -96,6 +76,121 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
+// --- IMAGINEERING RIDE TRIVIA DATABASE ---
+const RIDE_TRIVIA_DB: Record<string, string[]> = {
+  'Space Mountain': [
+    'Did you know? Astronaut Gordon Cooper served as a consultant on Space Mountain to make the launch feel like real spaceflight!',
+    'Look closely in the queue star maps: you can find references to "Disney Skyway" and classic extinct Disney attractions disguised as star constellations.'
+  ],
+  'Haunted Mansion': [
+    'The singing busts in the graveyard scene include Thurl Ravenscroft, who was also the iconic voice of Tony the Tiger ("They\'re Grrreat!")!',
+    'The queue features interactive tombstones with musical instruments that play tunes when touched.'
+  ],
+  'Big Thunder Mountain Railroad': [
+    'The antique mining equipment scattered throughout the queue line was purchased as real 19th-century gold rush scrap metal from auctions across the US!',
+    'The town in the ride backstory is named Tumbleweed, and the runaway train company is Barnabas T. Bullion!'
+  ],
+  'Pirates of the Caribbean': [
+    'The chess game between two skeletons in the queue is locked in an eternal stalemate—neither player can ever win!',
+    'Paul Frees, who voiced the Ghost Host in Haunted Mansion, also voices several iconic pirates on this ride.'
+  ],
+  'TRON Lightcycle / Run': [
+    'The canopy above TRON is called the "Shifting Seat" or "Color-Changing Canopy" and spans over 50,000 square feet with over 1,200 light fixtures!',
+    'TRON is one of the fastest roller coasters in any Disney park worldwide, reaching speeds up to 50+ mph.'
+  ],
+  'Seven Dwarfs Mine Train': [
+    'The interactive jewels game in the queue uses real projection-mapped water that reacts when you drag your hands through it!',
+    'The animatronic figures of Grumpy, Doc, Happy, Sleepy, and Bashful in the final cottage scene were recycled from the classic Snow White’s Scary Adventures attraction.'
+  ],
+  'Guardians of the Galaxy: Cosmic Rewind': [
+    'Cosmic Rewind features Disney’s first-ever reverse launch coaster and rotates 360 degrees to direct your eyes toward the story action!',
+    'The Wonders of Xandar pavilion queue features authentic props and video cameos filmed specifically by the original Guardians of the Galaxy movie cast.'
+  ],
+  'Spaceship Earth': [
+    'The exterior geodesic sphere consists of 11,324 individual triangular tiles made of Alucobond, designed so rainwater drains down hidden channels into World Showcase lagoon!',
+    'The papyrus-making scene in the queue uses authentic scents engineered by Imagineers to smell like real drying ink and ancient parchment.'
+  ],
+  'Soarin’ Around the World': [
+    'Each scene in Soarin\' includes custom synchronized scents pumped through the seats, including fresh grass over Africa and sea breeze over Fiji!',
+    'The flight motion simulator technology was originally invented by Imagineer Mark Sumner using an old Erector toy set.'
+  ],
+  'Frozen Ever After': [
+    'The animatronics in Frozen Ever After were among the first in Walt Disney World to use rear-projection facial animation for hyper-expressive characters!',
+    'The queue winds through Wandering Oaken’s Trading Post, where Oaken himself appears in the sauna window drawing hearts in the steam.'
+  ],
+  'Star Wars: Rise of the Resistance': [
+    'Rise of the Resistance uses three distinct ride system technologies: trackless vehicles, a motion simulator, and a drop tower!',
+    'There are over 50 Stormtroopers lined up in the Star Destroyer hangar bay, creating one of the most stunning scale reveals in theme park history.'
+  ],
+  'Millennium Falcon: Smugglers Run': [
+    'The cockpit controls are fully functional—every button pushed or lever pulled during your flight directly affects your spaceship’s flight!',
+    'While waiting in the main hold, you can sit at the actual Dejarik (holochess) table recreated down to the smallest paint scratch.'
+  ],
+  'The Twilight Zone Tower of Terror': [
+    'The hotel lobby queue is filled with authentic 1930s antiques, including genuine sculptures and unread newspapers dated October 31, 1939.',
+    'The elevator drops are completely randomized by a central computer—you never get the exact same drop pattern twice!'
+  ],
+  'Slinky Dog Dash': [
+    'Look at the giant box in the queue: it\'s Andy\'s "Dash & Dodge Coaster Kit" which Andy assembled in his backyard using household toys!',
+    'Rex stands atop towers of Jenga blocks held together with giant plastic Elmer’s glue bottles.'
+  ],
+  'Mickey & Minnie’s Runaway Railway': [
+    'This was the first ride-through attraction in Disney history starring Mickey Mouse himself!',
+    'The whistle sound effect used for the train is the exact original 1928 steam whistle recording used in Steamboat Willie.'
+  ],
+  'Avatar Flight of Passage': [
+    'In the RDA lab queue scene, the full-scale Na’vi avatar floating inside the water tank actually breathes in real-time!',
+    'The banshees you ride incorporate breathing bladders beneath your legs so you can feel the creature breathing beneath you during flight.'
+  ],
+  'Expedition Everest': [
+    'At 199.5 feet tall, Expedition Everest is the tallest mountain peak in Walt Disney World—just 6 inches under the 200-foot FAA red beacon light requirement!',
+    'The Yeti animatronic inside the mountain stands 25 feet tall and was built with the force of a 747 airliner engine.'
+  ],
+  'Kilimanjaro Safaris': [
+    'The 110-acre safari reserve is so large that the entire Magic Kingdom park could easily fit inside it!',
+    'Imagineers installed hidden climate-controlled rocks (heated in winter, cooled in summer) near truck pathways so animals relax near guests.'
+  ],
+  'DINOSAUR': [
+    'The three pipes in the queue area are labeled with chemical formulas for Red, Yellow, and White mustard, ketchup, and mayonnaise—a nod to the ride’s sponsor, McDonald’s!',
+    'The Carnotaurus animatronic in the climax was one of the largest and fastest-moving prehistoric animatronics ever constructed by Disney.'
+  ],
+  'The Barnstormer': [
+    'The Barnstormer is themed around Goofy’s stunt plane show, featuring a giant wooden billboard that Goofy’s plane crashed straight through!',
+    'The ride track was originally part of The Great Goofini’s Wiseacre Farm in Toontown Fair.'
+  ]
+};
+
+const getRideTriviaFact = (rideName: string, parkName: string): string => {
+  if (RIDE_TRIVIA_DB[rideName] && RIDE_TRIVIA_DB[rideName].length > 0) {
+    const facts = RIDE_TRIVIA_DB[rideName];
+    return facts[Math.floor(Math.random() * facts.length)];
+  }
+
+  const parkTrivia: Record<string, string[]> = {
+    'Magic Kingdom': [
+      'Imagineers built Cinderella Castle with forced perspective: the upper bricks and windows get smaller near the top to make it look taller!',
+      'Underneath Magic Kingdom lies a 9-acre network of utility tunnels called "utilidors" so cast members and supplies move unseen.'
+    ],
+    'Epcot': [
+      'The World Showcase promenade is 1.2 miles around the lagoon, featuring 11 country pavilions celebrating global culture!',
+      'Spaceship Earth weighs approximately 16 million pounds—more than three times the weight of a fully loaded Space Shuttle!'
+    ],
+    'Hollywood Studios': [
+      'The land of Galaxy’s Edge is set on the remote planet Batuu, designed with custom weathered architecture down to creature footprints in the concrete.',
+      'Echo Lake is shaped like a giant footprint of Dinosaur Gertie, who sits beside the water offering ice cream!'
+    ],
+    'Animal Kingdom': [
+      'The Tree of Life stands 145 feet tall and features over 300 intricately hand-carved animal figures woven into its trunk and branches.',
+      'Disney’s Animal Kingdom was built with over 4 million trees, shrubs, and vines planted across 500 acres.'
+    ]
+  };
+
+  const list = parkTrivia[parkName] || [
+    'Did you know? Disney Imagineers hide unique details, props, and story clues throughout every line in the park!'
+  ];
+  return list[Math.floor(Math.random() * list.length)];
+};
+
 // Helper: Parse attendees/riders string or array safely
 const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
@@ -152,7 +247,7 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
-  // Sync default selected riders whenever activeVisit changes
+  // Sync default selected riders whenever activeVisit changes or ride reset
   useEffect(() => {
     if (activeVisit) {
       const currentParty = parseAttendees(activeVisit.attendees);
@@ -169,7 +264,6 @@ export default function DisneyTracker() {
   const fetchCloudVisits = async () => {
     setLoading(true);
     try {
-      const supabase = await getSupabase();
       const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
         .select('*, activities(*)');
@@ -260,6 +354,7 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
+  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -277,6 +372,7 @@ export default function DisneyTracker() {
     return parseAttendees(visit.attendees).includes(person);
   };
 
+  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
   
   const totalActivities = useMemo(() => {
@@ -445,7 +541,6 @@ export default function DisneyTracker() {
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
 
-    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('visits')
       .insert({
@@ -485,8 +580,7 @@ export default function DisneyTracker() {
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -497,6 +591,23 @@ export default function DisneyTracker() {
       })
       .select()
       .single();
+
+    // Fallback if 'riders' column does not exist in Supabase schema yet
+    if (error && error.message.includes('riders')) {
+      const fallbackRes = await supabase
+        .from('activities')
+        .insert({
+          visit_id: activeVisit.id,
+          rideName,
+          waitTimeMinutes: waitMins,
+          notes: notesVal
+        })
+        .select()
+        .single();
+
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       alert("Error adding attraction: " + error.message);
@@ -517,35 +628,42 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
+  // FETCH RIDE TRIVIA
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
-    setRideTrivia(null);
-    const apiKey = "";
-    const promptText = `Provide 2 short, fun, surprising Disney Imagineering secret facts or hidden details for waiting in line at "${attractionName}" in ${park}. Keep it cheerful and under 60 words total.`;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          })
-        });
-        if (!res.ok) throw new Error("Trivia API issue");
+    // 1. Instantly load a ride-specific trivia fact from local database
+    const localFact = getRideTriviaFact(attractionName, park);
+    setRideTrivia(localFact);
+
+    // 2. Optional: Try live Gemini API call if process.env key is configured
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    if (!apiKey) {
+      setTriviaLoading(false);
+      return;
+    }
+
+    try {
+      const promptText = `Provide 1 short, fun, surprising Disney Imagineering secret fact or hidden detail for waiting in line at "${attractionName}" in ${park}. Keep it cheerful and under 50 words.`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+      if (res.ok) {
         const json = await res.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           setRideTrivia(text);
-          setTriviaLoading(false);
-          return;
         }
-      } catch (err) {
-        await new Promise(r => setTimeout(r, 1000));
       }
+    } catch (err) {
+      // Keeps localFact on API failure
+    } finally {
+      setTriviaLoading(false);
     }
-    setRideTrivia("Did you know? Disney Imagineers plant 'Hidden Mickeys' and unique interactive storytelling props throughout the queue line!");
-    setTriviaLoading(false);
   };
 
   const handleStartQueueTimer = () => {
@@ -568,8 +686,7 @@ export default function DisneyTracker() {
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -580,6 +697,22 @@ export default function DisneyTracker() {
       })
       .select()
       .single();
+
+    if (error && error.message.includes('riders')) {
+      const fallbackRes = await supabase
+        .from('activities')
+        .insert({
+          visit_id: activeVisit.id,
+          rideName,
+          waitTimeMinutes: calculatedWait,
+          notes: notesVal
+        })
+        .select()
+        .single();
+
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       alert("Error logging timer activity: " + error.message);
@@ -634,8 +767,7 @@ export default function DisneyTracker() {
     const notesVal = editNotes.trim() ? editNotes : null;
     const ridersStr = editRiders.join(', ');
 
-    const supabase = await getSupabase();
-    const { error } = await supabase
+    let { error } = await supabase
       .from('activities')
       .update({
         rideName: editRideName,
@@ -644,6 +776,19 @@ export default function DisneyTracker() {
         riders: ridersStr
       })
       .eq('id', editingActivityId);
+
+    if (error && error.message.includes('riders')) {
+      const fallbackRes = await supabase
+        .from('activities')
+        .update({
+          rideName: editRideName,
+          waitTimeMinutes: waitMins,
+          notes: notesVal
+        })
+        .eq('id', editingActivityId);
+
+      error = fallbackRes.error;
+    }
 
     if (error) {
       alert("Error saving edits: " + error.message);
@@ -657,7 +802,6 @@ export default function DisneyTracker() {
   const deleteActivity = async (activityId: string) => {
     if (!confirm("Delete this ride entry?")) return;
 
-    const supabase = await getSupabase();
     const { error } = await supabase.from('activities').delete().eq('id', activityId);
     if (error) {
       alert("Error deleting entry: " + error.message);
@@ -667,6 +811,7 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
+  // STAGGERED CHECK-OUT HANDLER
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
     const now = new Date();
@@ -675,8 +820,6 @@ export default function DisneyTracker() {
     const currentParty = parseAttendees(activeVisit.attendees);
     const leavingParty = checkoutType === 'everyone' ? currentParty : departingMembers;
     const remainingParty = currentParty.filter(m => !leavingParty.includes(m));
-
-    const supabase = await getSupabase();
 
     if (remainingParty.length === 0 || checkoutType === 'everyone') {
       const { error } = await supabase
@@ -737,7 +880,6 @@ export default function DisneyTracker() {
 
   const deleteVisit = async (id: string) => {
     if (confirm("Delete this visit history permanently?")) {
-      const supabase = await getSupabase();
       const { error } = await supabase.from('visits').delete().eq('id', id);
       if (error) {
         alert("Error deleting visit: " + error.message);
@@ -1312,7 +1454,6 @@ export default function DisneyTracker() {
               {FIXED_FAMILY_MEMBERS.map((person) => {
                 const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
                 
-                // Activities where person was actually a rider
                 const personActs = personVisits.reduce((sum, v) => {
                   return sum + v.activities.filter(a => isPersonRider(a, v, person)).length;
                 }, 0);
@@ -1457,7 +1598,7 @@ export default function DisneyTracker() {
                       <div key={attraction} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: '10px', background: isCompleted ? '#F0FFF4' : '#F8FAFC', border: isCompleted ? '1px solid #C6F6D5' : '1px solid #EDF2F7' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingRight: '8px' }}>
                           <span style={{ fontSize: '14px', flexShrink: 0 }}>
-                            {isCompleted ? '✅' : '⬜'}
+                            {isCompleted ? '✅' : '0'}
                           </span>
                           <span style={{ fontSize: '13px', fontWeight: isCompleted ? '700' : '500', color: isCompleted ? '#22543D' : '#4A5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {attraction}
