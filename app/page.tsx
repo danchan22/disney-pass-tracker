@@ -1317,10 +1317,10 @@ export default function DisneyTracker() {
                         </div>
                       ) : (
                         <div style={{ marginTop: '6px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                          <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ DEPARTURE TIMES:</div>
+                          <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ HOURS:</div>
                           {uniqueDepTimes.map(depTime => (
                             <div key={depTime} style={{ fontSize: '12px', color: '#2D3748', marginTop: '2px' }}>
-                              • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
+                              • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(v.startTime)} - {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
                             </div>
                           ))}
                         </div>
