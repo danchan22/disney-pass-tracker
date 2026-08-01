@@ -229,7 +229,7 @@ const parseAttendees = (raw: string | string[] | undefined): string[] => {
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 };
 
-// Helper: Parse memberEndTimes dictionary
+// Helper: Parse memberEndTimes dictionary safely
 const parseMemberEndTimes = (raw: any, notes?: string): Record<string, string> => {
   if (raw && typeof raw === 'object') return raw;
   if (typeof raw === 'string' && raw.trim().startsWith('{')) {
@@ -460,7 +460,6 @@ export default function DisneyTracker() {
         ? parseAttendees(v.attendees)
         : [selectedAttendee];
 
-      // Calculate avg or person-specific time in park
       let visitTime = 0;
       attendeesToCount.forEach(person => {
         const pEndTime = getPersonEndTime(v, person);
@@ -671,7 +670,6 @@ export default function DisneyTracker() {
       .select()
       .single();
 
-    // Fallback if 'riders' column does not exist in Supabase schema yet
     if (error && error.message.includes('riders')) {
       const fallbackRes = await supabase
         .from('activities')
@@ -711,11 +709,9 @@ export default function DisneyTracker() {
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
 
-    // 1. Instantly load a ride-specific trivia fact from local database
     const localFact = getRideTriviaFact(attractionName, park);
     setRideTrivia(localFact);
 
-    // 2. Optional: Try live Gemini API call if process.env key is configured
     const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
     if (!apiKey) {
       setTriviaLoading(false);
@@ -893,7 +889,7 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
-  // SINGLE VISIT OPTION 1 STAGGERED CHECK-OUT HANDLER
+  // ROBUST MULTI-STAGE STAGGERED CHECK-OUT HANDLER
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
     const now = new Date();
@@ -917,18 +913,17 @@ export default function DisneyTracker() {
 
     const supabase = await getSupabase();
 
-    // Save memberEndTimes directly on the active visit (no duplication!)
+    // Stage 1: Try updating memberEndTimes
     let { error } = await supabase
       .from('visits')
       .update({
         endTime: finalEndTime,
-        memberEndTimes: jsonEndTimesStr,
-        notes: jsonEndTimesStr
+        memberEndTimes: jsonEndTimesStr
       })
       .eq('id', activeVisit.id);
 
+    // Stage 2: Fall back to 'notes' if memberEndTimes column missing
     if (error) {
-      // Fallback if memberEndTimes column isn't in Supabase schema yet
       const fallbackRes = await supabase
         .from('visits')
         .update({
@@ -938,6 +933,18 @@ export default function DisneyTracker() {
         .eq('id', activeVisit.id);
 
       error = fallbackRes.error;
+    }
+
+    // Stage 3: Absolute Fallback (Update strictly endTime) so checkout NEVER fails
+    if (error) {
+      const absoluteFallback = await supabase
+        .from('visits')
+        .update({
+          endTime: finalEndTime
+        })
+        .eq('id', activeVisit.id);
+
+      error = absoluteFallback.error;
     }
 
     if (error) {
@@ -1311,7 +1318,6 @@ export default function DisneyTracker() {
             ) : (
               filteredVisits.map((v) => {
                 const partyList = parseAttendees(v.attendees);
-                const endTimes = v.memberEndTimes || {};
 
                 // Group attendees by their departure time
                 const departureGroups: Record<string, string[]> = {};
