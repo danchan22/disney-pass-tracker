@@ -1,21 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-// Environment variable fallbacks for Supabase
-const supabaseUrl = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL ? process.env.NEXT_PUBLIC_SUPABASE_URL : '';
-const supabaseAnonKey = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '';
-
-// Safe client loader to maintain compatibility in both Next.js/Vercel and preview environments
-const getSupabase = () => {
-  if (typeof window !== 'undefined' && (window as any).supabase?.createClient) {
-    if (!(window as any)._supabaseInstance) {
-      (window as any)._supabaseInstance = (window as any).supabase.createClient(supabaseUrl, supabaseAnonKey);
-    }
-    return (window as any)._supabaseInstance;
-  }
-  return null;
-};
+// Initialize Supabase Client internally
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- TYPES ---
 interface Activity {
@@ -24,6 +15,7 @@ interface Activity {
   rideName: string;
   waitTimeMinutes: number;
   notes?: string;
+  riders?: string | string[];
 }
 
 interface Visit {
@@ -36,6 +28,7 @@ interface Visit {
   activities: Activity[];
 }
 
+// --- FIXED FAMILY MEMBERS ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -83,7 +76,7 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
-// Helper: Parse attendees string/array safely
+// Helper: Parse attendees/riders string or array safely
 const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
@@ -96,15 +89,18 @@ export default function DisneyTracker() {
   const [activeTab, setActiveTab] = useState<'tracker' | 'analytics' | 'ride-everything'>('tracker');
   const [loading, setLoading] = useState(true);
 
-  // Attendee Filter State
+  // Global Attendee Filter State
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
   // Check-In Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
+  
+  // Track Attraction States
   const [rideName, setRideName] = useState('');
   const [waitTime, setWaitTime] = useState('');
   const [characterName, setCharacterName] = useState('');
+  const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
 
   // ⏱️ LIVE QUEUE TIMER STATE
   const [queueStartTimestamp, setQueueStartTimestamp] = useState<number | null>(null);
@@ -119,7 +115,13 @@ export default function DisneyTracker() {
   const [editRideName, setEditRideName] = useState('');
   const [editWaitTime, setEditWaitTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editRiders, setEditRiders] = useState<string[]>([]);
 
+  // 👋 STAGGERED CHECK-OUT MODAL STATE
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [departingMembers, setDepartingMembers] = useState<string[]>([]);
+
+  // Ticking timer effect for live queue time calculation
   useEffect(() => {
     let interval: any;
     if (queueStartTimestamp) {
@@ -130,37 +132,24 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
-  // Load CDN script if needed for Supabase and fetch visits
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !(window as any).supabase) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-      script.async = true;
-      script.onload = () => {
-        fetchCloudVisits();
-      };
-      document.head.appendChild(script);
-    } else {
-      fetchCloudVisits();
-    }
-  }, []);
-
+  // Sync default selected riders whenever activeVisit changes or ride reset
   useEffect(() => {
     if (activeVisit) {
+      const currentParty = parseAttendees(activeVisit.attendees);
+      setSelectedRiders(currentParty);
       setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
     }
   }, [activeVisit]);
 
+  // Load from Supabase on start
+  useEffect(() => {
+    fetchCloudVisits();
+  }, []);
+
   const fetchCloudVisits = async () => {
     setLoading(true);
     try {
-      const sb = getSupabase();
-      if (!sb) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: visitsData, error: visitsError } = await sb
+      const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
         .select('*, activities(*)');
 
@@ -179,7 +168,8 @@ export default function DisneyTracker() {
             visit_id: a.visit_id,
             rideName: a.rideName || a.ridename,
             waitTimeMinutes: Number(a.waitTimeMinutes || a.waittimeminutes || 0),
-            notes: a.notes
+            notes: a.notes,
+            riders: a.riders ? parseAttendees(a.riders) : parseAttendees(v.attendees)
           }))
         }));
 
@@ -194,6 +184,9 @@ export default function DisneyTracker() {
         const completed = formattedVisits.filter(v => v.endTime);
 
         setActiveVisit(ongoing || null);
+        if (ongoing) {
+          setDepartingMembers(parseAttendees(ongoing.attendees));
+        }
         setVisits(completed);
       }
     } catch (err) {
@@ -221,7 +214,7 @@ export default function DisneyTracker() {
     return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
   };
 
-  const parseTimeToMinutes = (timeStr: string) => {
+  const parseTimeToMinutes = (timeStr?: string) => {
     if (!timeStr) return 0;
     const [hrs, mins] = timeStr.split(':').map(Number);
     return (hrs * 60) + mins;
@@ -246,6 +239,7 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
+  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -254,9 +248,37 @@ export default function DisneyTracker() {
     });
   }, [visits, selectedAttendee]);
 
+  // Helper: check if person actually rode activity
+  const isPersonRider = (activity: Activity, visit: Visit, person: string) => {
+    const activityRiders = parseAttendees(activity.riders);
+    if (activityRiders.length > 0) {
+      return activityRiders.includes(person);
+    }
+    return parseAttendees(visit.attendees).includes(person);
+  };
+
+  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
-  const totalActivities = filteredVisits.reduce((sum, v) => sum + v.activities.length, 0);
-  const totalWaitMinutes = filteredVisits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
+  
+  const totalActivities = useMemo(() => {
+    if (selectedAttendee === 'ALL') {
+      return filteredVisits.reduce((sum, v) => sum + v.activities.length, 0);
+    }
+    return filteredVisits.reduce((sum, v) => {
+      return sum + v.activities.filter(a => isPersonRider(a, v, selectedAttendee)).length;
+    }, 0);
+  }, [filteredVisits, selectedAttendee]);
+
+  const totalWaitMinutes = useMemo(() => {
+    if (selectedAttendee === 'ALL') {
+      return filteredVisits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
+    }
+    return filteredVisits.reduce((sum, v) => {
+      return sum + v.activities
+        .filter(a => isPersonRider(a, v, selectedAttendee))
+        .reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
+    }, 0);
+  }, [filteredVisits, selectedAttendee]);
 
   const totalParkMinutes = filteredVisits.reduce((sum, v) => {
     if (!v.startTime || !v.endTime) return sum;
@@ -269,7 +291,7 @@ export default function DisneyTracker() {
   const avgParkMinutesPerDay = totalDays > 0 ? totalParkMinutes / totalDays : 0;
   const avgWaitPerActivity = totalActivities > 0 ? Math.round(totalWaitMinutes / totalActivities) : 0;
 
-  const getParkBreakdown = (visitList: Visit[]) => {
+  const getParkBreakdown = (visitList: Visit[], personFilter: string) => {
     const initialParks: Record<string, { visits: number; activities: number; timeInPark: number; waitTime: number }> = {
       'Magic Kingdom': { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 },
       'Epcot': { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 },
@@ -280,8 +302,12 @@ export default function DisneyTracker() {
       const park = v.parkName;
       if (initialParks[park]) {
         initialParks[park].visits += 1;
-        initialParks[park].activities += v.activities.length;
-        initialParks[park].waitTime += v.activities.reduce((sum, act) => sum + act.waitTimeMinutes, 0);
+        const validActs = personFilter === 'ALL' 
+          ? v.activities 
+          : v.activities.filter(a => isPersonRider(a, v, personFilter));
+        
+        initialParks[park].activities += validActs.length;
+        initialParks[park].waitTime += validActs.reduce((sum, act) => sum + act.waitTimeMinutes, 0);
         if (v.startTime && v.endTime) {
           const start = parseTimeToMinutes(v.startTime);
           const end = parseTimeToMinutes(v.endTime);
@@ -292,10 +318,14 @@ export default function DisneyTracker() {
     return initialParks;
   };
 
-  const getRideBreakdown = (visitList: Visit[]) => {
+  const getRideBreakdown = (visitList: Visit[], personFilter: string) => {
     const rideMap: Record<string, { count: number; totalWait: number; park: string }> = {};
     visitList.forEach(v => {
-      v.activities.forEach(act => {
+      const validActs = personFilter === 'ALL' 
+        ? v.activities 
+        : v.activities.filter(a => isPersonRider(a, v, personFilter));
+
+      validActs.forEach(act => {
         const key = act.rideName === 'Character Meeting' && act.notes ? `Meet ${act.notes}` : act.rideName;
         if (!rideMap[key]) rideMap[key] = { count: 0, totalWait: 0, park: v.parkName };
         rideMap[key].count += 1;
@@ -306,8 +336,8 @@ export default function DisneyTracker() {
       .map(name => ({ name, ...rideMap[name], avgWait: Math.round(rideMap[name].totalWait / rideMap[name].count) }));
   };
 
-  const parkStats = getParkBreakdown(filteredVisits);
-  const rideStats = getRideBreakdown(filteredVisits);
+  const parkStats = getParkBreakdown(filteredVisits, selectedAttendee);
+  const rideStats = getRideBreakdown(filteredVisits, selectedAttendee);
 
   const mostTimesRidden = [...rideStats]
     .sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait)
@@ -323,24 +353,36 @@ export default function DisneyTracker() {
 
   const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
 
-  const getRideCountsMap = (visitList: Visit[]) => {
+  const getRideCountsMap = (visitList: Visit[], personFilter: string) => {
     const counts: Record<string, number> = {};
     visitList.forEach(v => {
-      v.activities.forEach(act => {
+      const validActs = personFilter === 'ALL'
+        ? v.activities
+        : v.activities.filter(a => isPersonRider(a, v, personFilter));
+
+      validActs.forEach(act => {
         counts[act.rideName] = (counts[act.rideName] || 0) + 1;
       });
     });
-    if (activeVisit && visitList.some(v => v.id === activeVisit.id || visitList === filteredVisits)) {
-      activeVisit.activities.forEach(act => {
-        counts[act.rideName] = (counts[act.rideName] || 0) + 1;
-      });
+
+    if (activeVisit) {
+      const isUserInActive = personFilter === 'ALL' || parseAttendees(activeVisit.attendees).includes(personFilter);
+      if (isUserInActive) {
+        const validActiveActs = personFilter === 'ALL'
+          ? activeVisit.activities
+          : activeVisit.activities.filter(a => isPersonRider(a, activeVisit, personFilter));
+
+        validActiveActs.forEach(act => {
+          counts[act.rideName] = (counts[act.rideName] || 0) + 1;
+        });
+      }
     }
     return counts;
   };
 
-  const rideCountsMap = getRideCountsMap(filteredVisits);
+  const rideCountsMap = getRideCountsMap(filteredVisits, selectedAttendee);
 
-  const toggleAttendee = (name: string) => {
+  const toggleCheckInAttendee = (name: string) => {
     if (selectedAttendees.includes(name)) {
       setSelectedAttendees(selectedAttendees.filter(a => a !== name));
     } else {
@@ -348,11 +390,35 @@ export default function DisneyTracker() {
     }
   };
 
+  const toggleRiderSelection = (name: string) => {
+    if (selectedRiders.includes(name)) {
+      if (selectedRiders.length === 1) return; // keep at least 1 rider
+      setSelectedRiders(selectedRiders.filter(r => r !== name));
+    } else {
+      setSelectedRiders([...selectedRiders, name]);
+    }
+  };
+
+  const toggleEditRiderSelection = (name: string) => {
+    if (editRiders.includes(name)) {
+      if (editRiders.length === 1) return;
+      setEditRiders(editRiders.filter(r => r !== name));
+    } else {
+      setEditRiders([...editRiders, name]);
+    }
+  };
+
+  const toggleDepartingMember = (name: string) => {
+    if (departingMembers.includes(name)) {
+      if (departingMembers.length === 1) return;
+      setDepartingMembers(departingMembers.filter(m => m !== name));
+    } else {
+      setDepartingMembers([...departingMembers, name]);
+    }
+  };
+
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sb = getSupabase();
-    if (!sb) return;
-
     const now = new Date();
     const localDate = now.toLocaleDateString('en-CA');
     const localTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -360,7 +426,7 @@ export default function DisneyTracker() {
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
 
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from('visits')
       .insert({
         visitDate: localDate,
@@ -377,7 +443,7 @@ export default function DisneyTracker() {
       return;
     }
 
-    setActiveVisit({
+    const newVisit: Visit = {
       id: data.id,
       visitDate: localDate,
       startTime: localTime,
@@ -385,26 +451,28 @@ export default function DisneyTracker() {
       parkName,
       attendees: newAttendeesList,
       activities: []
-    });
+    };
 
+    setActiveVisit(newVisit);
+    setSelectedRiders(newAttendeesList);
+    setDepartingMembers(newAttendeesList);
     setSelectedAttendees([]);
   };
 
   const handleAddRideLive = async () => {
     if (!activeVisit || !rideName) return;
-    const sb = getSupabase();
-    if (!sb) return;
-
     const waitMins = parseInt(waitTime) || 0;
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+    const ridersStr = selectedRiders.join(', ');
 
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
         rideName,
         waitTimeMinutes: waitMins,
-        notes: notesVal
+        notes: notesVal,
+        riders: ridersStr
       })
       .select()
       .single();
@@ -419,7 +487,8 @@ export default function DisneyTracker() {
       visit_id: activeVisit.id,
       rideName,
       waitTimeMinutes: waitMins,
-      notes: notesVal
+      notes: notesVal,
+      riders: selectedRiders
     };
 
     setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, newActivity] });
@@ -427,6 +496,7 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
+  // FETCH RIDE TRIVIA VIA GEMINI API
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
     setRideTrivia(null);
@@ -470,23 +540,22 @@ export default function DisneyTracker() {
 
   const handleEndQueueTimer = async () => {
     if (!activeVisit || !queueStartTimestamp) return;
-    const sb = getSupabase();
-    if (!sb) return;
-
     const nowMs = Date.now();
     const diffMs = nowMs - queueStartTimestamp;
     let calculatedWait = Math.round(diffMs / 60000);
     if (calculatedWait <= 0) calculatedWait = 1;
 
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+    const ridersStr = selectedRiders.join(', ');
 
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
         rideName,
         waitTimeMinutes: calculatedWait,
-        notes: notesVal
+        notes: notesVal,
+        riders: ridersStr
       })
       .select()
       .single();
@@ -501,7 +570,8 @@ export default function DisneyTracker() {
       visit_id: activeVisit.id,
       rideName,
       waitTimeMinutes: calculatedWait,
-      notes: notesVal
+      notes: notesVal,
+      riders: selectedRiders
     };
 
     setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, newActivity] });
@@ -518,6 +588,18 @@ export default function DisneyTracker() {
     setEditRideName(activity.rideName);
     setEditWaitTime(activity.waitTimeMinutes.toString());
     setEditNotes(activity.notes || '');
+
+    // Determine available party list for editing riders
+    let currentParty: string[] = [];
+    if (visitId === null && activeVisit) {
+      currentParty = parseAttendees(activeVisit.attendees);
+    } else {
+      const foundV = visits.find(v => v.id === visitId);
+      if (foundV) currentParty = parseAttendees(foundV.attendees);
+    }
+    
+    const existingRiders = parseAttendees(activity.riders);
+    setEditRiders(existingRiders.length > 0 ? existingRiders : currentParty);
   };
 
   const cancelEditing = () => {
@@ -527,18 +609,18 @@ export default function DisneyTracker() {
 
   const saveEditedActivity = async () => {
     if (!editingActivityId) return;
-    const sb = getSupabase();
-    if (!sb) return;
 
     const waitMins = parseInt(editWaitTime) || 0;
     const notesVal = editNotes.trim() ? editNotes : null;
+    const ridersStr = editRiders.join(', ');
 
-    const { error } = await sb
+    const { error } = await supabase
       .from('activities')
       .update({
         rideName: editRideName,
         waitTimeMinutes: waitMins,
-        notes: notesVal
+        notes: notesVal,
+        riders: ridersStr
       })
       .eq('id', editingActivityId);
 
@@ -553,10 +635,8 @@ export default function DisneyTracker() {
 
   const deleteActivity = async (activityId: string) => {
     if (!confirm("Delete this ride entry?")) return;
-    const sb = getSupabase();
-    if (!sb) return;
 
-    const { error } = await sb.from('activities').delete().eq('id', activityId);
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
     if (error) {
       alert("Error deleting entry: " + error.message);
       return;
@@ -565,25 +645,71 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
-  const handleCheckOut = async () => {
+  // STAGGERED CHECK-OUT HANDLER
+  const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
-    if (!confirm("Ready to wrap up your park day and save to history?")) return;
-    const sb = getSupabase();
-    if (!sb) return;
-
     const now = new Date();
     const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
-    const { error } = await sb
-      .from('visits')
-      .update({ endTime })
-      .eq('id', activeVisit.id);
+    const currentParty = parseAttendees(activeVisit.attendees);
+    const leavingParty = checkoutType === 'everyone' ? currentParty : departingMembers;
+    const remainingParty = currentParty.filter(m => !leavingParty.includes(m));
 
-    if (error) {
-      alert("Error checking out: " + error.message);
-      return;
+    if (remainingParty.length === 0 || checkoutType === 'everyone') {
+      // Complete entire visit
+      const { error } = await supabase
+        .from('visits')
+        .update({ endTime, attendees: leavingParty.join(', ') })
+        .eq('id', activeVisit.id);
+
+      if (error) {
+        alert("Error checking out: " + error.message);
+        return;
+      }
+    } else {
+      // Partial Checkout: create completed visit record for departing members
+      const { data: newV, error: vErr } = await supabase
+        .from('visits')
+        .insert({
+          visitDate: activeVisit.visitDate,
+          startTime: activeVisit.startTime,
+          endTime,
+          parkName: activeVisit.parkName,
+          attendees: leavingParty.join(', ')
+        })
+        .select()
+        .single();
+
+      if (vErr) {
+        alert("Error creating departure log: " + vErr.message);
+        return;
+      }
+
+      // Copy relevant logged activities to departing members' completed visit
+      if (activeVisit.activities.length > 0) {
+        const actsToDuplicate = activeVisit.activities.map(a => ({
+          visit_id: newV.id,
+          rideName: a.rideName,
+          waitTimeMinutes: a.waitTimeMinutes,
+          notes: a.notes,
+          riders: parseAttendees(a.riders).filter(r => leavingParty.includes(r)).join(', ') || leavingParty.join(', ')
+        }));
+        await supabase.from('activities').insert(actsToDuplicate);
+      }
+
+      // Update remaining active visit
+      const { error: updateErr } = await supabase
+        .from('visits')
+        .update({ attendees: remainingParty.join(', ') })
+        .eq('id', activeVisit.id);
+
+      if (updateErr) {
+        alert("Error updating active party: " + updateErr.message);
+        return;
+      }
     }
 
+    setShowCheckoutModal(false);
     await fetchCloudVisits();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
@@ -592,10 +718,7 @@ export default function DisneyTracker() {
 
   const deleteVisit = async (id: string) => {
     if (confirm("Delete this visit history permanently?")) {
-      const sb = getSupabase();
-      if (!sb) return;
-
-      const { error } = await sb.from('visits').delete().eq('id', id);
+      const { error } = await supabase.from('visits').delete().eq('id', id);
       if (error) {
         alert("Error deleting visit: " + error.message);
         return;
@@ -612,6 +735,8 @@ export default function DisneyTracker() {
     if (mins === 0) return `${secs}s`;
     return `${mins} mins ${secs > 0 ? `${secs}s` : ''}`;
   };
+
+  const activePartyList = activeVisit ? parseAttendees(activeVisit.attendees) : [];
 
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
@@ -646,32 +771,28 @@ export default function DisneyTracker() {
         <button onClick={() => setActiveTab('ride-everything')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'ride-everything' ? '#004487' : 'transparent', color: activeTab === 'ride-everything' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>🎡 Ride Everything</button>
       </div>
 
-      {}
+      {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               
-              {/* CURRENTLY AT BADGE */}
               <div style={{ marginBottom: '10px' }}>
                 <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
                   ✨ CURRENTLY AT
                 </span>
               </div>
 
-              {/* PARK NAME FULL WIDTH ACROSS */}
               <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%' }}>
                 {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
               </h2>
 
-              {/* DATE & ARRIVED TIME UNDERNEATH */}
               <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px', fontWeight: '600' }}>
                 📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
               </div>
 
-              {/* PARTY */}
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
-                👥 <strong>Party:</strong> {parseAttendees(activeVisit.attendees).join(', ')}
+                👥 <strong>Party:</strong> {activePartyList.join(', ')}
               </p>
 
               {/* TRACK ATTRACTION CARD */}
@@ -692,6 +813,40 @@ export default function DisneyTracker() {
                     </optgroup>
                   </select>
 
+                  {/* 🎢 PER-RIDE ATTENDEE SELECTOR ("WHO RODE THIS?") */}
+                  {activePartyList.length > 1 && (
+                    <div style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '10px', borderRadius: '10px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
+                        👥 WHO IS RIDING THIS?
+                      </label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {activePartyList.map((member) => {
+                          const isRiding = selectedRiders.includes(member);
+                          return (
+                            <button
+                              key={member}
+                              type="button"
+                              onClick={() => toggleRiderSelection(member)}
+                              disabled={!!queueStartTimestamp}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: isRiding ? '2px solid #004487' : '1px solid #CBD5E0',
+                                background: isRiding ? '#004487' : '#FFF',
+                                color: isRiding ? '#FFF' : '#718096',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {isRiding ? `✓ ${member}` : member}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {rideName === 'Character Meeting' && (
                     <div style={{ background: '#FFF5F7', padding: '10px', borderRadius: '10px', border: '1px solid #FF8DA1' }}>
                       <label style={{ fontSize: '11px', fontWeight: '800', color: '#D61F40', display: 'block', marginBottom: '4px' }}>✨ WHICH CHARACTER?</label>
@@ -707,12 +862,10 @@ export default function DisneyTracker() {
                         Entered line at: <strong style={{ color: '#004487' }}>{queueStartTimeStr}</strong>
                       </div>
                       
-                      {/* DYNAMIC TIME IN LINE DISPLAY */}
                       <div style={{ fontSize: '20px', fontWeight: '900', color: '#C05621', margin: '8px 0' }}>
                         Time in line: {getElapsedQueueTimeString()}
                       </div>
 
-                      {/* IMAGINEERING TRIVIA BOX */}
                       <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
                         <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           ✨ Queue Imagineering Secret:
@@ -760,7 +913,8 @@ export default function DisneyTracker() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {activeVisit.activities.map((act) => {
                         const isEditingThis = editingActivityId === act.id && editingVisitId === null;
-                        
+                        const actRidersList = parseAttendees(act.riders);
+
                         return isEditingThis ? (
                           <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
                             <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
@@ -776,6 +930,21 @@ export default function DisneyTracker() {
                                 ))}
                               </optgroup>
                             </select>
+
+                            {/* EDIT RIDERS SELECTOR */}
+                            <div style={{ marginBottom: '6px' }}>
+                              <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {activePartyList.map((m) => {
+                                  const checked = editRiders.includes(m);
+                                  return (
+                                    <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                      {m}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                             
                             <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
                               <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
@@ -793,7 +962,7 @@ export default function DisneyTracker() {
                             <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                               <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.rideName}</div>
                               <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                ⏱️ {act.waitTimeMinutes} mins wait{act.notes ? ` • ${act.notes}` : ''}
+                                ⏱️ {act.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {act.notes ? `• ${act.notes}` : ''}
                               </div>
                             </div>
                             <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
@@ -807,7 +976,8 @@ export default function DisneyTracker() {
                 )}
               </div>
 
-              <button onClick={handleCheckOut} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+              {/* LEAVE PARK TRIGGER */}
+              <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
                 👋 Leave the Park & Save Day
               </button>
             </div>
@@ -830,7 +1000,7 @@ export default function DisneyTracker() {
                   {FIXED_FAMILY_MEMBERS.map((name) => {
                     const isSelected = selectedAttendees.includes(name);
                     return (
-                      <button key={name} type="button" onClick={() => toggleAttendee(name)} style={{ padding: '10px 4px', borderRadius: '10px', border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0', background: isSelected ? '#004487' : '#FFF', color: isSelected ? '#FFF' : '#2D3748', fontSize: '13px', fontWeight: isSelected ? '800' : '500', cursor: 'pointer' }}>
+                      <button key={name} type="button" onClick={() => toggleCheckInAttendee(name)} style={{ padding: '10px 4px', borderRadius: '10px', border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0', background: isSelected ? '#004487' : '#FFF', color: isSelected ? '#FFF' : '#2D3748', fontSize: '13px', fontWeight: isSelected ? '800' : '500', cursor: 'pointer' }}>
                         {name}
                       </button>
                     );
@@ -844,7 +1014,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {}
+          {/* MAIN CORE SUMMARY MODULE */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -894,7 +1064,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
+          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -921,6 +1091,8 @@ export default function DisneyTracker() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {v.activities.map((a) => {
                           const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+                          const actRidersList = parseAttendees(a.riders);
+                          const visitPartyList = parseAttendees(v.attendees);
 
                           return isEditingThis ? (
                             <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
@@ -937,6 +1109,21 @@ export default function DisneyTracker() {
                                   ))}
                                 </optgroup>
                               </select>
+
+                              {/* EDIT RIDERS SELECTOR FOR PAST VISITS */}
+                              <div style={{ marginBottom: '6px' }}>
+                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {visitPartyList.map((m) => {
+                                    const checked = editRiders.includes(m);
+                                    return (
+                                      <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                        {m}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                               
                               <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
                                 <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
@@ -954,7 +1141,7 @@ export default function DisneyTracker() {
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                                 <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
                                 <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                  ⏱️ {a.waitTimeMinutes} mins wait{a.notes ? ` • ${a.notes}` : ''}
+                                  ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
                                 </div>
                               </div>
                               <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
@@ -976,7 +1163,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
           {/* PARK AVERAGES */}
@@ -1019,7 +1206,7 @@ export default function DisneyTracker() {
             })}
           </div>
 
-          {}
+          {/* MOST TIMES RIDDEN LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
             {mostTimesRidden.length === 0 ? (
@@ -1047,6 +1234,7 @@ export default function DisneyTracker() {
             )}
           </div>
 
+          {/* LONGEST WAIT TIMES LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1070,6 +1258,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {/* SHORTEST WAIT TIMES LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1093,7 +1282,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
+          {/* 👥 ATTENDEE CARDS SECTION */}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
               👥 Attendee Cards
@@ -1102,8 +1291,17 @@ export default function DisneyTracker() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {FIXED_FAMILY_MEMBERS.map((person) => {
                 const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
-                const personActs = personVisits.reduce((sum, v) => sum + v.activities.length, 0);
-                const personWaitMins = personVisits.reduce((sum, v) => sum + v.activities.reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
+                
+                // Activities where person was actually a rider
+                const personActs = personVisits.reduce((sum, v) => {
+                  return sum + v.activities.filter(a => isPersonRider(a, v, person)).length;
+                }, 0);
+
+                const personWaitMins = personVisits.reduce((sum, v) => {
+                  return sum + v.activities
+                    .filter(a => isPersonRider(a, v, person))
+                    .reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
+                }, 0);
                 
                 const personParkMins = personVisits.reduce((sum, v) => {
                   if (!v.startTime || !v.endTime) return sum;
@@ -1116,10 +1314,10 @@ export default function DisneyTracker() {
                 const personAvgDuration = personVisits.length > 0 ? personParkMins / personVisits.length : 0;
                 const personAvgWait = personActs > 0 ? Math.round(personWaitMins / personActs) : 0;
 
-                const personRidesMap = getRideBreakdown(personVisits);
+                const personRidesMap = getRideBreakdown(personVisits, person);
                 const personFavorite = personRidesMap.sort((a, b) => b.count - a.count || b.totalWait - a.totalWait)[0] || null;
 
-                const personCountsMap = getRideCountsMap(personVisits);
+                const personCountsMap = getRideCountsMap(personVisits, person);
 
                 return (
                   <div key={person} style={{ background: '#FFF', borderRadius: '20px', padding: '18px', border: '1px solid #CBD5E0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
@@ -1204,7 +1402,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
@@ -1256,6 +1454,105 @@ export default function DisneyTracker() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 👋 STAGGERED CHECK-OUT MODAL */}
+      {showCheckoutModal && activeVisit && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '900', color: '#004487' }}>
+              👋 Leaving the Park
+            </h3>
+            <p style={{ fontSize: '13px', color: '#4A5568', margin: '0 0 16px 0' }}>
+              Who is departing the park right now?
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {activePartyList.map((member) => {
+                const isSelected = departingMembers.includes(member);
+                return (
+                  <button
+                    key={member}
+                    type="button"
+                    onClick={() => toggleDepartingMember(member)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justify: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: isSelected ? '2px solid #E53E3E' : '1px solid #CBD5E0',
+                      background: isSelected ? '#FFF5F5' : '#F8FAFC',
+                      color: isSelected ? '#C53030' : '#4A5568',
+                      fontWeight: '700',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>👤 {member}</span>
+                    <span>{isSelected ? '🚪 Leaving' : '🏰 Staying'}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => processCheckout('selected')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#E53E3E',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Check Out Selected ({departingMembers.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => processCheckout('everyone')}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#EDF2F7',
+                  color: '#2D3748',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Check Out Everyone
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowCheckoutModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  background: 'none',
+                  color: '#718096',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  marginTop: '4px'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
