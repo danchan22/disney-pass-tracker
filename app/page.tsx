@@ -2,6 +2,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
+// Environment variable fallbacks for Supabase
+const supabaseUrl = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL ? process.env.NEXT_PUBLIC_SUPABASE_URL : '';
+const supabaseAnonKey = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '';
+
+// Safe client loader to maintain compatibility in both Next.js/Vercel and preview environments
+const getSupabase = () => {
+  if (typeof window !== 'undefined' && (window as any).supabase?.createClient) {
+    if (!(window as any)._supabaseInstance) {
+      (window as any)._supabaseInstance = (window as any).supabase.createClient(supabaseUrl, supabaseAnonKey);
+    }
+    return (window as any)._supabaseInstance;
+  }
+  return null;
+};
+
 // --- TYPES ---
 interface Activity {
   id: string;
@@ -21,7 +36,6 @@ interface Visit {
   activities: Activity[];
 }
 
-// --- FIXED FAMILY MEMBERS ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -69,42 +83,14 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
+// Helper: Parse attendees string/array safely
 const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
   return raw.split(',').map(s => s.trim()).filter(Boolean);
 };
 
-// Dynamic Supabase client loader that works seamlessly in both preview and build contexts
-const getSupabaseClient = async () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-  if (typeof window !== 'undefined' && (window as any).supabase) {
-    return (window as any).supabase.createClient(url, key);
-  }
-
-  // Load via CDN script if missing in bundle runner
-  if (typeof window !== 'undefined') {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-      script.onload = () => {
-        if ((window as any).supabase) {
-          resolve((window as any).supabase.createClient(url, key));
-        } else {
-          resolve(null);
-        }
-      };
-      script.onerror = () => resolve(null);
-      document.head.appendChild(script);
-    });
-  }
-  return null;
-};
-
 export default function DisneyTracker() {
-  const [supabase, setSupabase] = useState<any>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState<'tracker' | 'analytics' | 'ride-everything'>('tracker');
@@ -135,12 +121,6 @@ export default function DisneyTracker() {
   const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
-    getSupabaseClient().then(client => {
-      setSupabase(client);
-    });
-  }, []);
-
-  useEffect(() => {
     let interval: any;
     if (queueStartTimestamp) {
       interval = setInterval(() => {
@@ -150,13 +130,20 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
+  // Load CDN script if needed for Supabase and fetch visits
   useEffect(() => {
-    if (supabase) {
-      fetchCloudVisits(supabase);
+    if (typeof window !== 'undefined' && !(window as any).supabase) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      script.async = true;
+      script.onload = () => {
+        fetchCloudVisits();
+      };
+      document.head.appendChild(script);
     } else {
-      setLoading(false);
+      fetchCloudVisits();
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (activeVisit) {
@@ -164,12 +151,16 @@ export default function DisneyTracker() {
     }
   }, [activeVisit]);
 
-  const fetchCloudVisits = async (sbClient: any) => {
-    const client = sbClient || supabase;
-    if (!client) return;
+  const fetchCloudVisits = async () => {
     setLoading(true);
     try {
-      const { data: visitsData, error: visitsError } = await client
+      const sb = getSupabase();
+      if (!sb) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: visitsData, error: visitsError } = await sb
         .from('visits')
         .select('*, activities(*)');
 
@@ -192,6 +183,7 @@ export default function DisneyTracker() {
           }))
         }));
 
+        // Sort visits reverse chronologically
         formattedVisits.sort((a, b) => {
           const dateA = new Date(`${a.visitDate}T${a.startTime || '00:00'}`).getTime();
           const dateB = new Date(`${b.visitDate}T${b.startTime || '00:00'}`).getTime();
@@ -358,6 +350,9 @@ export default function DisneyTracker() {
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    const sb = getSupabase();
+    if (!sb) return;
+
     const now = new Date();
     const localDate = now.toLocaleDateString('en-CA');
     const localTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -365,9 +360,7 @@ export default function DisneyTracker() {
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
 
-    if (!supabase) return;
-
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('visits')
       .insert({
         visitDate: localDate,
@@ -398,11 +391,14 @@ export default function DisneyTracker() {
   };
 
   const handleAddRideLive = async () => {
-    if (!activeVisit || !rideName || !supabase) return;
+    if (!activeVisit || !rideName) return;
+    const sb = getSupabase();
+    if (!sb) return;
+
     const waitMins = parseInt(waitTime) || 0;
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -473,7 +469,10 @@ export default function DisneyTracker() {
   };
 
   const handleEndQueueTimer = async () => {
-    if (!activeVisit || !queueStartTimestamp || !supabase) return;
+    if (!activeVisit || !queueStartTimestamp) return;
+    const sb = getSupabase();
+    if (!sb) return;
+
     const nowMs = Date.now();
     const diffMs = nowMs - queueStartTimestamp;
     let calculatedWait = Math.round(diffMs / 60000);
@@ -481,7 +480,7 @@ export default function DisneyTracker() {
 
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -527,12 +526,14 @@ export default function DisneyTracker() {
   };
 
   const saveEditedActivity = async () => {
-    if (!editingActivityId || !supabase) return;
+    if (!editingActivityId) return;
+    const sb = getSupabase();
+    if (!sb) return;
 
     const waitMins = parseInt(editWaitTime) || 0;
     const notesVal = editNotes.trim() ? editNotes : null;
 
-    const { error } = await supabase
+    const { error } = await sb
       .from('activities')
       .update({
         rideName: editRideName,
@@ -546,29 +547,34 @@ export default function DisneyTracker() {
       return;
     }
 
-    await fetchCloudVisits(supabase);
+    await fetchCloudVisits();
     cancelEditing();
   };
 
   const deleteActivity = async (activityId: string) => {
-    if (!confirm("Delete this ride entry?") || !supabase) return;
+    if (!confirm("Delete this ride entry?")) return;
+    const sb = getSupabase();
+    if (!sb) return;
 
-    const { error } = await supabase.from('activities').delete().eq('id', activityId);
+    const { error } = await sb.from('activities').delete().eq('id', activityId);
     if (error) {
       alert("Error deleting entry: " + error.message);
       return;
     }
 
-    await fetchCloudVisits(supabase);
+    await fetchCloudVisits();
   };
 
   const handleCheckOut = async () => {
-    if (!activeVisit || !supabase) return;
+    if (!activeVisit) return;
     if (!confirm("Ready to wrap up your park day and save to history?")) return;
+    const sb = getSupabase();
+    if (!sb) return;
+
     const now = new Date();
     const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
-    const { error } = await supabase
+    const { error } = await sb
       .from('visits')
       .update({ endTime })
       .eq('id', activeVisit.id);
@@ -578,20 +584,23 @@ export default function DisneyTracker() {
       return;
     }
 
-    await fetchCloudVisits(supabase);
+    await fetchCloudVisits();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setRideTrivia(null);
   };
 
   const deleteVisit = async (id: string) => {
-    if (confirm("Delete this visit history permanently?") && supabase) {
-      const { error } = await supabase.from('visits').delete().eq('id', id);
+    if (confirm("Delete this visit history permanently?")) {
+      const sb = getSupabase();
+      if (!sb) return;
+
+      const { error } = await sb.from('visits').delete().eq('id', id);
       if (error) {
         alert("Error deleting visit: " + error.message);
         return;
       }
-      await fetchCloudVisits(supabase);
+      await fetchCloudVisits();
     }
   };
 
@@ -607,11 +616,13 @@ export default function DisneyTracker() {
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
       
+      {/* 🏰 HERO HEADER */}
       <header style={{ textAlign: 'center', marginBottom: '15px', padding: '10px 0' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0 0 4px 0' }}>🏰 My Annual Pass Tracker</h1>
         <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>Shared Cloud Sync Active ☁️</p>
       </header>
 
+      {/* 👤 GLOBAL ATTENDEE FILTER BAR */}
       <div style={{ background: '#FFF', padding: '10px 14px', borderRadius: '14px', border: '1px solid #E2E8F0', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
         <label style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568', display: 'flex', alignItems: 'center', gap: '6px' }}>
           👤 Filter by Attendee:
@@ -628,6 +639,7 @@ export default function DisneyTracker() {
         </select>
       </div>
 
+      {/* 🗂️ TAB NAVIGATION */}
       <div style={{ display: 'flex', background: '#E2E8F0', padding: '4px', borderRadius: '12px', marginBottom: '20px' }}>
         <button onClick={() => setActiveTab('tracker')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'tracker' ? '#004487' : 'transparent', color: activeTab === 'tracker' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>⏱️ Live Companion</button>
         <button onClick={() => setActiveTab('analytics')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'analytics' ? '#004487' : 'transparent', color: activeTab === 'analytics' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>📊 Analytics</button>
@@ -640,24 +652,29 @@ export default function DisneyTracker() {
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               
+              {/* CURRENTLY AT BADGE */}
               <div style={{ marginBottom: '10px' }}>
                 <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
                   ✨ CURRENTLY AT
                 </span>
               </div>
 
+              {/* PARK NAME FULL WIDTH ACROSS */}
               <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%' }}>
                 {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
               </h2>
 
+              {/* DATE & ARRIVED TIME UNDERNEATH */}
               <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px', fontWeight: '600' }}>
                 📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
               </div>
 
+              {/* PARTY */}
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
                 👥 <strong>Party:</strong> {parseAttendees(activeVisit.attendees).join(', ')}
               </p>
 
+              {/* TRACK ATTRACTION CARD */}
               <div style={{ background: '#FFF', padding: '16px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#004487' }}>Track an Attraction:</h3>
                 
@@ -690,10 +707,12 @@ export default function DisneyTracker() {
                         Entered line at: <strong style={{ color: '#004487' }}>{queueStartTimeStr}</strong>
                       </div>
                       
+                      {/* DYNAMIC TIME IN LINE DISPLAY */}
                       <div style={{ fontSize: '20px', fontWeight: '900', color: '#C05621', margin: '8px 0' }}>
                         Time in line: {getElapsedQueueTimeString()}
                       </div>
 
+                      {/* IMAGINEERING TRIVIA BOX */}
                       <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
                         <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           ✨ Queue Imagineering Secret:
@@ -825,7 +844,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {/* MAIN CORE SUMMARY MODULE */}
+          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -857,6 +876,7 @@ export default function DisneyTracker() {
               </div>
             </div>
 
+            {/* AVERAGES SECTION */}
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
               <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
@@ -874,6 +894,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -892,7 +913,7 @@ export default function DisneyTracker() {
                     <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
                   </div>
                   <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime || '')}</span> <br />
+                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span> <br />
                     👥 <strong>Party:</strong> {parseAttendees(v.attendees).join(', ')}
                   </div>
                   {v.activities.length > 0 && (
@@ -958,6 +979,7 @@ export default function DisneyTracker() {
       {}
       {activeTab === 'analytics' && (
         <div>
+          {/* PARK AVERAGES */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>
               🏟️ Park Averages
@@ -997,6 +1019,7 @@ export default function DisneyTracker() {
             })}
           </div>
 
+          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
             {mostTimesRidden.length === 0 ? (
@@ -1073,7 +1096,7 @@ export default function DisneyTracker() {
           {}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
-              👥 Family Attendee Cards (All 6 Members)
+              👥 Attendee Cards
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -1107,10 +1130,11 @@ export default function DisneyTracker() {
                       </span>
                     </div>
 
+                    {/* STATS OVERVIEW */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
                       <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
                         <div style={{ fontSize: '15px', fontWeight: '800', color: '#2D3748' }}>{personActs}</div>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>TOTAL ACTS</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>Activities</div>
                       </div>
                       <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
                         <div style={{ fontSize: '15px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(personParkMins)}</div>
@@ -1122,10 +1146,11 @@ export default function DisneyTracker() {
                       </div>
                     </div>
 
+                    {/* AVERAGES ROW */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
                       <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgActs}</div>
-                        <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>AVG ACTS</div>
+                        <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>Avg Activities</div>
                       </div>
                       <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{formatMinutes(personAvgDuration)}</div>
@@ -1137,6 +1162,7 @@ export default function DisneyTracker() {
                       </div>
                     </div>
 
+                    {/* FAVORITE RIDE BANNER */}
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px' }}>
                       <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621' }}>⭐ FAVORITE RIDE</div>
                       <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', marginTop: '2px' }}>
@@ -1149,6 +1175,7 @@ export default function DisneyTracker() {
                       )}
                     </div>
 
+                    {/* RIDE EVERYTHING CHECKLIST BREAKDOWN */}
                     <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginBottom: '6px' }}>🎡 RIDE EVERYTHING PROGRESS:</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
