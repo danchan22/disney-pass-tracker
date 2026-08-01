@@ -15,6 +15,7 @@ const getSupabase = async () => {
       return supabaseInstance;
     }
     try {
+      // @ts-ignore
       const supabaseModule = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
       if (supabaseModule && supabaseModule.createClient) {
         supabaseInstance = supabaseModule.createClient(supabaseUrl, supabaseAnonKey);
@@ -976,7 +977,6 @@ export default function DisneyTracker() {
       {/* TAB 1: LIVE COMPANION */}
       {activeTab === 'tracker' && (
         <div>
-          {}
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               
@@ -1110,7 +1110,6 @@ export default function DisneyTracker() {
                   )}
                 </div>
 
-                {}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                     <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
@@ -1217,7 +1216,6 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -1266,7 +1264,6 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -1364,7 +1361,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* TAB 2: ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
           {/* PARK AVERAGES */}
@@ -1407,7 +1404,6 @@ export default function DisneyTracker() {
             })}
           </div>
 
-          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
             {mostTimesRidden.length === 0 ? (
@@ -1481,7 +1477,6 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
               👥 Attendee Cards
@@ -1596,7 +1591,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* TAB 3: RIDE EVERYTHING */}
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
@@ -1651,7 +1646,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {}
+      {/* CHECKOUT MODAL */}
       {showCheckoutModal && activeVisit && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
