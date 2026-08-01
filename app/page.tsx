@@ -369,6 +369,12 @@ export default function DisneyTracker() {
   const [editNotes, setEditNotes] = useState('');
   const [editRiders, setEditRiders] = useState<string[]>([]);
 
+  // ✏️ EDITING ENTIRE VISIT LOG STATE
+  const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
+  const [editVisitStartTime, setEditVisitStartTime] = useState('');
+  const [editVisitEndTime, setEditVisitEndTime] = useState('');
+  const [editVisitMemberEndTimes, setEditVisitMemberEndTimes] = useState<Record<string, string>>({});
+
   // 👋 STAGGERED CHECK-OUT MODAL STATE
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
@@ -1020,6 +1026,41 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
+  // EDIT ENTIRE VISIT LOG MODAL OPENER
+  const openEditVisit = (v: Visit) => {
+    setEditingVisit(v);
+    setEditVisitStartTime(v.startTime || '');
+    setEditVisitEndTime(v.endTime || '');
+    setEditVisitMemberEndTimes({ ...(v.memberEndTimes || {}) });
+  };
+
+  // SAVE EDITED VISIT LOG
+  const handleSaveVisitEdit = async () => {
+    if (!editingVisit) return;
+    const rawAttendeesStr = parseAttendees(editingVisit.attendees).join(', ');
+    const jsonEndTimesStr = JSON.stringify(editVisitMemberEndTimes);
+    const attendeesWithEndTimes = `${rawAttendeesStr}|ENDTIMES:${jsonEndTimesStr}`;
+
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from('visits')
+      .update({
+        startTime: editVisitStartTime,
+        endTime: editVisitEndTime,
+        attendees: attendeesWithEndTimes,
+        notes: jsonEndTimesStr
+      })
+      .eq('id', editingVisit.id);
+
+    if (error) {
+      setErrorMessage("Error updating visit log: " + error.message);
+      return;
+    }
+
+    setEditingVisit(null);
+    await fetchCloudVisits();
+  };
+
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
     const now = new Date();
@@ -1067,6 +1108,9 @@ export default function DisneyTracker() {
   };
 
   const deleteVisit = async (id: string) => {
+    const confirmDelete = window.confirm("⚠️ Are you sure you want to delete this entire visit log? This action cannot be undone!");
+    if (!confirmDelete) return;
+
     const supabase = await getSupabase();
     const { error } = await supabase.from('visits').delete().eq('id', id);
     if (error) {
@@ -1550,9 +1594,16 @@ export default function DisneyTracker() {
                         </div>
                       </div>
                     )}
-                    <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                      🗑️ Delete Entire Visit Log
-                    </button>
+
+                    {/* VISIT ACTIONS BAR */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #EDF2F7' }}>
+                      <button onClick={() => openEditVisit(v)} style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '800' }}>
+                        ✏️ Edit Visit Hours
+                      </button>
+                      <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
+                        🗑️ Delete Entire Visit Log
+                      </button>
+                    </div>
                   </div>
                 );
               })
@@ -1852,6 +1903,92 @@ export default function DisneyTracker() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ✏️ EDIT VISIT LOG MODAL */}
+      {editingVisit && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '900', color: '#004487' }}>
+              ✏️ Edit Visit Hours
+            </h3>
+            <p style={{ fontSize: '12px', color: '#718096', margin: '0 0 16px 0' }}>
+              {editingVisit.parkName} • {formatDisplayDate(editingVisit.visitDate)}
+            </p>
+
+            {/* Arrival Time Input */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
+                ⏰ ARRIVAL TIME (HH:MM / e.g. 08:59 or 14:30)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 08:59"
+                value={editVisitStartTime}
+                onChange={(e) => setEditVisitStartTime(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }}
+              />
+            </div>
+
+            {/* Overall Departure Time Input */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
+                🚪 MAIN DEPARTURE TIME (e.g. 21:50)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 21:50"
+                value={editVisitEndTime}
+                onChange={(e) => setEditVisitEndTime(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }}
+              />
+            </div>
+
+            {/* Per-Member Departure Times */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
+                👥 MEMBER DEPARTURE TIMES
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {parseAttendees(editingVisit.attendees).map(member => (
+                  <div key={member} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#2D3748' }}>👤 {member}</span>
+                    <input
+                      type="text"
+                      placeholder={editVisitEndTime || "HH:MM"}
+                      value={editVisitMemberEndTimes[member] || ''}
+                      onChange={(e) => {
+                        setEditVisitMemberEndTimes({
+                          ...editVisitMemberEndTimes,
+                          [member]: e.target.value
+                        });
+                      }}
+                      style={{ width: '110px', padding: '6px 8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '13px', textAlign: 'center' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setEditingVisit(null)}
+                style={{ flex: 1, padding: '12px', background: '#EDF2F7', color: '#4A5568', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveVisitEdit}
+                style={{ flex: 2, padding: '12px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}
+              >
+                💾 Save Changes
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
