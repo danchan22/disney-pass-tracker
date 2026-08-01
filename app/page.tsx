@@ -84,22 +84,22 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Frozen Ever After', 'Gran Fiesta Tour Starring The Three Caballeros', 'Guardians of the Galaxy: Cosmic Rewind',
     'ImageWorks What If Labs', 'Journey into Imagination with Figment', 'Journey of Water, Inspired by Moana',
     'Living with the Land', 'Mission: SPACE (Green)', 'Mission: SPACE (Orange)', 'Reflections of China',
-    'Remy’s Ratatouille Adventure', 'Soarin', 'Soarin’ Around the World', 'Spaceship Earth', 'Test Track',
+    'Remy’s Ratatouille Adventure', 'Soarin', 'Spaceship Earth', 'Test Track',
     'The Seas with Nemo & Friends', 'Turtle Talk with Crush'
   ],
   'Hollywood Studios': [
     'Alien Swirling Saucers', 'Beauty and the Beast Live on Stage', 'Disney Junior Play & Dance!',
     'Disney Villains: Unfairly Ever After', 'Fantasmic',
     'For the First Time in Forever: A Frozen Sing-Along Celebration', 'Indiana Jones Epic Stunt Spectacular!',
-    'Lightning McQueen’s Racing Academy', 'Mickey & Minnie’s Runaway Railway', 'Millennium Falcon: Smugglers Run',
-    'Rock ’n’ Roller Coaster Starring Aerosmith', 'Slinky Dog Dash', 'Star Tours – The Adventures Continue',
+    'Mickey & Minnie’s Runaway Railway', 'Millennium Falcon: Smugglers Run',
+    'Rock ’n’ Roller Coaster', 'Slinky Dog Dash', 'Star Tours – The Adventures Continue',
     'Star Wars: Rise of the Resistance', 'The Twilight Zone Tower of Terror', 'The Little Mermaid: A Musical Adventure',
     'Toy Story Mania!', 'Vacation Fun', 'Walt Disney Presents'
   ],
   'Animal Kingdom': [
-    'Avatar Flight of Passage', 'DINOSAUR', 'Expedition Everest', 'Feathered Friends in Flight!',
+    'Avatar Flight of Passage', 'Expedition Everest', 'Feathered Friends in Flight!',
     'Festival of the Lion King', 'Finding Nemo: The Big Blue... and Beyond!', 'Gorilla Falls Exploration Trail',
-    'It’s Tough to be a Bug!', 'Kali River Rapids', 'Kilimanjaro Safaris', 'Maharajah Jungle Trek',
+    'Kali River Rapids', 'Kilimanjaro Safaris', 'Maharajah Jungle Trek',
     'Na’vi River Journey', 'The Animation Experience at Conservation Station', 'Wildlife Express Train',
     'Zootopia: Better Together'
   ]
@@ -138,7 +138,7 @@ const RIDE_TRIVIA_DB: Record<string, string[]> = {
     'The exterior geodesic sphere consists of 11,324 individual triangular tiles made of Alucobond, designed so rainwater drains down hidden channels into World Showcase lagoon!',
     'The papyrus-making scene in the queue uses authentic scents engineered by Imagineers to smell like real drying ink and ancient parchment.'
   ],
-  'Soarin’ Around the World': [
+  'Soarin': [
     'Each scene in Soarin\' includes custom synchronized scents pumped through the seats, including fresh grass over Africa and sea breeze over Fiji!',
     'The flight motion simulator technology was originally invented by Imagineer Mark Sumner using an old Erector toy set.'
   ],
@@ -177,10 +177,6 @@ const RIDE_TRIVIA_DB: Record<string, string[]> = {
   'Kilimanjaro Safaris': [
     'The 110-acre safari reserve is so large that the entire Magic Kingdom park could easily fit inside it!',
     'Imagineers installed hidden climate-controlled rocks (heated in winter, cooled in summer) near truck pathways so animals relax near guests.'
-  ],
-  'DINOSAUR': [
-    'The three pipes in the queue area are labeled with chemical formulas for Red, Yellow, and White mustard, ketchup, and mayonnaise—a nod to the ride’s sponsor, McDonald’s!',
-    'The Carnotaurus animatronic in the climax was one of the largest and fastest-moving prehistoric animatronics ever constructed by Disney.'
   ],
   'The Barnstormer': [
     'The Barnstormer is themed around Goofy’s stunt plane show, featuring a giant wooden billboard that Goofy’s plane crashed straight through!',
@@ -896,7 +892,6 @@ export default function DisneyTracker() {
     const finalEndTime = isVisitComplete ? endTime : '';
     const jsonEndTimesStr = JSON.stringify(updatedEndTimes);
 
-    // Encode memberEndTimes directly into attendees text string so no DB columns are required
     const rawAttendeesStr = parseAttendees(activeVisit.attendees).join(', ');
     const attendeesWithEndTimes = `${rawAttendeesStr}|ENDTIMES:${jsonEndTimesStr}`;
 
@@ -985,6 +980,7 @@ export default function DisneyTracker() {
       {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
+          {}
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
               
@@ -1118,6 +1114,7 @@ export default function DisneyTracker() {
                   )}
                 </div>
 
+                {}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                     <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
@@ -1225,7 +1222,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
-          {/* MAIN CORE SUMMARY MODULE */}
+          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -1275,7 +1272,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* PAST LOG ENTRIES */}
+          {}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -1407,7 +1404,7 @@ export default function DisneyTracker() {
       {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
-          {/* PARK AVERAGES */}
+          {}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>
               🏟️ Park Averages
@@ -1523,7 +1520,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
-          {/* 👥 ATTENDEE CARDS SECTION */}
+          {}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
               👥 Attendee Cards
@@ -1643,7 +1640,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
+      {}
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
@@ -1698,7 +1695,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {/* 👋 STAGGERED CHECK-OUT MODAL */}
+      {}
       {showCheckoutModal && activeVisit && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
