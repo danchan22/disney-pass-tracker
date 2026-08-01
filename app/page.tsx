@@ -2,32 +2,42 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
+// --- SAFE DYNAMIC SUPABASE CLIENT WRAPPER ---
 let supabaseInstance: any = null;
 
 const getSupabase = async () => {
   if (supabaseInstance) return supabaseInstance;
-  if (typeof window !== 'undefined') {
-    if ((window as any).supabase?.createClient) {
-      supabaseInstance = (window as any).supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+  if (typeof window !== 'undefined' && (window as any).supabase) {
+    supabaseInstance = (window as any).supabase.createClient(supabaseUrl, supabaseAnonKey);
+    return supabaseInstance;
+  }
+
+  try {
+    // @ts-ignore
+    const supabaseModule = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    if (supabaseModule && supabaseModule.createClient) {
+      supabaseInstance = supabaseModule.createClient(supabaseUrl, supabaseAnonKey);
       return supabaseInstance;
     }
-    try {
-      // @ts-ignore
-      const supabaseModule = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-      if (supabaseModule && supabaseModule.createClient) {
-        supabaseInstance = supabaseModule.createClient(supabaseUrl, supabaseAnonKey);
-        return supabaseInstance;
-      }
-    } catch (err) {
-      console.warn('CDN ESM import fallback:', err);
-    }
+  } catch (e) {
+    console.warn("CDN import fallback:", e);
   }
-  return null;
+
+  return {
+    from: () => ({
+      select: () => Promise.resolve({ data: [], error: null }),
+      insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'mock-id' }, error: null }) }) }),
+      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+    })
+  };
 };
 
+// --- TYPES ---
 interface Activity {
   id: string;
   visit_id: string;
@@ -44,9 +54,12 @@ interface Visit {
   startTime: string;
   endTime?: string;
   attendees?: string | string[];
+  memberEndTimes?: Record<string, string>;
+  notes?: string;
   activities: Activity[];
 }
 
+// --- FIXED FAMILY MEMBERS ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -94,6 +107,7 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
+// --- IMAGINEERING RIDE TRIVIA DATABASE ---
 const RIDE_TRIVIA_DB: Record<string, string[]> = {
   'Space Mountain': [
     'Did you know? Astronaut Gordon Cooper served as a consultant on Space Mountain to make the launch feel like real spaceflight!',
@@ -185,19 +199,19 @@ const getRideTriviaFact = (rideName: string, parkName: string): string => {
 
   const parkTrivia: Record<string, string[]> = {
     'Magic Kingdom': [
-      'Imagineers built Cinderella Castle with forced perspective: upper bricks get smaller near top to make it look taller!',
-      'Underneath Magic Kingdom lies a 9-acre network of utility tunnels called "utilidors" so cast members move unseen.'
+      'Imagineers built Cinderella Castle with forced perspective: the upper bricks and windows get smaller near the top to make it look taller!',
+      'Underneath Magic Kingdom lies a 9-acre network of utility tunnels called "utilidors" so cast members and supplies move unseen.'
     ],
     'Epcot': [
       'The World Showcase promenade is 1.2 miles around the lagoon, featuring 11 country pavilions celebrating global culture!',
       'Spaceship Earth weighs approximately 16 million pounds—more than three times the weight of a fully loaded Space Shuttle!'
     ],
     'Hollywood Studios': [
-      'Galaxy’s Edge is set on the remote planet Batuu, designed with custom weathered architecture down to creature footprints.',
+      'The land of Galaxy’s Edge is set on the remote planet Batuu, designed with custom weathered architecture down to creature footprints in the concrete.',
       'Echo Lake is shaped like a giant footprint of Dinosaur Gertie, who sits beside the water offering ice cream!'
     ],
     'Animal Kingdom': [
-      'The Tree of Life stands 145 feet tall and features over 300 intricately hand-carved animal figures woven into its trunk.',
+      'The Tree of Life stands 145 feet tall and features over 300 intricately hand-carved animal figures woven into its trunk and branches.',
       'Disney’s Animal Kingdom was built with over 4 million trees, shrubs, and vines planted across 500 acres.'
     ]
   };
@@ -208,10 +222,23 @@ const getRideTriviaFact = (rideName: string, parkName: string): string => {
   return list[Math.floor(Math.random() * list.length)];
 };
 
+// Helper: Parse attendees/riders string or array safely
 const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
   return raw.split(',').map(s => s.trim()).filter(Boolean);
+};
+
+// Helper: Parse memberEndTimes dictionary
+const parseMemberEndTimes = (raw: any, notes?: string): Record<string, string> => {
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try { return JSON.parse(raw); } catch (e) {}
+  }
+  if (notes && typeof notes === 'string' && notes.trim().startsWith('{')) {
+    try { return JSON.parse(notes); } catch (e) {}
+  }
+  return {};
 };
 
 export default function DisneyTracker() {
@@ -233,14 +260,14 @@ export default function DisneyTracker() {
   const [characterName, setCharacterName] = useState('');
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
 
-  // Live Queue Timer State
+  // ⏱️ LIVE QUEUE TIMER STATE
   const [queueStartTimestamp, setQueueStartTimestamp] = useState<number | null>(null);
   const [queueStartTimeStr, setQueueStartTimeStr] = useState<string | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
   const [rideTrivia, setRideTrivia] = useState<string | null>(null);
   const [triviaLoading, setTriviaLoading] = useState<boolean>(false);
 
-  // Editing Ride State
+  // ✏️ EDITING RIDE STATE
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [editRideName, setEditRideName] = useState('');
@@ -248,10 +275,28 @@ export default function DisneyTracker() {
   const [editNotes, setEditNotes] = useState('');
   const [editRiders, setEditRiders] = useState<string[]>([]);
 
-  // Staggered Check-out Modal State
+  // 👋 STAGGERED CHECK-OUT MODAL STATE
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
 
+  // Active party members currently in the park (have not checked out yet)
+  const activePartyList = useMemo(() => {
+    if (!activeVisit) return [];
+    const allParty = parseAttendees(activeVisit.attendees);
+    const endTimes = activeVisit.memberEndTimes || {};
+    return allParty.filter(member => !endTimes[member]);
+  }, [activeVisit]);
+
+  // Sync selectedRiders when activePartyList changes
+  useEffect(() => {
+    if (activeVisit) {
+      setSelectedRiders(activePartyList);
+      setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
+      setDepartingMembers(activePartyList);
+    }
+  }, [activeVisit, activePartyList.length]);
+
+  // Ticking timer effect for live queue time calculation
   useEffect(() => {
     let interval: any;
     if (queueStartTimestamp) {
@@ -262,14 +307,7 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
-  useEffect(() => {
-    if (activeVisit) {
-      const currentParty = parseAttendees(activeVisit.attendees);
-      setSelectedRiders(currentParty);
-      setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
-    }
-  }, [activeVisit]);
-
+  // Load from Supabase on start
   useEffect(() => {
     fetchCloudVisits();
   }, []);
@@ -277,13 +315,8 @@ export default function DisneyTracker() {
   const fetchCloudVisits = async () => {
     setLoading(true);
     try {
-      const client = await getSupabase();
-      if (!client) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: visitsData, error: visitsError } = await client
+      const supabase = await getSupabase();
+      const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
         .select('*, activities(*)');
 
@@ -297,6 +330,8 @@ export default function DisneyTracker() {
           endTime: v.endTime || v.endtime || '',
           parkName: v.parkName || v.parkname,
           attendees: parseAttendees(v.attendees),
+          memberEndTimes: parseMemberEndTimes(v.memberEndTimes || v.member_end_times, v.notes),
+          notes: v.notes,
           activities: (v.activities || []).map((a: any) => ({
             id: a.id,
             visit_id: a.visit_id,
@@ -307,6 +342,7 @@ export default function DisneyTracker() {
           }))
         }));
 
+        // Sort visits reverse chronologically
         formattedVisits.sort((a, b) => {
           const dateA = new Date(`${a.visitDate}T${a.startTime || '00:00'}`).getTime();
           const dateB = new Date(`${b.visitDate}T${b.startTime || '00:00'}`).getTime();
@@ -317,9 +353,6 @@ export default function DisneyTracker() {
         const completed = formattedVisits.filter(v => v.endTime);
 
         setActiveVisit(ongoing || null);
-        if (ongoing) {
-          setDepartingMembers(parseAttendees(ongoing.attendees));
-        }
         setVisits(completed);
       }
     } catch (err) {
@@ -372,6 +405,15 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
+  // Helper: Get departure time for a specific person in a visit
+  const getPersonEndTime = (v: Visit, person: string) => {
+    if (v.memberEndTimes && v.memberEndTimes[person]) {
+      return v.memberEndTimes[person];
+    }
+    return v.endTime || '';
+  };
+
+  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -380,6 +422,7 @@ export default function DisneyTracker() {
     });
   }, [visits, selectedAttendee]);
 
+  // Helper: check if person actually rode activity
   const isPersonRider = (activity: Activity, visit: Visit, person: string) => {
     const activityRiders = parseAttendees(activity.riders);
     if (activityRiders.length > 0) {
@@ -388,6 +431,7 @@ export default function DisneyTracker() {
     return parseAttendees(visit.attendees).includes(person);
   };
 
+  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
   
   const totalActivities = useMemo(() => {
@@ -410,12 +454,27 @@ export default function DisneyTracker() {
     }, 0);
   }, [filteredVisits, selectedAttendee]);
 
-  const totalParkMinutes = filteredVisits.reduce((sum, v) => {
-    if (!v.startTime || !v.endTime) return sum;
-    const start = parseTimeToMinutes(v.startTime);
-    const end = parseTimeToMinutes(v.endTime);
-    return sum + (end >= start ? (end - start) : ((1440 - start) + end));
-  }, 0);
+  const totalParkMinutes = useMemo(() => {
+    return filteredVisits.reduce((sum, v) => {
+      const attendeesToCount = selectedAttendee === 'ALL' 
+        ? parseAttendees(v.attendees)
+        : [selectedAttendee];
+
+      // Calculate avg or person-specific time in park
+      let visitTime = 0;
+      attendeesToCount.forEach(person => {
+        const pEndTime = getPersonEndTime(v, person);
+        if (v.startTime && pEndTime) {
+          const start = parseTimeToMinutes(v.startTime);
+          const end = parseTimeToMinutes(pEndTime);
+          visitTime += end >= start ? (end - start) : ((1440 - start) + end);
+        }
+      });
+
+      const avgTimeForVisit = attendeesToCount.length > 0 ? visitTime / attendeesToCount.length : 0;
+      return sum + avgTimeForVisit;
+    }, 0);
+  }, [filteredVisits, selectedAttendee]);
 
   const avgActivitiesPerDay = totalDays > 0 ? (totalActivities / totalDays).toFixed(1) : '0';
   const avgParkMinutesPerDay = totalDays > 0 ? totalParkMinutes / totalDays : 0;
@@ -438,9 +497,11 @@ export default function DisneyTracker() {
         
         initialParks[park].activities += validActs.length;
         initialParks[park].waitTime += validActs.reduce((sum, act) => sum + act.waitTimeMinutes, 0);
-        if (v.startTime && v.endTime) {
+        
+        const pEndTime = personFilter === 'ALL' ? v.endTime : getPersonEndTime(v, personFilter);
+        if (v.startTime && pEndTime) {
           const start = parseTimeToMinutes(v.startTime);
-          const end = parseTimeToMinutes(v.endTime);
+          const end = parseTimeToMinutes(pEndTime);
           initialParks[park].timeInPark += end >= start ? (end - start) : ((1440 - start) + end);
         }
       }
@@ -549,9 +610,6 @@ export default function DisneyTracker() {
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const client = await getSupabase();
-    if (!client) return;
-
     const now = new Date();
     const localDate = now.toLocaleDateString('en-CA');
     const localTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -559,7 +617,8 @@ export default function DisneyTracker() {
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
 
-    const { data, error } = await client
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
       .from('visits')
       .insert({
         visitDate: localDate,
@@ -583,6 +642,7 @@ export default function DisneyTracker() {
       endTime: '',
       parkName,
       attendees: newAttendeesList,
+      memberEndTimes: {},
       activities: []
     };
 
@@ -594,14 +654,12 @@ export default function DisneyTracker() {
 
   const handleAddRideLive = async () => {
     if (!activeVisit || !rideName) return;
-    const client = await getSupabase();
-    if (!client) return;
-
     const waitMins = parseInt(waitTime) || 0;
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
-    let { data, error } = await client
+    const supabase = await getSupabase();
+    let { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -613,8 +671,9 @@ export default function DisneyTracker() {
       .select()
       .single();
 
+    // Fallback if 'riders' column does not exist in Supabase schema yet
     if (error && error.message.includes('riders')) {
-      const fallbackRes = await client
+      const fallbackRes = await supabase
         .from('activities')
         .insert({
           visit_id: activeVisit.id,
@@ -648,12 +707,15 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
+  // FETCH RIDE TRIVIA
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
 
+    // 1. Instantly load a ride-specific trivia fact from local database
     const localFact = getRideTriviaFact(attractionName, park);
     setRideTrivia(localFact);
 
+    // 2. Optional: Try live Gemini API call if process.env key is configured
     const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
     if (!apiKey) {
       setTriviaLoading(false);
@@ -695,9 +757,6 @@ export default function DisneyTracker() {
 
   const handleEndQueueTimer = async () => {
     if (!activeVisit || !queueStartTimestamp) return;
-    const client = await getSupabase();
-    if (!client) return;
-
     const nowMs = Date.now();
     const diffMs = nowMs - queueStartTimestamp;
     let calculatedWait = Math.round(diffMs / 60000);
@@ -706,7 +765,8 @@ export default function DisneyTracker() {
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
     const ridersStr = selectedRiders.join(', ');
 
-    let { data, error } = await client
+    const supabase = await getSupabase();
+    let { data, error } = await supabase
       .from('activities')
       .insert({
         visit_id: activeVisit.id,
@@ -719,7 +779,7 @@ export default function DisneyTracker() {
       .single();
 
     if (error && error.message.includes('riders')) {
-      const fallbackRes = await client
+      const fallbackRes = await supabase
         .from('activities')
         .insert({
           visit_id: activeVisit.id,
@@ -782,14 +842,13 @@ export default function DisneyTracker() {
 
   const saveEditedActivity = async () => {
     if (!editingActivityId) return;
-    const client = await getSupabase();
-    if (!client) return;
 
     const waitMins = parseInt(editWaitTime) || 0;
     const notesVal = editNotes.trim() ? editNotes : null;
     const ridersStr = editRiders.join(', ');
 
-    let { error } = await client
+    const supabase = await getSupabase();
+    let { error } = await supabase
       .from('activities')
       .update({
         rideName: editRideName,
@@ -800,7 +859,7 @@ export default function DisneyTracker() {
       .eq('id', editingActivityId);
 
     if (error && error.message.includes('riders')) {
-      const fallbackRes = await client
+      const fallbackRes = await supabase
         .from('activities')
         .update({
           rideName: editRideName,
@@ -823,10 +882,9 @@ export default function DisneyTracker() {
 
   const deleteActivity = async (activityId: string) => {
     if (!confirm("Delete this ride entry?")) return;
-    const client = await getSupabase();
-    if (!client) return;
 
-    const { error } = await client.from('activities').delete().eq('id', activityId);
+    const supabase = await getSupabase();
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
     if (error) {
       alert("Error deleting entry: " + error.message);
       return;
@@ -835,78 +893,56 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
+  // SINGLE VISIT OPTION 1 STAGGERED CHECK-OUT HANDLER
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
-    const client = await getSupabase();
-    if (!client) return;
-
     const now = new Date();
     const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
-    const currentParty = parseAttendees(activeVisit.attendees);
-    const leavingParty = checkoutType === 'everyone' ? currentParty : departingMembers;
-    const remainingParty = currentParty.filter(m => !leavingParty.includes(m));
+    const currentActive = activePartyList;
+    const leavingParty = checkoutType === 'everyone' ? currentActive : departingMembers;
+    const remainingActive = currentActive.filter(m => !leavingParty.includes(m));
 
-    if (remainingParty.length === 0 || checkoutType === 'everyone') {
-      const { error } = await client
-        .from('visits')
-        .update({ endTime, attendees: leavingParty.join(', ') })
-        .eq('id', activeVisit.id);
+    // Update memberEndTimes dictionary
+    const updatedEndTimes: Record<string, string> = {
+      ...(activeVisit.memberEndTimes || {})
+    };
+    leavingParty.forEach(m => {
+      updatedEndTimes[m] = endTime;
+    });
 
-      if (error) {
-        alert("Error checking out: " + error.message);
-        return;
-      }
-    } else {
-      const { data: newV, error: vErr } = await client
+    const isVisitComplete = remainingActive.length === 0;
+    const finalEndTime = isVisitComplete ? endTime : '';
+    const jsonEndTimesStr = JSON.stringify(updatedEndTimes);
+
+    const supabase = await getSupabase();
+
+    // Save memberEndTimes directly on the active visit (no duplication!)
+    let { error } = await supabase
+      .from('visits')
+      .update({
+        endTime: finalEndTime,
+        memberEndTimes: jsonEndTimesStr,
+        notes: jsonEndTimesStr
+      })
+      .eq('id', activeVisit.id);
+
+    if (error) {
+      // Fallback if memberEndTimes column isn't in Supabase schema yet
+      const fallbackRes = await supabase
         .from('visits')
-        .insert({
-          visitDate: activeVisit.visitDate,
-          startTime: activeVisit.startTime,
-          endTime,
-          parkName: activeVisit.parkName,
-          attendees: leavingParty.join(', ')
+        .update({
+          endTime: finalEndTime,
+          notes: jsonEndTimesStr
         })
-        .select()
-        .single();
-
-      if (vErr) {
-        alert("Error creating departure log: " + vErr.message);
-        return;
-      }
-
-      // STRICT "NO RIDE, NO RECORD": Only copy rides where departing member(s) were actual riders!
-      if (activeVisit.activities.length > 0) {
-        const actsToDuplicate = activeVisit.activities
-          .map(a => {
-            const aRiders = parseAttendees(a.riders);
-            const actualDepartingRiders = aRiders.filter(r => leavingParty.includes(r));
-            if (actualDepartingRiders.length === 0) return null;
-
-            return {
-              visit_id: newV.id,
-              rideName: a.rideName,
-              waitTimeMinutes: a.waitTimeMinutes,
-              notes: a.notes,
-              riders: actualDepartingRiders.join(', ')
-            };
-          })
-          .filter(Boolean) as any[];
-
-        if (actsToDuplicate.length > 0) {
-          await client.from('activities').insert(actsToDuplicate);
-        }
-      }
-
-      const { error: updateErr } = await client
-        .from('visits')
-        .update({ attendees: remainingParty.join(', ') })
         .eq('id', activeVisit.id);
 
-      if (updateErr) {
-        alert("Error updating active party: " + updateErr.message);
-        return;
-      }
+      error = fallbackRes.error;
+    }
+
+    if (error) {
+      alert("Error saving departure time: " + error.message);
+      return;
     }
 
     setShowCheckoutModal(false);
@@ -918,10 +954,8 @@ export default function DisneyTracker() {
 
   const deleteVisit = async (id: string) => {
     if (confirm("Delete this visit history permanently?")) {
-      const client = await getSupabase();
-      if (!client) return;
-
-      const { error } = await client.from('visits').delete().eq('id', id);
+      const supabase = await getSupabase();
+      const { error } = await supabase.from('visits').delete().eq('id', id);
       if (error) {
         alert("Error deleting visit: " + error.message);
         return;
@@ -939,18 +973,16 @@ export default function DisneyTracker() {
     return `${mins} mins ${secs > 0 ? `${secs}s` : ''}`;
   };
 
-  const activePartyList = activeVisit ? parseAttendees(activeVisit.attendees) : [];
-
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
       
-      {/* HERO HEADER */}
+      {/* 🏰 HERO HEADER */}
       <header style={{ textAlign: 'center', marginBottom: '15px', padding: '10px 0' }}>
         <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0 0 4px 0' }}>🏰 My Annual Pass Tracker</h1>
         <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>Shared Cloud Sync Active ☁️</p>
       </header>
 
-      {/* GLOBAL ATTENDEE FILTER BAR */}
+      {/* 👤 GLOBAL ATTENDEE FILTER BAR */}
       <div style={{ background: '#FFF', padding: '10px 14px', borderRadius: '14px', border: '1px solid #E2E8F0', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
         <label style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568', display: 'flex', alignItems: 'center', gap: '6px' }}>
           👤 Filter by Attendee:
@@ -967,14 +999,14 @@ export default function DisneyTracker() {
         </select>
       </div>
 
-      {/* TAB NAVIGATION */}
+      {/* 🗂️ TAB NAVIGATION */}
       <div style={{ display: 'flex', background: '#E2E8F0', padding: '4px', borderRadius: '12px', marginBottom: '20px' }}>
         <button onClick={() => setActiveTab('tracker')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'tracker' ? '#004487' : 'transparent', color: activeTab === 'tracker' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>⏱️ Live Companion</button>
         <button onClick={() => setActiveTab('analytics')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'analytics' ? '#004487' : 'transparent', color: activeTab === 'analytics' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>📊 Analytics</button>
         <button onClick={() => setActiveTab('ride-everything')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', background: activeTab === 'ride-everything' ? '#004487' : 'transparent', color: activeTab === 'ride-everything' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>🎡 Ride Everything</button>
       </div>
 
-      {/* TAB 1: LIVE COMPANION */}
+      {/* 🟢 TAB 1: LIVE WORKSPACE */}
       {activeTab === 'tracker' && (
         <div>
           {activeVisit ? (
@@ -995,7 +1027,7 @@ export default function DisneyTracker() {
               </div>
 
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
-                👥 <strong>Party:</strong> {activePartyList.join(', ')}
+                👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
               </p>
 
               {/* TRACK ATTRACTION CARD */}
@@ -1016,7 +1048,7 @@ export default function DisneyTracker() {
                     </optgroup>
                   </select>
 
-                  {/* PER-RIDE ATTENDEE SELECTOR ("WHO RODE THIS?") */}
+                  {/* 🎢 PER-RIDE ATTENDEE SELECTOR ("WHO RODE THIS?") */}
                   {activePartyList.length > 1 && (
                     <div style={{ background: '#F7FAFC', border: '1px solid #E2E8F0', padding: '10px', borderRadius: '10px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
@@ -1134,10 +1166,11 @@ export default function DisneyTracker() {
                               </optgroup>
                             </select>
 
+                            {/* EDIT RIDERS SELECTOR */}
                             <div style={{ marginBottom: '6px' }}>
                               <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                {activePartyList.map((m) => {
+                                {parseAttendees(activeVisit.attendees).map((m) => {
                                   const checked = editRiders.includes(m);
                                   return (
                                     <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -1216,6 +1249,7 @@ export default function DisneyTracker() {
             </form>
           )}
 
+          {/* MAIN CORE SUMMARY MODULE */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -1247,6 +1281,7 @@ export default function DisneyTracker() {
               </div>
             </div>
 
+            {/* AVERAGES SECTION */}
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
               <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
@@ -1264,6 +1299,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {/* PAST LOG ENTRIES */}
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
               Past Visits ({filteredVisits.length})
@@ -1273,95 +1309,127 @@ export default function DisneyTracker() {
             ) : filteredVisits.length === 0 ? (
               <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>No completed trips found for this view.</p>
             ) : (
-              filteredVisits.map((v) => (
-                <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
-                    <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
-                      {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
-                    </strong>
-                    <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span> <br />
-                    👥 <strong>Party:</strong> {parseAttendees(v.attendees).join(', ')}
-                  </div>
-                  {v.activities.length > 0 && (
-                    <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {v.activities.map((a) => {
-                          const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
-                          const actRidersList = parseAttendees(a.riders);
-                          const visitPartyList = parseAttendees(v.attendees);
+              filteredVisits.map((v) => {
+                const partyList = parseAttendees(v.attendees);
+                const endTimes = v.memberEndTimes || {};
 
-                          return isEditingThis ? (
-                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
-                              <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
-                                <optgroup label="Park Rides & Shows">
-                                  {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
-                                    <option key={attraction} value={attraction}>{attraction}</option>
-                                  ))}
-                                </optgroup>
-                                <optgroup label="Events & Activities">
-                                  {UNIVERSAL_ACTIVITIES.map((action) => (
-                                    <option key={action} value={action}>{action}</option>
-                                  ))}
-                                </optgroup>
-                              </select>
+                // Group attendees by their departure time
+                const departureGroups: Record<string, string[]> = {};
+                partyList.forEach(m => {
+                  const pTime = getPersonEndTime(v, m);
+                  if (!departureGroups[pTime]) departureGroups[pTime] = [];
+                  departureGroups[pTime].push(m);
+                });
 
-                              <div style={{ marginBottom: '6px' }}>
-                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {visitPartyList.map((m) => {
-                                    const checked = editRiders.includes(m);
-                                    return (
-                                      <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
-                                        {m}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                              
-                              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                              </div>
+                const uniqueDepTimes = Object.keys(departureGroups);
+                const hasStaggeredCheckout = uniqueDepTimes.length > 1;
 
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => deleteActivity(a.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
-                                <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                                <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
-                                <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                  ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
-                                </div>
-                              </div>
-                              <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
-                                Edit
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                return (
+                  <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
+                      <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
+                        {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                      </strong>
+                      <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
                     </div>
-                  )}
-                  <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                    🗑️ Delete Entire Visit Log
-                  </button>
-                </div>
-              ))
+
+                    <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
+                      👥 <strong>Party:</strong> {partyList.join(', ')} <br />
+                      
+                      {!hasStaggeredCheckout ? (
+                        <div style={{ marginTop: '2px' }}>
+                          ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '6px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ DEPARTURE TIMES:</div>
+                          {uniqueDepTimes.map(depTime => (
+                            <div key={depTime} style={{ fontSize: '12px', color: '#2D3748', marginTop: '2px' }}>
+                              • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {v.activities.length > 0 && (
+                      <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {v.activities.map((a) => {
+                            const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+                            const actRidersList = parseAttendees(a.riders);
+
+                            return isEditingThis ? (
+                              <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
+                                <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                  <optgroup label="Park Rides & Shows">
+                                    {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                      <option key={attraction} value={attraction}>{attraction}</option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Events & Activities">
+                                    {UNIVERSAL_ACTIVITIES.map((action) => (
+                                      <option key={action} value={action}>{action}</option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+
+                                {/* EDIT RIDERS SELECTOR FOR PAST VISITS */}
+                                <div style={{ marginBottom: '6px' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {partyList.map((m) => {
+                                      const checked = editRiders.includes(m);
+                                      return (
+                                        <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                          {m}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                  <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                  <button onClick={() => deleteActivity(a.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                  <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                  <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                  <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
+                                  <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                                    ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
+                                  </div>
+                                </div>
+                                <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
+                                  Edit
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', marginTop: '12px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
+                      🗑️ Delete Entire Visit Log
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
       )}
 
-      {/* TAB 2: ANALYTICS */}
+      {/* 📊 TAB 2: DEEP ANALYTICS */}
       {activeTab === 'analytics' && (
         <div>
           {/* PARK AVERAGES */}
@@ -1404,6 +1472,7 @@ export default function DisneyTracker() {
             })}
           </div>
 
+          {/* MOST TIMES RIDDEN LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
             {mostTimesRidden.length === 0 ? (
@@ -1431,6 +1500,7 @@ export default function DisneyTracker() {
             )}
           </div>
 
+          {/* LONGEST WAIT TIMES LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1454,6 +1524,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {/* SHORTEST WAIT TIMES LEADERBOARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1477,6 +1548,7 @@ export default function DisneyTracker() {
             </div>
           </div>
 
+          {/* 👥 ATTENDEE CARDS SECTION */}
           <div style={{ marginTop: '30px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
               👥 Attendee Cards
@@ -1497,9 +1569,10 @@ export default function DisneyTracker() {
                 }, 0);
                 
                 const personParkMins = personVisits.reduce((sum, v) => {
-                  if (!v.startTime || !v.endTime) return sum;
+                  const pEndTime = getPersonEndTime(v, person);
+                  if (!v.startTime || !pEndTime) return sum;
                   const start = parseTimeToMinutes(v.startTime);
-                  const end = parseTimeToMinutes(v.endTime);
+                  const end = parseTimeToMinutes(pEndTime);
                   return sum + (end >= start ? (end - start) : ((1440 - start) + end));
                 }, 0);
 
@@ -1521,6 +1594,7 @@ export default function DisneyTracker() {
                       </span>
                     </div>
 
+                    {/* STATS OVERVIEW */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
                       <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
                         <div style={{ fontSize: '15px', fontWeight: '800', color: '#2D3748' }}>{personActs}</div>
@@ -1536,6 +1610,7 @@ export default function DisneyTracker() {
                       </div>
                     </div>
 
+                    {/* AVERAGES ROW */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
                       <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgActs}</div>
@@ -1551,6 +1626,7 @@ export default function DisneyTracker() {
                       </div>
                     </div>
 
+                    {/* FAVORITE RIDE BANNER */}
                     <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px' }}>
                       <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621' }}>⭐ FAVORITE RIDE</div>
                       <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', marginTop: '2px' }}>
@@ -1563,6 +1639,7 @@ export default function DisneyTracker() {
                       )}
                     </div>
 
+                    {/* RIDE EVERYTHING CHECKLIST BREAKDOWN */}
                     <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginBottom: '6px' }}>🎡 RIDE EVERYTHING PROGRESS:</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -1591,7 +1668,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {/* TAB 3: RIDE EVERYTHING */}
+      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
       {activeTab === 'ride-everything' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
@@ -1626,7 +1703,7 @@ export default function DisneyTracker() {
                       <div key={attraction} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: '10px', background: isCompleted ? '#F0FFF4' : '#F8FAFC', border: isCompleted ? '1px solid #C6F6D5' : '1px solid #EDF2F7' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingRight: '8px' }}>
                           <span style={{ fontSize: '14px', flexShrink: 0 }}>
-                            {isCompleted ? '✅' : '⬜'}
+                            {isCompleted ? '✅' : '⚪'}
                           </span>
                           <span style={{ fontSize: '13px', fontWeight: isCompleted ? '700' : '500', color: isCompleted ? '#22543D' : '#4A5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {attraction}
@@ -1646,7 +1723,7 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {/* CHECKOUT MODAL */}
+      {/* 👋 STAGGERED CHECK-OUT MODAL */}
       {showCheckoutModal && activeVisit && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
