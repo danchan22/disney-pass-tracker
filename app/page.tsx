@@ -1620,6 +1620,47 @@ export default function DisneyTracker() {
                         </div>
                       )}
 
+                      {/* 🎵 POSSIBLE SONGS INFO BOX */}
+                      {(() => {
+                        const lower = rideName.toLowerCase();
+                        const isMuppets = lower.includes('muppet') || lower.includes('rock') || lower.includes('roller');
+                        const isGuardians = lower.includes('guardians') || lower.includes('cosmic');
+
+                        if (!isMuppets && !isGuardians) return null;
+
+                        const muppetsSongs = [
+                          '"Song 2"',
+                          '"Born to Be Wild" (featuring Camilla the Chicken)',
+                          '"Love Rollercoaster"'
+                        ];
+
+                        const guardiansSongs = [
+                          '“September” by Earth, Wind & Fire',
+                          '“Disco Inferno” by The Trammps',
+                          '“Everybody Wants to Rule the World” by Tears for Fears',
+                          '“I Ran (So Far Away)” by A Flock of Seagulls',
+                          '“One Way or Another” by Blondie',
+                          '“Conga” by Gloria Estefan'
+                        ];
+
+                        const songs = isMuppets ? muppetsSongs : guardiansSongs;
+
+                        return (
+                          <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', padding: '10px 12px', borderRadius: '12px', marginTop: '2px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
+                            <div style={{ fontWeight: '800', color: '#7E22CE', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              🎵 Possible Songs:
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
+                              {songs.map((song, i) => (
+                                <li key={i} style={{ marginBottom: i === songs.length - 1 ? 0 : '3px' }}>
+                                  {song}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
+
                       {queueStartTimestamp ? (
                         <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
                           <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
@@ -2038,7 +2079,7 @@ export default function DisneyTracker() {
             <div>
               {/* MOST TIMES RIDDEN */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden</h2>
                 {mostTimesRidden.length === 0 ? (
                   <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to build your charts!</p>
                 ) : (
@@ -2067,7 +2108,7 @@ export default function DisneyTracker() {
 
               {/* LONGEST AVERAGE WAITS */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {longestWaitTimes.map((ride, index) => (
                     <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFAF0', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
@@ -2078,8 +2119,8 @@ export default function DisneyTracker() {
                           {PARK_EMOJIS[ride.park]} {ride.park}
                         </div>
                         <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                          Avg Wait Time: <strong>{ride.avgWait}m</strong><br />
-                          Total Times Ridden: <strong>{ride.count}x</strong>
+                          Total Times Ridden: <strong>{ride.count}x</strong><br />
+                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong>
                         </div>
                       </div>
                       <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
@@ -2092,7 +2133,7 @@ export default function DisneyTracker() {
 
               {/* SHORTEST AVERAGE WAITS */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {shortestWaitTimes.map((ride, index) => (
                     <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F0FFF4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
@@ -2103,8 +2144,8 @@ export default function DisneyTracker() {
                           {PARK_EMOJIS[ride.park]} {ride.park}
                         </div>
                         <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                          Avg Wait Time: <strong>{ride.avgWait}m</strong><br />
-                          Total Times Ridden: <strong>{ride.count}x</strong>
+                          Total Times Ridden: <strong>{ride.count}x</strong><br />
+                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong>
                         </div>
                       </div>
                       <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
@@ -2117,7 +2158,7 @@ export default function DisneyTracker() {
 
               {/* LONGEST INDIVIDUAL WAIT TIMES */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#9B2C2C', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🔥 Longest Individual Wait Times (Top 10)</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#9B2C2C', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🔥 Longest Individual Wait Times</h2>
                 {(() => {
                   const allIndividualActs: { id: string; name: string; park: string; wait: number; date: string; riders: string[] }[] = [];
                   filteredVisits.forEach(v => {
@@ -2155,7 +2196,8 @@ export default function DisneyTracker() {
                               {PARK_EMOJIS[act.park]} {act.park}
                             </div>
                             <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                              📅 {formatDisplayDate(act.date)} • 👥 {act.riders.join(', ')}
+                              📅 {formatDisplayDate(act.date)}<br />
+                              👥 {act.riders.join(', ')}
                             </div>
                           </div>
                           <div style={{ background: '#FEB2B2', color: '#9B2C2C', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
