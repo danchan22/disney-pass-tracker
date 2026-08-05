@@ -1302,6 +1302,49 @@ export default function DisneyTracker() {
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px 15px 30px 15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
       
+      {/* 🔮 ALWAYS-ON RAINBOW GLOW ANIMATION */}
+      <style>{`
+        @keyframes glowingAnimation {
+          0% { background-position: 0 0; }
+          50% { background-position: 400% 0; }
+          100% { background-position: 0 0; }
+        }
+
+        .always-glowing-btn {
+          position: relative;
+          z-index: 0;
+          border-radius: 14px;
+        }
+
+        .always-glowing-btn::before {
+          content: '';
+          background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+          position: absolute;
+          top: -3px;
+          left: -3px;
+          background-size: 400%;
+          z-index: -1;
+          filter: blur(6px);
+          width: calc(100% + 6px);
+          height: calc(100% + 6px);
+          animation: glowingAnimation 20s linear infinite;
+          opacity: 1;
+          border-radius: 16px;
+        }
+
+        .always-glowing-btn::after {
+          z-index: -1;
+          content: '';
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, #0066cc 0%, #004487 100%);
+          left: 0;
+          top: 0;
+          border-radius: 14px;
+        }
+      `}</style>
+
       {/* 🏰 APP HEADER (Clean Disney Pass Tracker) */}
       <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0' }}>
         <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0' }}>🏰 Disney Pass Tracker</h1>
@@ -1464,7 +1507,7 @@ export default function DisneyTracker() {
       {(mainTab === 'checklist' || (mainTab === 'analytics' && analyticsSubTab !== 'cards')) && (
         <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '14px' }}>
           <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>👤 FILTER BY ATTENDEE</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
             {FIXED_FAMILY_MEMBERS.map(m => {
               const isSelected = selectedAttendee === m;
               return (
@@ -1472,13 +1515,13 @@ export default function DisneyTracker() {
                   key={m}
                   onClick={() => setSelectedAttendee(prev => prev === m ? 'ALL' : m)}
                   style={{
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    border: isSelected ? '2px solid #004487' : '1px solid #CBD5E0',
+                    padding: '10px 4px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? '800' : '500',
+                    border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
                     background: isSelected ? '#004487' : '#FFF',
-                    color: isSelected ? '#FFF' : '#4A5568',
+                    color: isSelected ? '#FFF' : '#2D3748',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -1741,8 +1784,21 @@ export default function DisneyTracker() {
                     </div>
                   </div>
 
-                  <button type="submit" style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0066cc 0%, #004487 100%)', color: '#FFF', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    🚀 Check In to Park
+                  <button
+                    type="submit"
+                    className="always-glowing-btn"
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      color: '#FFF',
+                      border: 'none',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                    }}
+                  >
+                    Here we go...🧚✨
                   </button>
                 </form>
               )}
@@ -1996,7 +2052,8 @@ export default function DisneyTracker() {
                             {PARK_EMOJIS[ride.park]} {ride.park}
                           </div>
                           <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                            Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                            Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong><br />
+                            Avg Wait Time: <strong>{ride.avgWait}m</strong>
                           </div>
                         </div>
                         <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
@@ -2008,7 +2065,7 @@ export default function DisneyTracker() {
                 )}
               </div>
 
-              {/* LONGEST WAIT TIMES */}
+              {/* LONGEST AVERAGE WAITS */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2021,18 +2078,19 @@ export default function DisneyTracker() {
                           {PARK_EMOJIS[ride.park]} {ride.park}
                         </div>
                         <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                          Avg Wait Time: <strong>{ride.avgWait}m</strong><br />
+                          Total Times Ridden: <strong>{ride.count}x</strong>
                         </div>
                       </div>
                       <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                        {ride.avgWait}m avg
+                        {ride.avgWait}m
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* SHORTEST WAIT TIMES */}
+              {/* SHORTEST AVERAGE WAITS */}
               <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -2045,15 +2103,69 @@ export default function DisneyTracker() {
                           {PARK_EMOJIS[ride.park]} {ride.park}
                         </div>
                         <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                          Avg Wait Time: <strong>{ride.avgWait}m</strong><br />
+                          Total Times Ridden: <strong>{ride.count}x</strong>
                         </div>
                       </div>
                       <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                        {ride.avgWait}m avg
+                        {ride.avgWait}m
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* LONGEST INDIVIDUAL WAIT TIMES */}
+              <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#9B2C2C', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🔥 Longest Individual Wait Times (Top 10)</h2>
+                {(() => {
+                  const allIndividualActs: { id: string; name: string; park: string; wait: number; date: string; riders: string[] }[] = [];
+                  filteredVisits.forEach(v => {
+                    const validActs = selectedAttendee === 'ALL'
+                      ? v.activities
+                      : v.activities.filter(a => isPersonRider(a, v, selectedAttendee));
+                    validActs.forEach(a => {
+                      const rList = parseAttendees(a.riders);
+                      allIndividualActs.push({
+                        id: a.id,
+                        name: a.rideName === 'Character Meeting' && a.notes ? `Meet ${a.notes}` : a.rideName,
+                        park: v.parkName,
+                        wait: a.waitTimeMinutes,
+                        date: v.visitDate,
+                        riders: rList.length > 0 ? rList : parseAttendees(v.attendees)
+                      });
+                    });
+                  });
+
+                  allIndividualActs.sort((a, b) => b.wait - a.wait);
+                  const topIndividual = allIndividualActs.slice(0, 10);
+
+                  if (topIndividual.length === 0) {
+                    return <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>No activity records available.</p>;
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {topIndividual.map((act, index) => (
+                        <div key={`${act.id}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFF5F5', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEB2B2' }}>
+                          <div style={{ background: '#E53E3E', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.name}</div>
+                            <div style={{ fontSize: '11px', color: '#9B2C2C', fontWeight: '700', marginTop: '1px' }}>
+                              {PARK_EMOJIS[act.park]} {act.park}
+                            </div>
+                            <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                              📅 {formatDisplayDate(act.date)} • 👥 {act.riders.join(', ')}
+                            </div>
+                          </div>
+                          <div style={{ background: '#FEB2B2', color: '#9B2C2C', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                            {act.wait}m
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
