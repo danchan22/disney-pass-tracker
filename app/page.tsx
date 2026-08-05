@@ -415,7 +415,7 @@ export default function DisneyTracker() {
   const [mainTab, setMainTab] = useState<'tracker' | 'analytics' | 'checklist' | 'rainbow'>('tracker');
 
   // Subheader Nav States
-  const [trackerSubTab, setTrackerSubTab] = useState<'visit' | 'past'>('Visit a Park');
+  const [trackerSubTab, setTrackerSubTab] = useState<'Visit a Park' | 'Past Visits'>('Visit a Park');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<'averages' | 'top10' | 'cards'>('averages');
   const [rainbowSubTab, setRainbowSubTab] = useState<'stream' | 'badges'>('stream');
 
