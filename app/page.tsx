@@ -75,7 +75,7 @@ export interface PhotoGridRecord {
   created_at?: string;
 }
 
-// --- FIXED FAMILY MEMBERS ---
+// --- CONSTANTS & DATA ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -193,8 +193,8 @@ const RIDE_TRIVIA_DB: Record<string, string[]> = {
     'The elevator drops are completely randomized by a central computer—you never get the exact same drop pattern twice!'
   ],
   'Slinky Dog Dash': [
-    'Look at the giant box in the queue: it\'s Andy\'s "Dash & Dodge Coaster Kit" which Andy assembled in his backyard using household toys!',
-    'Rex stands atop towers of Jenga blocks held together with giant plastic Elmer’s glue bottles.'
+    'Look at Andy’s coaster blueprint drawing near the queue entrance: check the red crayon doodles.',
+    'Check the Jenga block tower support pillars near Rex.'
   ],
   'Mickey & Minnie’s Runaway Railway': [
     'This was the first ride-through attraction in Disney history starring Mickey Mouse himself!',
@@ -410,11 +410,19 @@ const compressImageToWebP = (file: File): Promise<Blob> => {
 export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
-  const [activeTab, setActiveTab] = useState<'tracker' | 'analytics' | 'ride-everything' | 'rainbow-challenge'>('tracker');
+
+  // Main Header Nav State: 'tracker' | 'analytics' | 'checklist' | 'rainbow'
+  const [mainTab, setMainTab] = useState<'tracker' | 'analytics' | 'checklist' | 'rainbow'>('tracker');
+
+  // Subheader Nav States
+  const [trackerSubTab, setTrackerSubTab] = useState<'visit' | 'past'>('Visit a Park');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'averages' | 'top10' | 'cards'>('averages');
+  const [rainbowSubTab, setRainbowSubTab] = useState<'stream' | 'badges'>('stream');
+
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Global Attendee Filter State
+  // Global Attendee Filter State (Only for Analytics and Checklist)
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
   // Check-In Form States
@@ -457,7 +465,6 @@ export default function DisneyTracker() {
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
 
   // 🌈 RAINBOW CHALLENGE STATE
-  const [rainbowSubTab, setRainbowSubTab] = useState<'photos' | 'badges'>('photos');
   const [photoGrids, setPhotoGrids] = useState<PhotoGridRecord[]>([]);
   const [photoLoading, setPhotoLoading] = useState<boolean>(false);
 
@@ -479,7 +486,6 @@ export default function DisneyTracker() {
   // Lightbox State
   const [lightboxGrid, setLightboxGrid] = useState<PhotoGridRecord | null>(null);
 
-  // Active party members currently in the park (have not checked out yet)
   const activePartyList = useMemo(() => {
     if (!activeVisit) return [];
     const allParty = parseAttendees(activeVisit.attendees);
@@ -487,7 +493,6 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-  // Sync selectedRiders when activePartyList changes
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
@@ -496,7 +501,6 @@ export default function DisneyTracker() {
     }
   }, [activeVisit, activePartyList.length]);
 
-  // Ticking timer effect for live queue time calculation
   useEffect(() => {
     let interval: any;
     if (queueStartTimestamp) {
@@ -507,7 +511,6 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, [queueStartTimestamp]);
 
-  // Load from Supabase on start
   useEffect(() => {
     fetchCloudVisits();
     fetchPhotoGrids();
@@ -543,7 +546,6 @@ export default function DisneyTracker() {
           }))
         }));
 
-        // Sort visits reverse chronologically
         formattedVisits.sort((a, b) => {
           const dateA = new Date(`${a.visitDate}T${a.startTime || '00:00'}`).getTime();
           const dateB = new Date(`${b.visitDate}T${b.startTime || '00:00'}`).getTime();
@@ -625,7 +627,6 @@ export default function DisneyTracker() {
     return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
   };
 
-  // Helper: Get departure time for a specific person in a visit
   const getPersonEndTime = (v: Visit, person: string) => {
     if (v.memberEndTimes && v.memberEndTimes[person]) {
       return v.memberEndTimes[person];
@@ -633,7 +634,6 @@ export default function DisneyTracker() {
     return v.endTime || '';
   };
 
-  // --- FILTERED VISITS BASED ON ATTENDEE SELECTION ---
   const filteredVisits = useMemo(() => {
     if (selectedAttendee === 'ALL') return visits;
     return visits.filter(v => {
@@ -642,7 +642,6 @@ export default function DisneyTracker() {
     });
   }, [visits, selectedAttendee]);
 
-  // Helper: check if person actually rode activity
   const isPersonRider = (activity: Activity, visit: Visit, person: string) => {
     const activityRiders = parseAttendees(activity.riders);
     if (activityRiders.length > 0) {
@@ -792,7 +791,6 @@ export default function DisneyTracker() {
 
   const rideCountsMap = getRideCountsMap(filteredVisits, selectedAttendee);
 
-  // Filtered Photos for Rainbow Challenge
   const filteredPhotos = useMemo(() => {
     return photoGrids.filter(p => {
       if (filterPhotographer !== 'ALL' && p.user_name !== filterPhotographer) return false;
@@ -935,10 +933,8 @@ export default function DisneyTracker() {
     setCharacterName('');
   };
 
-  // FETCH RIDE TRIVIA
   const fetchRideTrivia = async (attractionName: string, park: string) => {
     setTriviaLoading(true);
-
     const localFact = getRideTriviaFact(attractionName, park);
     setRideTrivia(localFact);
 
@@ -960,21 +956,16 @@ export default function DisneyTracker() {
       if (res.ok) {
         const json = await res.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          setRideTrivia(text);
-        }
+        if (text) setRideTrivia(text);
       }
     } catch (err) {
-      // Keeps localFact on API failure
     } finally {
       setTriviaLoading(false);
     }
   };
 
-  // FETCH HIDDEN MICKEY
   const fetchHiddenMickey = async (attractionName: string, park: string) => {
     setMickeyLoading(true);
-
     const localMickey = getHiddenMickeyFact(attractionName, park);
     setHiddenMickey(localMickey);
 
@@ -996,12 +987,9 @@ export default function DisneyTracker() {
       if (res.ok) {
         const json = await res.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          setHiddenMickey(text);
-        }
+        if (text) setHiddenMickey(text);
       }
     } catch (err) {
-      // Keeps localMickey on API failure
     } finally {
       setMickeyLoading(false);
     }
@@ -1155,7 +1143,6 @@ export default function DisneyTracker() {
     await fetchCloudVisits();
   };
 
-  // EDIT ENTIRE VISIT LOG MODAL OPENER
   const openEditVisit = (v: Visit) => {
     setEditingVisit(v);
     setEditVisitStartTime(v.startTime || '');
@@ -1163,7 +1150,6 @@ export default function DisneyTracker() {
     setEditVisitMemberEndTimes({ ...(v.memberEndTimes || {}) });
   };
 
-  // SAVE EDITED VISIT LOG
   const handleSaveVisitEdit = async () => {
     if (!editingVisit) return;
     const rawAttendeesStr = parseAttendees(editingVisit.attendees).join(', ');
@@ -1208,9 +1194,9 @@ export default function DisneyTracker() {
 
     const isVisitComplete = remainingActive.length === 0;
     const finalEndTime = isVisitComplete ? endTime : '';
-    const jsonEndTimesStr = JSON.stringify(updatedEndTimes);
 
     const rawAttendeesStr = parseAttendees(activeVisit.attendees).join(', ');
+    const jsonEndTimesStr = JSON.stringify(updatedEndTimes);
     const attendeesWithEndTimes = `${rawAttendeesStr}|ENDTIMES:${jsonEndTimesStr}`;
 
     const supabase = await getSupabase();
@@ -1314,420 +1300,361 @@ export default function DisneyTracker() {
   };
 
   return (
-    <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px 15px 30px 15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
       
-      {/* 🏰 HERO HEADER */}
-      <header style={{ textAlign: 'center', marginBottom: '15px', padding: '10px 0' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0 0 4px 0' }}>🏰 My Annual Pass Tracker</h1>
-        <p style={{ color: '#D4AF37', margin: 0, fontSize: '15px', fontWeight: '600', fontStyle: 'italic' }}>Shared Cloud Sync Active ☁️</p>
+      {/* 🏰 APP HEADER (Clean Disney Pass Tracker) */}
+      <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0' }}>🏰 Disney Pass Tracker</h1>
       </header>
 
       {/* ERROR BANNER */}
       {errorMessage && (
-        <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', padding: '12px', borderRadius: '12px', color: '#C53030', fontSize: '13px', fontWeight: 'bold', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: '#FFF5F5', border: '1px solid #FEB2B2', padding: '10px 14px', borderRadius: '12px', color: '#C53030', fontSize: '13px', fontWeight: 'bold', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{errorMessage}</span>
           <button onClick={() => setErrorMessage(null)} style={{ background: 'none', border: 'none', color: '#C53030', fontWeight: '900', cursor: 'pointer' }}>✕</button>
         </div>
       )}
 
-      {/* 👤 GLOBAL ATTENDEE FILTER BAR (Hidden on Rainbow Challenge to avoid clutter) */}
-      {activeTab !== 'rainbow-challenge' && (
-        <div style={{ background: '#FFF', padding: '10px 14px', borderRadius: '14px', border: '1px solid #E2E8F0', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-          <label style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            👤 Filter by Attendee:
-          </label>
-          <select
-            value={selectedAttendee}
-            onChange={(e) => setSelectedAttendee(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #CBD5E0', background: '#F8FAFC', fontWeight: '700', fontSize: '13px', color: '#004487', cursor: 'pointer' }}
-          >
-            <option value="ALL">Everyone (All Data)</option>
-            {FIXED_FAMILY_MEMBERS.map(member => (
-              <option key={member} value={member}>{member}</option>
-            ))}
-          </select>
+      {/* 1. HEADER MENU (Top Navigation Bar with Icons & Labels) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '6px', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+        {/* Tracker */}
+        <button
+          onClick={() => setMainTab('tracker')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px 2px 6px 2px',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            borderBottom: mainTab === 'tracker' ? '3px solid #004487' : '3px solid transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mainTab === 'tracker' ? '#004487' : '#718096'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span style={{ fontSize: '11px', fontWeight: mainTab === 'tracker' ? '800' : '600', color: mainTab === 'tracker' ? '#004487' : '#718096', marginTop: '4px' }}>Tracker</span>
+        </button>
+
+        {/* Analytics */}
+        <button
+          onClick={() => setMainTab('analytics')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px 2px 6px 2px',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            borderBottom: mainTab === 'analytics' ? '3px solid #E53E3E' : '3px solid transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mainTab === 'analytics' ? '#E53E3E' : '#718096'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span style={{ fontSize: '11px', fontWeight: mainTab === 'analytics' ? '800' : '600', color: mainTab === 'analytics' ? '#E53E3E' : '#718096', marginTop: '4px' }}>Analytics</span>
+        </button>
+
+        {/* Checklist */}
+        <button
+          onClick={() => setMainTab('checklist')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px 2px 6px 2px',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            borderBottom: mainTab === 'checklist' ? '3px solid #38A169' : '3px solid transparent',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mainTab === 'checklist' ? '#38A169' : '#718096'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span style={{ fontSize: '11px', fontWeight: mainTab === 'checklist' ? '800' : '600', color: mainTab === 'checklist' ? '#38A169' : '#718096', marginTop: '4px' }}>Checklist</span>
+        </button>
+
+        {/* Rainbow */}
+        <button
+          onClick={() => setMainTab('rainbow')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px 2px 6px 2px',
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            borderBottom: mainTab === 'rainbow' ? '3px solid transparent' : '3px solid transparent',
+            borderImage: mainTab === 'rainbow' ? 'linear-gradient(to right, #E53E3E, #DD6B20, #D69E2E, #38A169, #3182CE, #805AD5) 1' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mainTab === 'rainbow' ? '#805AD5' : '#718096'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.72 1.7-1.61 0-.43-.17-.83-.44-1.13-.27-.3-.43-.7-.43-1.13 0-.89.78-1.61 1.7-1.61h2.47c2.76 0 5-2.24 5-5 0-5.52-4.48-10-10-10z"></path>
+          </svg>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: mainTab === 'rainbow' ? '800' : '600',
+            color: mainTab === 'rainbow' ? 'transparent' : '#718096',
+            background: mainTab === 'rainbow' ? 'linear-gradient(90deg, #E53E3E, #DD6B20, #D69E2E, #38A169, #3182CE, #805AD5)' : 'none',
+            WebkitBackgroundClip: mainTab === 'rainbow' ? 'text' : 'unset',
+            WebkitTextFillColor: mainTab === 'rainbow' ? 'transparent' : 'unset',
+            marginTop: '4px'
+          }}>Rainbow</span>
+        </button>
+      </div>
+
+      {/* 2. SUBHEADER MENU (when applicable) */}
+      {mainTab === 'tracker' && (
+        <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '12px' }}>
+          <button onClick={() => setTrackerSubTab('Visit a Park')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: trackerSubTab === 'Visit a Park' ? '#004487' : 'transparent', color: trackerSubTab === 'Visit a Park' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Visit a Park
+          </button>
+          <button onClick={() => setTrackerSubTab('Past Visits')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: trackerSubTab === 'Past Visits' ? '#004487' : 'transparent', color: trackerSubTab === 'Past Visits' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Past Visits
+          </button>
         </div>
       )}
 
-      {/* 🗂️ TAB NAVIGATION */}
-      <div style={{ display: 'flex', background: '#E2E8F0', padding: '4px', borderRadius: '12px', marginBottom: '20px', gap: '2px' }}>
-        <button onClick={() => setActiveTab('tracker')} style={{ flex: 1, padding: '10px 2px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer', background: activeTab === 'tracker' ? '#004487' : 'transparent', color: activeTab === 'tracker' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>⏱️ Live Companion</button>
-        <button onClick={() => setActiveTab('analytics')} style={{ flex: 1, padding: '10px 2px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer', background: activeTab === 'analytics' ? '#004487' : 'transparent', color: activeTab === 'analytics' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>📊 Analytics</button>
-        <button onClick={() => setActiveTab('ride-everything')} style={{ flex: 1, padding: '10px 2px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer', background: activeTab === 'ride-everything' ? '#004487' : 'transparent', color: activeTab === 'ride-everything' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>🎡 Ride Everything</button>
-        <button onClick={() => setActiveTab('rainbow-challenge')} style={{ flex: 1, padding: '10px 2px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer', background: activeTab === 'rainbow-challenge' ? '#004487' : 'transparent', color: activeTab === 'rainbow-challenge' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>🎨 Rainbow Challenge</button>
-      </div>
+      {mainTab === 'analytics' && (
+        <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '10px' }}>
+          <button onClick={() => setAnalyticsSubTab('averages')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'averages' ? '#004487' : 'transparent', color: analyticsSubTab === 'averages' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Averages
+          </button>
+          <button onClick={() => setAnalyticsSubTab('top10')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'top10' ? '#004487' : 'transparent', color: analyticsSubTab === 'top10' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Top 10s
+          </button>
+          <button onClick={() => setAnalyticsSubTab('cards')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'cards' ? '#004487' : 'transparent', color: analyticsSubTab === 'cards' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Attendee Cards
+          </button>
+        </div>
+      )}
 
-      {/* 🟢 TAB 1: LIVE WORKSPACE */}
-      {activeTab === 'tracker' && (
-        <div>
-          {activeVisit ? (
-            <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
-              
-              <div style={{ marginBottom: '10px' }}>
-                <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
-                  ✨ CURRENTLY AT
-                </span>
-              </div>
+      {mainTab === 'rainbow' && (
+        <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '14px' }}>
+          <button onClick={() => setRainbowSubTab('stream')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: rainbowSubTab === 'stream' ? '#004487' : 'transparent', color: rainbowSubTab === 'stream' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Photo Stream
+          </button>
+          <button onClick={() => setRainbowSubTab('badges')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: rainbowSubTab === 'badges' ? '#004487' : 'transparent', color: rainbowSubTab === 'badges' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+            Badges
+          </button>
+        </div>
+      )}
 
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%' }}>
-                {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
-              </h2>
-
-              <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px', fontWeight: '600' }}>
-                📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
-              </div>
-
-              <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
-                👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
-              </p>
-
-              {/* TRACK ATTRACTION CARD */}
-              <div style={{ background: '#FFF', padding: '16px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#004487' }}>Track an Attraction:</h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <select value={rideName} onChange={(e) => setRideName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #CBD5E0', background: queueStartTimestamp ? '#EDF2F7' : '#F8FAFC', fontSize: '14px', color: queueStartTimestamp ? '#718096' : '#1A202C' }}>
-                    <optgroup label="Park Rides & Shows">
-                      {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
-                        <option key={attraction} value={attraction}>{attraction}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Events & Activities">
-                      {UNIVERSAL_ACTIVITIES.map((action) => (
-                        <option key={action} value={action}>{action}</option>
-                      ))}
-                    </optgroup>
-                  </select>
-
-                  {/* 🎢 PER-RIDE ATTENDEE SELECTOR ("WHO RODE THIS?") */}
-                  {activePartyList.length > 1 && (
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '10px', borderRadius: '10px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
-                        👥 WHO IS RIDING THIS?
-                      </label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {activePartyList.map((member) => {
-                          const isRiding = selectedRiders.includes(member);
-                          return (
-                            <button
-                              key={member}
-                              type="button"
-                              onClick={() => toggleRiderSelection(member)}
-                              disabled={!!queueStartTimestamp}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: isRiding ? '2px solid #004487' : '1px solid #CBD5E0',
-                                background: isRiding ? '#004487' : '#FFF',
-                                color: isRiding ? '#FFF' : '#718096',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {isRiding ? `✓ ${member}` : member}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {rideName === 'Character Meeting' && (
-                    <div style={{ background: '#FFF5F7', padding: '10px', borderRadius: '10px', border: '1px solid #FF8DA1' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '800', color: '#D61F40', display: 'block', marginBottom: '4px' }}>✨ WHICH CHARACTER?</label>
-                      <input type="text" placeholder="Mickey, Cinderella, etc." value={characterName} onChange={(e) => setCharacterName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #FFCBD4', fontSize: '14px' }} />
-                    </div>
-                  )}
-
-                  {queueStartTimestamp ? (
-                    <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
-                      
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', marginTop: '6px' }}>
-                        Entered line at: <strong style={{ color: '#004487' }}>{queueStartTimeStr}</strong>
-                      </div>
-                      
-                      <div style={{ fontSize: '20px', fontWeight: '900', color: '#C05621', margin: '8px 0' }}>
-                        Time in line: {getElapsedQueueTimeString()}
-                      </div>
-
-                      {/* ✨ DISNEY FUN FACT BOX */}
-                      <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
-                        <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ✨ Disney Fun Fact:
-                        </div>
-                        {triviaLoading ? (
-                          <div style={{ fontStyle: 'italic', color: '#718096' }}>Searching Imagineering vault for facts...</div>
-                        ) : (
-                          <div>{rideTrivia}</div>
-                        )}
-                      </div>
-
-                      {/* 👀 HIDDEN MICKEYS BOX */}
-                      <div style={{ background: '#F0F5FF', border: '1px solid #C3DAFE', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#1A365D' }}>
-                        <div style={{ fontWeight: '800', color: '#2B6CB0', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          👀 Hidden Mickeys:
-                        </div>
-                        {mickeyLoading ? (
-                          <div style={{ fontStyle: 'italic', color: '#718096' }}>Scanning queue for Hidden Mickeys...</div>
-                        ) : (
-                          <div>{hiddenMickey}</div>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); setHiddenMickey(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-                          Cancel
-                        </button>
-                        <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
-                          ✅ On Ride Now!
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px', marginTop: '5px' }}>
-                      <button type="button" onClick={handleStartQueueTimer} style={{ width: '100%', padding: '12px', background: '#004487', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        ⏱️ Start Line Timer
-                      </button>
-
-                      <div style={{ textAlign: 'center', fontSize: '11px', color: '#A0AEC0', fontWeight: 'bold', marginBottom: '12px', position: 'relative' }}>
-                        <span style={{ background: '#FFF', padding: '0 10px', position: 'relative', zIndex: 2 }}>OR LOG MANUALLY</span>
-                        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#E2E8F0', zIndex: 1 }}></div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }} />
-                        <button type="button" onClick={handleAddRideLive} style={{ padding: '11px 22px', background: '#EDF2F7', color: '#2D3748', border: '1px solid #CBD5E0', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
-                          Log
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {activeVisit.activities.length > 0 && (
-                  <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
-                    <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {activeVisit.activities.map((act) => {
-                        const isEditingThis = editingActivityId === act.id && editingVisitId === null;
-                        const actRidersList = parseAttendees(act.riders);
-
-                        return isEditingThis ? (
-                          <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
-                            <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
-                              <optgroup label="Park Rides & Shows">
-                                {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
-                                  <option key={attraction} value={attraction}>{attraction}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Events & Activities">
-                                {UNIVERSAL_ACTIVITIES.map((action) => (
-                                  <option key={action} value={action}>{action}</option>
-                                ))}
-                              </optgroup>
-                            </select>
-
-                            {/* EDIT RIDERS SELECTOR */}
-                            <div style={{ marginBottom: '6px' }}>
-                              <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                {parseAttendees(activeVisit.attendees).map((m) => {
-                                  const checked = editRiders.includes(m);
-                                  return (
-                                    <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
-                                      {m}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            
-                            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                              <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                              <button onClick={() => deleteActivity(act.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
-                              <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                              <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
-                            <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.rideName}</div>
-                              <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                ⏱️ {act.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {act.notes ? `• ${act.notes}` : ''}
-                              </div>
-                            </div>
-                            <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
-                              Edit
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* LEAVE PARK TRIGGER */}
-              <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-                👋 Leave the Park & Save Day
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleCheckIn} style={{ background: '#FFF', padding: '22px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' }}>
-              <h2 style={{ marginTop: 0, fontSize: '19px', fontWeight: '800', color: '#004487', marginBottom: '15px', textAlign: 'center' }}>✨ Enter the Magic</h2>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>SELECT PARK</label>
-                <select value={parkName} onChange={(e) => setParkName(e.target.value as any)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E0', background: '#F8FAFC', fontSize: '16px', fontWeight: '700', color: '#004487' }}>
-                  <option value="Magic Kingdom">🏰 Magic Kingdom</option>
-                  <option value="Epcot">🪩 Epcot</option>
-                  <option value="Hollywood Studios">🎥 Hollywood Studios</option>
-                  <option value="Animal Kingdom">🌳 Animal Kingdom</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>WHO'S ATTENDING?</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                  {FIXED_FAMILY_MEMBERS.map((name) => {
-                    const isSelected = selectedAttendees.includes(name);
-                    return (
-                      <button key={name} type="button" onClick={() => toggleCheckInAttendee(name)} style={{ padding: '10px 4px', borderRadius: '10px', border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0', background: isSelected ? '#004487' : '#FFF', color: isSelected ? '#FFF' : '#2D3748', fontSize: '13px', fontWeight: isSelected ? '800' : '500', cursor: 'pointer' }}>
-                        {name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button type="submit" style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0066cc 0%, #004487 100%)', color: '#FFF', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-                🚀 Check In to Park
-              </button>
-            </form>
-          )}
-
-          {/* MAIN CORE SUMMARY MODULE */}
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
-            <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
-              TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#004487' }}>{totalDays}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>PARK VISITS</div>
-              </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#38A169' }}>{totalActivities}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TOTAL ACTIVITIES</div>
-              </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(totalParkMinutes)}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARKS</div>
-              </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(totalWaitMinutes)}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
-              </div>
-            </div>
-
-            <div style={{ background: '#FFFDF5', padding: '12px 15px', borderRadius: '14px', border: '1px solid #FEEBC8', borderLeft: '5px solid #D4AF37', marginBottom: '18px' }}>
-              <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621', marginBottom: '3px', letterSpacing: '0.5px' }}>⭐ TOP ACTIVITY</div>
-              <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '15px' }}>{topActivity.name}</div>
-              <div style={{ color: '#4A5568', marginTop: '3px', fontSize: '12px' }}>
-                Logged <strong>{topActivity.count}x</strong> | Total Wait: <strong style={{ color: '#C05621' }}>{formatMinutes(topActivity.totalWait || 0)}</strong>
-              </div>
-            </div>
-
-            {/* AVERAGES SECTION */}
-            <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgActivitiesPerDay}</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Activities</div>
-              </div>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{formatMinutes(avgParkMinutesPerDay)}</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Duration</div>
-              </div>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgWaitPerActivity}m</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Wait Time</div>
-              </div>
-            </div>
+      {/* 3. FILTER BY ATTENDEE (Shown on Checklist, and Analytics except Attendee Cards) */}
+      {(mainTab === 'checklist' || (mainTab === 'analytics' && analyticsSubTab !== 'cards')) && (
+        <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '14px' }}>
+          <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>👤 FILTER BY ATTENDEE</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {FIXED_FAMILY_MEMBERS.map(m => {
+              const isSelected = selectedAttendee === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setSelectedAttendee(prev => prev === m ? 'ALL' : m)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    border: isSelected ? '2px solid #004487' : '1px solid #CBD5E0',
+                    background: isSelected ? '#004487' : '#FFF',
+                    color: isSelected ? '#FFF' : '#4A5568',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {isSelected ? `✓ ${m}` : m}
+                </button>
+              );
+            })}
           </div>
+        </div>
+      )}
 
-          {/* PAST LOG ENTRIES */}
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
-              Past Visits ({filteredVisits.length})
-            </h2>
-            {loading ? (
-              <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', margin: '20px 0' }}>Syncing with Supabase cloud...</p>
-            ) : filteredVisits.length === 0 ? (
-              <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>No completed trips found for this view.</p>
-            ) : (
-              filteredVisits.map((v) => {
-                const partyList = parseAttendees(v.attendees);
+      {/* 4. PAGE WIDGETS */}
 
-                // Group attendees by their departure time
-                const departureGroups: Record<string, string[]> = {};
-                partyList.forEach(m => {
-                  const pTime = getPersonEndTime(v, m);
-                  if (!departureGroups[pTime]) departureGroups[pTime] = [];
-                  departureGroups[pTime].push(m);
-                });
+      {/* ==================== PAGE 1: TRACKER ==================== */}
+      {mainTab === 'tracker' && (
+        <div>
+          {/* Subtab: Visit a Park */}
+          {trackerSubTab === 'Visit a Park' && (
+            <div>
+              {activeVisit ? (
+                <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
+                      ✨ CURRENTLY AT
+                    </span>
+                  </div>
 
-                const uniqueDepTimes = Object.keys(departureGroups);
-                const hasStaggeredCheckout = uniqueDepTimes.length > 1;
+                  <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%' }}>
+                    {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
+                  </h2>
 
-                return (
-                  <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
-                      <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
-                        {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
-                      </strong>
-                      <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
-                    </div>
+                  <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px', fontWeight: '600' }}>
+                    📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
+                  </div>
 
-                    <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
-                      👥 <strong>Party:</strong> {partyList.join(', ')} <br />
-                      
-                      {!hasStaggeredCheckout ? (
-                        <div style={{ marginTop: '2px' }}>
-                          ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
+                    👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
+                  </p>
+
+                  {/* TRACK ATTRACTION CARD */}
+                  <div style={{ background: '#FFF', padding: '16px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#004487' }}>Track an Attraction:</h3>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <select value={rideName} onChange={(e) => setRideName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #CBD5E0', background: queueStartTimestamp ? '#EDF2F7' : '#F8FAFC', fontSize: '14px', color: queueStartTimestamp ? '#718096' : '#1A202C' }}>
+                        <optgroup label="Park Rides & Shows">
+                          {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
+                            <option key={attraction} value={attraction}>{attraction}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Events & Activities">
+                          {UNIVERSAL_ACTIVITIES.map((action) => (
+                            <option key={action} value={action}>{action}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+
+                      {activePartyList.length > 1 && (
+                        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '10px', borderRadius: '10px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
+                            👥 WHO IS RIDING THIS?
+                          </label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {activePartyList.map((member) => {
+                              const isRiding = selectedRiders.includes(member);
+                              return (
+                                <button
+                                  key={member}
+                                  type="button"
+                                  onClick={() => toggleRiderSelection(member)}
+                                  disabled={!!queueStartTimestamp}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: isRiding ? '2px solid #004487' : '1px solid #CBD5E0',
+                                    background: isRiding ? '#004487' : '#FFF',
+                                    color: isRiding ? '#FFF' : '#718096',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {isRiding ? `✓ ${member}` : member}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {rideName === 'Character Meeting' && (
+                        <div style={{ background: '#FFF5F7', padding: '10px', borderRadius: '10px', border: '1px solid #FF8DA1' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '800', color: '#D61F40', display: 'block', marginBottom: '4px' }}>✨ WHICH CHARACTER?</label>
+                          <input type="text" placeholder="Mickey, Cinderella, etc." value={characterName} onChange={(e) => setCharacterName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #FFCBD4', fontSize: '14px' }} />
+                        </div>
+                      )}
+
+                      {queueStartTimestamp ? (
+                        <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
+                          
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: '#2D3748', marginTop: '6px' }}>
+                            Entered line at: <strong style={{ color: '#004487' }}>{queueStartTimeStr}</strong>
+                          </div>
+                          
+                          <div style={{ fontSize: '20px', fontWeight: '900', color: '#C05621', margin: '8px 0' }}>
+                            Time in line: {getElapsedQueueTimeString()}
+                          </div>
+
+                          <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
+                            <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              ✨ Disney Fun Fact:
+                            </div>
+                            {triviaLoading ? (
+                              <div style={{ fontStyle: 'italic', color: '#718096' }}>Searching Imagineering vault for facts...</div>
+                            ) : (
+                              <div>{rideTrivia}</div>
+                            )}
+                          </div>
+
+                          <div style={{ background: '#F0F5FF', border: '1px solid #C3DAFE', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#1A365D' }}>
+                            <div style={{ fontWeight: '800', color: '#2B6CB0', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              👀 Hidden Mickeys:
+                            </div>
+                            {mickeyLoading ? (
+                              <div style={{ fontStyle: 'italic', color: '#718096' }}>Scanning queue for Hidden Mickeys...</div>
+                            ) : (
+                              <div>{hiddenMickey}</div>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                            <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); setHiddenMickey(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                              Cancel
+                            </button>
+                            <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
+                              ✅ On Ride Now!
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <div style={{ marginTop: '6px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                          <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ HOURS:</div>
-                          {uniqueDepTimes.map(depTime => (
-                            <div key={depTime} style={{ fontSize: '12px', color: '#2D3748', marginTop: '2px' }}>
-                              • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(v.startTime)} - {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
-                            </div>
-                          ))}
+                        <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px', marginTop: '5px' }}>
+                          <button type="button" onClick={handleStartQueueTimer} style={{ width: '100%', padding: '12px', background: '#004487', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            ⏱️ Start Line Timer
+                          </button>
+
+                          <div style={{ textAlign: 'center', fontSize: '11px', color: '#A0AEC0', fontWeight: 'bold', marginBottom: '12px', position: 'relative' }}>
+                            <span style={{ background: '#FFF', padding: '0 10px', position: 'relative', zIndex: 2 }}>OR LOG MANUALLY</span>
+                            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#E2E8F0', zIndex: 1 }}></div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }} />
+                            <button type="button" onClick={handleAddRideLive} style={{ padding: '11px 22px', background: '#EDF2F7', color: '#2D3748', border: '1px solid #CBD5E0', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
+                              Log
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    {v.activities.length > 0 && (
-                      <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                    {activeVisit.activities.length > 0 && (
+                      <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
+                        <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {v.activities.map((a) => {
-                            const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
-                            const actRidersList = parseAttendees(a.riders);
+                          {activeVisit.activities.map((act) => {
+                            const isEditingThis = editingActivityId === act.id && editingVisitId === null;
+                            const actRidersList = parseAttendees(act.riders);
 
                             return isEditingThis ? (
-                              <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                              <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
                                 <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
                                 <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
                                   <optgroup label="Park Rides & Shows">
-                                    {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                    {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
                                       <option key={attraction} value={attraction}>{attraction}</option>
                                     ))}
                                   </optgroup>
@@ -1738,11 +1665,10 @@ export default function DisneyTracker() {
                                   </optgroup>
                                 </select>
 
-                                {/* EDIT RIDERS SELECTOR FOR PAST VISITS */}
                                 <div style={{ marginBottom: '6px' }}>
                                   <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                    {partyList.map((m) => {
+                                    {parseAttendees(activeVisit.attendees).map((m) => {
                                       const checked = editRiders.includes(m);
                                       return (
                                         <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -1759,20 +1685,20 @@ export default function DisneyTracker() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                  <button onClick={() => deleteActivity(a.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                  <button onClick={() => deleteActivity(act.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
                                   <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
                                   <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
                                 </div>
                               </div>
                             ) : (
-                              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
                                 <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                                  <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
+                                  <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.rideName}</div>
                                   <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                    ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
+                                    ⏱️ {act.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {act.notes ? `• ${act.notes}` : ''}
                                   </div>
                                 </div>
-                                <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
+                                <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
                                   Edit
                                 </button>
                               </div>
@@ -1781,265 +1707,467 @@ export default function DisneyTracker() {
                         </div>
                       </div>
                     )}
+                  </div>
 
-                    {/* VISIT ACTIONS BAR */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #EDF2F7' }}>
-                      <button onClick={() => openEditVisit(v)} style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '800' }}>
-                        ✏️ Edit Visit Hours
-                      </button>
-                      <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
-                        🗑️ Delete Entire Visit Log
-                      </button>
+                  <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    👋 Leave the Park & Save Day
+                  </button>
+                </div>
+              ) : (
+                /* VISIT A PARK FORM (Replaces "✨ Enter the Magic") */
+                <form onSubmit={handleCheckIn} style={{ background: '#FFF', padding: '22px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' }}>
+                  <h2 style={{ marginTop: 0, fontSize: '19px', fontWeight: '800', color: '#004487', marginBottom: '15px', textAlign: 'center' }}>Visit a Park</h2>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>SELECT PARK</label>
+                    <select value={parkName} onChange={(e) => setParkName(e.target.value as any)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E0', background: '#F8FAFC', fontSize: '16px', fontWeight: '700', color: '#004487' }}>
+                      <option value="Magic Kingdom">🏰 Magic Kingdom</option>
+                      <option value="Epcot">🪩 Epcot</option>
+                      <option value="Hollywood Studios">🎥 Hollywood Studios</option>
+                      <option value="Animal Kingdom">🌳 Animal Kingdom</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>WHO'S ATTENDING?</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                      {FIXED_FAMILY_MEMBERS.map((name) => {
+                        const isSelected = selectedAttendees.includes(name);
+                        return (
+                          <button key={name} type="button" onClick={() => toggleCheckInAttendee(name)} style={{ padding: '10px 4px', borderRadius: '10px', border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0', background: isSelected ? '#004487' : '#FFF', color: isSelected ? '#FFF' : '#2D3748', fontSize: '13px', fontWeight: isSelected ? '800' : '500', cursor: 'pointer' }}>
+                            {name}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
+
+                  <button type="submit" style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0066cc 0%, #004487 100%)', color: '#FFF', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    🚀 Check In to Park
+                  </button>
+                </form>
+              )}
+
+              {/* TOTALS WIDGET */}
+              <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
+                  TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                  <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#004487' }}>{totalDays}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>PARK VISITS</div>
+                  </div>
+                  <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#38A169' }}>{totalActivities}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TOTAL ACTIVITIES</div>
+                  </div>
+                  <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(totalParkMinutes)}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARKS</div>
+                  </div>
+                  <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(totalWaitMinutes)}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#FFFDF5', padding: '12px 15px', borderRadius: '14px', border: '1px solid #FEEBC8', borderLeft: '5px solid #D4AF37', marginBottom: '18px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621', marginBottom: '3px', letterSpacing: '0.5px' }}>⭐ TOP ACTIVITY</div>
+                  <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '15px' }}>{topActivity.name}</div>
+                  <div style={{ color: '#4A5568', marginTop: '3px', fontSize: '12px' }}>
+                    Logged <strong>{topActivity.count}x</strong> | Total Wait: <strong style={{ color: '#C05621' }}>{formatMinutes(topActivity.totalWait || 0)}</strong>
+                  </div>
+                </div>
+
+                <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgActivitiesPerDay}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Activities</div>
+                  </div>
+                  <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{formatMinutes(avgParkMinutesPerDay)}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Duration</div>
+                  </div>
+                  <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgWaitPerActivity}m</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Wait Time</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subtab: Past Visits */}
+          {trackerSubTab === 'Past Visits' && (
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
+                Past Visits ({filteredVisits.length})
+              </h2>
+              {loading ? (
+                <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', margin: '20px 0' }}>Syncing with Supabase cloud...</p>
+              ) : filteredVisits.length === 0 ? (
+                <p style={{ color: '#A0AEC0', textAlign: 'center', fontSize: '14px', marginTop: '20px', fontStyle: 'italic' }}>No completed trips found for this view.</p>
+              ) : (
+                filteredVisits.map((v) => {
+                  const partyList = parseAttendees(v.attendees);
+                  const departureGroups: Record<string, string[]> = {};
+                  partyList.forEach(m => {
+                    const pTime = getPersonEndTime(v, m);
+                    if (!departureGroups[pTime]) departureGroups[pTime] = [];
+                    departureGroups[pTime].push(m);
+                  });
+
+                  const uniqueDepTimes = Object.keys(departureGroups);
+                  const hasStaggeredCheckout = uniqueDepTimes.length > 1;
+
+                  return (
+                    <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
+                        <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                        </strong>
+                        <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
+                      </div>
+
+                      <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
+                        👥 <strong>Party:</strong> {partyList.join(', ')} <br />
+                        
+                        {!hasStaggeredCheckout ? (
+                          <div style={{ marginTop: '2px' }}>
+                            ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '6px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ HOURS:</div>
+                            {uniqueDepTimes.map(depTime => (
+                              <div key={depTime} style={{ fontSize: '12px', color: '#2D3748', marginTop: '2px' }}>
+                                • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(v.startTime)} - {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {v.activities.length > 0 && (
+                        <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {v.activities.map((a) => {
+                              const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
+                              const actRidersList = parseAttendees(a.riders);
+
+                              return isEditingThis ? (
+                                <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
+                                  <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                    <optgroup label="Park Rides & Shows">
+                                      {PARK_ATTRACTIONS[v.parkName].map((attraction) => (
+                                        <option key={attraction} value={attraction}>{attraction}</option>
+                                      ))}
+                                    </optgroup>
+                                    <optgroup label="Events & Activities">
+                                      {UNIVERSAL_ACTIVITIES.map((action) => (
+                                        <option key={action} value={action}>{action}</option>
+                                      ))}
+                                    </optgroup>
+                                  </select>
+
+                                  <div style={{ marginBottom: '6px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                      {partyList.map((m) => {
+                                        const checked = editRiders.includes(m);
+                                        return (
+                                          <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                            {m}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                  
+                                  <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                                    <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                    <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                                  </div>
+
+                                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => deleteActivity(a.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                    <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                    <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                    <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
+                                    <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                                      ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
+                                    </div>
+                                  </div>
+                                  <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
+                                    Edit
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #EDF2F7' }}>
+                        <button onClick={() => openEditVisit(v)} style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: '800' }}>
+                          ✏️ Edit Visit Hours
+                        </button>
+                        <button onClick={() => deleteVisit(v.id)} style={{ background: 'none', border: 'none', color: '#E53E3E', fontSize: '11px', cursor: 'pointer', padding: 0, fontWeight: '700' }}>
+                          🗑️ Delete Entire Visit Log
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 📊 TAB 2: DEEP ANALYTICS */}
-      {activeTab === 'analytics' && (
+      {/* ==================== PAGE 2: ANALYTICS ==================== */}
+      {mainTab === 'analytics' && (
         <div>
-          {/* PARK AVERAGES */}
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>
-              🏟️ Park Averages
-            </h2>
-            {Object.keys(parkStats).map((parkKey) => {
-              const park = parkKey as keyof typeof parkStats;
-              const stats = parkStats[park];
-              const avgAct = stats.visits > 0 ? (stats.activities / stats.visits).toFixed(1) : '0';
-              const avgTime = stats.visits > 0 ? formatMinutes(stats.timeInPark / stats.visits) : '0m';
-              const avgWait = stats.activities > 0 ? Math.round(stats.waitTime / stats.activities) : 0;
-              return (
-                <div key={park} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #EDF2F7' }}>
-                  <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{PARK_EMOJIS[park]} {park}</span>
-                    <span style={{ color: '#004487' }}>{stats.visits} {stats.visits === 1 ? 'visit' : 'visits'}</span>
-                  </div>
-                  {stats.visits > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '8px', fontSize: '11px', textAlign: 'center' }}>
-                      <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
-                        <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgAct}</div>
-                        <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>ACTIVITIES</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
-                        <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgTime}</div>
-                        <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>DURATION</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
-                        <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgWait}m</div>
-                        <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>WAIT TIME</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ color: '#A0AEC0', fontSize: '12px', fontStyle: 'italic', marginTop: '4px' }}>No entries recorded for this park yet.</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* MOST TIMES RIDDEN LEADERBOARD */}
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
-            {mostTimesRidden.length === 0 ? (
-              <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to build your charts!</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {mostTimesRidden.map((ride, index) => (
-                  <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
-                    <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                      <div style={{ fontSize: '11px', color: '#004487', fontWeight: '700', marginTop: '1px' }}>
-                        {PARK_EMOJIS[ride.park]} {ride.park}
-                      </div>
-                      <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                        Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
-                      </div>
-                    </div>
-                    <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
-                      {ride.count}x
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* LONGEST WAIT TIMES LEADERBOARD */}
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {longestWaitTimes.map((ride, index) => (
-                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFAF0', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
-                  <div style={{ background: '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                    <div style={{ fontSize: '11px', color: '#DD6B20', fontWeight: '700', marginTop: '1px' }}>
-                      {PARK_EMOJIS[ride.park]} {ride.park}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                      Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
-                    </div>
-                  </div>
-                  <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                    {ride.avgWait}m avg
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SHORTEST WAIT TIMES LEADERBOARD */}
-          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {shortestWaitTimes.map((ride, index) => (
-                <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F0FFF4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
-                  <div style={{ background: '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
-                    <div style={{ fontSize: '11px', color: '#276749', fontWeight: '700', marginTop: '1px' }}>
-                      {PARK_EMOJIS[ride.park]} {ride.park}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                      Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
-                    </div>
-                  </div>
-                  <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
-                    {ride.avgWait}m avg
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 👥 ATTENDEE CARDS SECTION */}
-          <div style={{ marginTop: '30px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
-              👥 Attendee Cards
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {FIXED_FAMILY_MEMBERS.map((person) => {
-                const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
-                
-                const personActs = personVisits.reduce((sum, v) => {
-                  return sum + v.activities.filter(a => isPersonRider(a, v, person)).length;
-                }, 0);
-
-                const personWaitMins = personVisits.reduce((sum, v) => {
-                  return sum + v.activities
-                    .filter(a => isPersonRider(a, v, person))
-                    .reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
-                }, 0);
-                
-                const personParkMins = personVisits.reduce((sum, v) => {
-                  const pEndTime = getPersonEndTime(v, person);
-                  if (!v.startTime || !pEndTime) return sum;
-                  const start = parseTimeToMinutes(v.startTime);
-                  const end = parseTimeToMinutes(pEndTime);
-                  return sum + (end >= start ? (end - start) : ((1440 - start) + end));
-                }, 0);
-
-                const personAvgActs = personVisits.length > 0 ? (personActs / personVisits.length).toFixed(1) : '0';
-                const personAvgDuration = personVisits.length > 0 ? personParkMins / personVisits.length : 0;
-                const personAvgWait = personActs > 0 ? Math.round(personWaitMins / personActs) : 0;
-
-                const personRidesMap = getRideBreakdown(personVisits, person);
-                const personFavorite = personRidesMap.sort((a, b) => b.count - a.count || b.totalWait - a.totalWait)[0] || null;
-
-                const personCountsMap = getRideCountsMap(personVisits, person);
-
+          {/* Subtab: Averages */}
+          {analyticsSubTab === 'averages' && (
+            <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>
+                🏟️ Park Averages
+              </h2>
+              {Object.keys(parkStats).map((parkKey) => {
+                const park = parkKey as keyof typeof parkStats;
+                const stats = parkStats[park];
+                const avgAct = stats.visits > 0 ? (stats.activities / stats.visits).toFixed(1) : '0';
+                const avgTime = stats.visits > 0 ? formatMinutes(stats.timeInPark / stats.visits) : '0m';
+                const avgWait = stats.activities > 0 ? Math.round(stats.waitTime / stats.activities) : 0;
                 return (
-                  <div key={person} style={{ background: '#FFF', borderRadius: '20px', padding: '18px', border: '1px solid #CBD5E0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #EDF2F7', paddingBottom: '10px', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>👤 {person}</h3>
-                      <span style={{ fontSize: '12px', fontWeight: '800', background: '#EBF8FF', color: '#2B6CB0', padding: '4px 10px', borderRadius: '12px' }}>
-                        {personVisits.length} Park {personVisits.length === 1 ? 'Visit' : 'Visits'}
-                      </span>
+                  <div key={park} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #EDF2F7' }}>
+                    <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{PARK_EMOJIS[park]} {park}</span>
+                      <span style={{ color: '#004487' }}>{stats.visits} {stats.visits === 1 ? 'visit' : 'visits'}</span>
                     </div>
-
-                    {/* STATS OVERVIEW */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
-                      <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                        <div style={{ fontSize: '15px', fontWeight: '800', color: '#2D3748' }}>{personActs}</div>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>Activities</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                        <div style={{ fontSize: '15px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(personParkMins)}</div>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>TIME IN PARKS</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                        <div style={{ fontSize: '15px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(personWaitMins)}</div>
-                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>TIME IN LINES</div>
-                      </div>
-                    </div>
-
-                    {/* AVERAGES ROW */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
-                      <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgActs}</div>
-                        <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>Avg Activities</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{formatMinutes(personAvgDuration)}</div>
-                        <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>AVG DURATION</div>
-                      </div>
-                      <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgWait}m</div>
-                        <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>AVG WAIT</div>
-                      </div>
-                    </div>
-
-                    {/* FAVORITE RIDE BANNER */}
-                    <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621' }}>⭐ FAVORITE RIDE</div>
-                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', marginTop: '2px' }}>
-                        {personFavorite ? personFavorite.name : 'None Logged Yet'}
-                      </div>
-                      {personFavorite && (
-                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
-                          Ridden {personFavorite.count}x • Total Wait: {formatMinutes(personFavorite.totalWait)}
+                    {stats.visits > 0 ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginTop: '8px', fontSize: '11px', textAlign: 'center' }}>
+                        <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgAct}</div>
+                          <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>ACTIVITIES</div>
                         </div>
-                      )}
-                    </div>
-
-                    {/* RIDE EVERYTHING CHECKLIST BREAKDOWN */}
-                    <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginBottom: '6px' }}>🎡 RIDE EVERYTHING PROGRESS:</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                        {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
-                          const doneCount = attractions.filter(att => (personCountsMap[att] || 0) > 0).length;
-                          const pct = attractions.length > 0 ? Math.round((doneCount / attractions.length) * 100) : 0;
-                          return (
-                            <div key={park} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: '8px', fontSize: '11px', border: '1px solid #EDF2F7' }}>
-                              <div style={{ fontWeight: '700', color: '#2D3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {PARK_EMOJIS[park]} {park}
-                              </div>
-                              <div style={{ fontWeight: '800', color: '#004487', marginTop: '2px' }}>
-                                {doneCount}/{attractions.length} ({pct}%)
-                              </div>
-                            </div>
-                          );
-                        })}
+                        <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgTime}</div>
+                          <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>DURATION</div>
+                        </div>
+                        <div style={{ background: '#F8FAFC', padding: '6px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 'bold', color: '#4A5568' }}>{avgWait}m</div>
+                          <div style={{ color: '#A0AEC0', fontSize: '9px', fontWeight: '800' }}>WAIT TIME</div>
+                        </div>
                       </div>
-                    </div>
-
+                    ) : (
+                      <div style={{ color: '#A0AEC0', fontSize: '12px', fontStyle: 'italic', marginTop: '4px' }}>No entries recorded for this park yet.</div>
+                    )}
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
+
+          {/* Subtab: Top 10s */}
+          {analyticsSubTab === 'top10' && (
+            <div>
+              {/* MOST TIMES RIDDEN */}
+              <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#004487', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>🎢 Most Times Ridden (Top 10)</h2>
+                {mostTimesRidden.length === 0 ? (
+                  <p style={{ color: '#A0AEC0', fontSize: '14px', textAlign: 'center', fontStyle: 'italic', margin: '20px 0' }}>Log some attractions to build your charts!</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {mostTimesRidden.map((ride, index) => (
+                      <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '10px 12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
+                        <div style={{ background: index === 0 ? '#D4AF37' : '#004487', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                          <div style={{ fontSize: '11px', color: '#004487', fontWeight: '700', marginTop: '1px' }}>
+                            {PARK_EMOJIS[ride.park]} {ride.park}
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                            Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                          </div>
+                        </div>
+                        <div style={{ background: '#EBF8FF', color: '#2B6CB0', border: '1px solid #BEE3F8', padding: '4px 10px', borderRadius: '12px', fontWeight: '900', fontSize: '13px', flexShrink: 0 }}>
+                          {ride.count}x
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* LONGEST WAIT TIMES */}
+              <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#C05621', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⏳ Longest Average Waits (Top 10)</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {longestWaitTimes.map((ride, index) => (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFAF0', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
+                      <div style={{ background: '#DD6B20', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '11px', color: '#DD6B20', fontWeight: '700', marginTop: '1px' }}>
+                          {PARK_EMOJIS[ride.park]} {ride.park}
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                        </div>
+                      </div>
+                      <div style={{ background: '#FEEBC8', color: '#C05621', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                        {ride.avgWait}m avg
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SHORTEST WAIT TIMES */}
+              <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '900', color: '#276749', margin: '0 0 15px 0', borderBottom: '2px solid #F2F2F7', paddingBottom: '6px' }}>⚡ Shortest Average Waits (Top 10)</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {shortestWaitTimes.map((ride, index) => (
+                    <div key={ride.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F0FFF4', padding: '10px 12px', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
+                      <div style={{ background: '#38A169', color: '#FFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{index + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ride.name}</div>
+                        <div style={{ fontSize: '11px', color: '#276749', fontWeight: '700', marginTop: '1px' }}>
+                          {PARK_EMOJIS[ride.park]} {ride.park}
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                          Total Wait Time: <strong>{formatMinutes(ride.totalWait)}</strong> | Avg Wait Time: <strong>{ride.avgWait}m</strong>
+                        </div>
+                      </div>
+                      <div style={{ background: '#C6F6D5', color: '#22543D', padding: '4px 8px', borderRadius: '10px', fontWeight: '800', fontSize: '12px', flexShrink: 0 }}>
+                        {ride.avgWait}m avg
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subtab: Attendee Cards */}
+          {analyticsSubTab === 'cards' && (
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '16px', paddingLeft: '4px' }}>
+                👥 Attendee Cards
+              </h2>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                {FIXED_FAMILY_MEMBERS.map((person) => {
+                  const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
+                  const personActs = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
+                  const personWaitMins = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
+                  const personParkMins = personVisits.reduce((sum, v) => {
+                    const pEndTime = getPersonEndTime(v, person);
+                    if (!v.startTime || !pEndTime) return sum;
+                    const start = parseTimeToMinutes(v.startTime);
+                    const end = parseTimeToMinutes(pEndTime);
+                    return sum + (end >= start ? (end - start) : ((1440 - start) + end));
+                  }, 0);
+
+                  const personAvgActs = personVisits.length > 0 ? (personActs / personVisits.length).toFixed(1) : '0';
+                  const personAvgDuration = personVisits.length > 0 ? personParkMins / personVisits.length : 0;
+                  const personAvgWait = personActs > 0 ? Math.round(personWaitMins / personActs) : 0;
+
+                  const personRidesMap = getRideBreakdown(personVisits, person);
+                  const personFavorite = personRidesMap.sort((a, b) => b.count - a.count || b.totalWait - a.totalWait)[0] || null;
+                  const personCountsMap = getRideCountsMap(personVisits, person);
+
+                  return (
+                    <div key={person} style={{ background: '#FFF', borderRadius: '20px', padding: '18px', border: '1px solid #CBD5E0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #EDF2F7', paddingBottom: '10px', marginBottom: '12px' }}>
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>👤 {person}</h3>
+                        <span style={{ fontSize: '12px', fontWeight: '800', background: '#EBF8FF', color: '#2B6CB0', padding: '4px 10px', borderRadius: '12px' }}>
+                          {personVisits.length} Park {personVisits.length === 1 ? 'Visit' : 'Visits'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
+                        <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#2D3748' }}>{personActs}</div>
+                          <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>Activities</div>
+                        </div>
+                        <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(personParkMins)}</div>
+                          <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>TIME IN PARKS</div>
+                        </div>
+                        <div style={{ background: '#F8FAFC', padding: '8px 4px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(personWaitMins)}</div>
+                          <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096' }}>TIME IN LINES</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', textAlign: 'center', marginBottom: '12px' }}>
+                        <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgActs}</div>
+                          <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>Avg Activities</div>
+                        </div>
+                        <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{formatMinutes(personAvgDuration)}</div>
+                          <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>AVG DURATION</div>
+                        </div>
+                        <div style={{ background: '#F8FAFC', padding: '6px 4px', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#4A5568' }}>{personAvgWait}m</div>
+                          <div style={{ fontSize: '8px', fontWeight: '800', color: '#A0AEC0' }}>AVG WAIT</div>
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621' }}>⭐ FAVORITE RIDE</div>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', marginTop: '2px' }}>
+                          {personFavorite ? personFavorite.name : 'None Logged Yet'}
+                        </div>
+                        {personFavorite && (
+                          <div style={{ fontSize: '10px', color: '#718096', marginTop: '1px' }}>
+                            Ridden {personFavorite.count}x • Total Wait: {formatMinutes(personFavorite.totalWait)}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginBottom: '6px' }}>🎡 RIDE EVERYTHING PROGRESS:</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
+                            const doneCount = attractions.filter(att => (personCountsMap[att] || 0) > 0).length;
+                            const pct = attractions.length > 0 ? Math.round((doneCount / attractions.length) * 100) : 0;
+                            return (
+                              <div key={park} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: '8px', fontSize: '11px', border: '1px solid #EDF2F7' }}>
+                                <div style={{ fontWeight: '700', color: '#2D3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {PARK_EMOJIS[park]} {park}
+                                </div>
+                                <div style={{ fontWeight: '800', color: '#004487', marginTop: '2px' }}>
+                                  {doneCount}/{attractions.length} ({pct}%)
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 🎡 TAB 3: RIDE EVERYTHING CHECKLIST */}
-      {activeTab === 'ride-everything' && (
+      {/* ==================== PAGE 3: CHECKLIST ==================== */}
+      {mainTab === 'checklist' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {Object.entries(PARK_ATTRACTIONS).map(([park, attractions]) => {
             const sortedAttractions = [...attractions].sort((a, b) => a.localeCompare(b));
@@ -2093,29 +2221,25 @@ export default function DisneyTracker() {
         </div>
       )}
 
-      {/* 🌈 TAB 4: RAINBOW CHALLENGE */}
-      {activeTab === 'rainbow-challenge' && (
+      {/* ==================== PAGE 4: RAINBOW ==================== */}
+      {mainTab === 'rainbow' && (
         <div>
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '16px', background: '#FFF', padding: '16px', borderRadius: '20px', border: '1px solid #E2E8F0' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '900', color: '#004487', margin: '0 0 4px 0' }}>Rainbow Challenge</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: '#718096', fontWeight: '500' }}>Create a 3x3 photo grid of each color</p>
-
-            {/* Sub-Tabs (Photos / Badges - Clean Text, No Icons) */}
-            <div style={{ display: 'flex', background: '#EDF2F7', padding: '3px', borderRadius: '10px', marginTop: '14px' }}>
-              <button onClick={() => setRainbowSubTab('photos')} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', background: rainbowSubTab === 'photos' ? '#004487' : 'transparent', color: rainbowSubTab === 'photos' ? '#FFF' : '#4A5568' }}>Photos</button>
-              <button onClick={() => setRainbowSubTab('badges')} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', background: rainbowSubTab === 'badges' ? '#004487' : 'transparent', color: rainbowSubTab === 'badges' ? '#FFF' : '#4A5568' }}>Badges</button>
-            </div>
+          {/* Header Subtitle Box */}
+          <div style={{ textAlign: 'center', marginBottom: '14px', background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: '0 0 4px 0' }}>Rainbow Challenge</h2>
+            <p style={{ margin: 0, fontSize: '12px', color: '#718096', fontWeight: '600' }}>
+              Upload a picture or photo grid for each color in every park.
+            </p>
           </div>
 
-          {/* SUB-TAB 1: PHOTOS STREAM */}
-          {rainbowSubTab === 'photos' && (
+          {/* Subtab: Photo Stream */}
+          {rainbowSubTab === 'stream' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              {/* TOGGLE FILTERS (Single-tap select, tap again to deselect back to ALL) */}
+              {/* TOGGLE FILTERS */}
               <div style={{ background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 
-                {/* Photographer Filter Buttons */}
+                {/* Photographer */}
                 <div>
                   <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>PHOTOGRAPHER</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -2143,7 +2267,7 @@ export default function DisneyTracker() {
                   </div>
                 </div>
 
-                {/* Park Filter Buttons */}
+                {/* Park */}
                 <div>
                   <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>PARK</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -2171,7 +2295,7 @@ export default function DisneyTracker() {
                   </div>
                 </div>
 
-                {/* Color Filter Buttons */}
+                {/* Color */}
                 <div>
                   <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>COLOR</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -2213,7 +2337,6 @@ export default function DisneyTracker() {
                   const colorConfig = RAINBOW_COLORS.find(c => c.name === photo.color) || RAINBOW_COLORS[0];
                   return (
                     <div key={photo.id} style={{ background: '#FFF', borderRadius: '20px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-                      {/* Card Header: Photographer name, Park emoji + name underneath, Color badge on right */}
                       <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7' }}>
                         <div>
                           <div style={{ fontWeight: '900', fontSize: '15px', color: '#1A202C' }}>{photo.user_name}</div>
@@ -2226,7 +2349,6 @@ export default function DisneyTracker() {
                         </span>
                       </div>
 
-                      {/* Photo Grid Image */}
                       <div style={{ cursor: 'pointer' }} onClick={() => setLightboxGrid(photo)}>
                         <img src={photo.image_url} alt={`${photo.color} grid by ${photo.user_name}`} style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} />
                       </div>
@@ -2244,11 +2366,10 @@ export default function DisneyTracker() {
             </div>
           )}
 
-          {/* SUB-TAB 2: BADGES GRID */}
+          {/* Subtab: Badges */}
           {rainbowSubTab === 'badges' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              {/* PHOTOGRAPHER FILTER BUTTONS */}
               <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PHOTOGRAPHER</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -2258,7 +2379,6 @@ export default function DisneyTracker() {
                 </div>
               </div>
 
-              {/* 4 PARK BADGE BOXES */}
               {PARK_NAMES.map(pName => {
                 const userGridsForPark = photoGrids.filter(g => g.user_name === badgePhotographer && g.park_name === pName);
                 const completedCount = userGridsForPark.length;
@@ -2272,7 +2392,6 @@ export default function DisneyTracker() {
                       </span>
                     </div>
 
-                    {/* SQUARES GRID (No icons, centered text, colored outline, plus sign in corner when locked, image thumbnail when unlocked) */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                       {RAINBOW_COLORS.map(cObj => {
                         const matchGrid = userGridsForPark.find(g => g.color === cObj.name);
@@ -2359,7 +2478,7 @@ export default function DisneyTracker() {
               </div>
 
               <div>
-                <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>3x3 GRID IMAGE</label>
+                <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>PHOTO OR GRID IMAGE</label>
                 <input type="file" accept="image/*" onChange={(e) => setSelectedGridFile(e.target.files?.[0] || null)} required style={{ width: '100%', fontSize: '12px' }} />
               </div>
 
