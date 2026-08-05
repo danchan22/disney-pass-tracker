@@ -43,7 +43,6 @@ const getSupabase = async () => {
   };
 };
 
-// --- TYPES ---
 interface Activity {
   id: string;
   visit_id: string;
@@ -75,7 +74,6 @@ export interface PhotoGridRecord {
   created_at?: string;
 }
 
-// --- CONSTANTS & DATA ---
 const FIXED_FAMILY_MEMBERS = ['Dan', 'Mandie', 'Elijah', 'Sophia', 'Sam', 'Andrew'];
 const UNIVERSAL_ACTIVITIES = ['Character Meeting', 'Parade', 'Fireworks Show', 'Other / Show / Food'];
 
@@ -138,7 +136,6 @@ const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
-// --- IMAGINEERING RIDE TRIVIA DATABASE ---
 const RIDE_TRIVIA_DB: Record<string, string[]> = {
   'Space Mountain': [
     'Did you know? Astronaut Gordon Cooper served as a consultant on Space Mountain to make the launch feel like real spaceflight!',
@@ -218,7 +215,6 @@ const RIDE_TRIVIA_DB: Record<string, string[]> = {
   ]
 };
 
-// --- HIDDEN MICKEYS LOCATION DATABASE ---
 const HIDDEN_MICKEYS_DB: Record<string, string[]> = {
   'Space Mountain': [
     'Look closely at the giant star map in the exit corridor: three circular asteroids form a classic Mickey head!',
@@ -650,7 +646,6 @@ export default function DisneyTracker() {
     return parseAttendees(visit.attendees).includes(person);
   };
 
-  // --- STATS CALCULATIONS ---
   const totalDays = filteredVisits.length;
   
   const totalActivities = useMemo(() => {
@@ -1301,49 +1296,6 @@ export default function DisneyTracker() {
 
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px 15px 30px 15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
-      
-      {/* 🔮 ALWAYS-ON RAINBOW GLOW ANIMATION */}
-      <style>{`
-        @keyframes glowingAnimation {
-          0% { background-position: 0 0; }
-          50% { background-position: 400% 0; }
-          100% { background-position: 0 0; }
-        }
-
-        .always-glowing-btn {
-          position: relative;
-          z-index: 0;
-          border-radius: 14px;
-        }
-
-        .always-glowing-btn::before {
-          content: '';
-          background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
-          position: absolute;
-          top: -3px;
-          left: -3px;
-          background-size: 400%;
-          z-index: -1;
-          filter: blur(6px);
-          width: calc(100% + 6px);
-          height: calc(100% + 6px);
-          animation: glowingAnimation 20s linear infinite;
-          opacity: 1;
-          border-radius: 16px;
-        }
-
-        .always-glowing-btn::after {
-          z-index: -1;
-          content: '';
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(135deg, #0066cc 0%, #004487 100%);
-          left: 0;
-          top: 0;
-          border-radius: 14px;
-        }
-      `}</style>
 
       {/* 🏰 APP HEADER (Clean Disney Pass Tracker) */}
       <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0' }}>
@@ -1466,7 +1418,6 @@ export default function DisneyTracker() {
         </button>
       </div>
 
-      {/* 2. SUBHEADER MENU (when applicable) */}
       {mainTab === 'tracker' && (
         <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '12px' }}>
           <button onClick={() => setTrackerSubTab('Visit a Park')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: trackerSubTab === 'Visit a Park' ? '#004487' : 'transparent', color: trackerSubTab === 'Visit a Park' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
@@ -1620,47 +1571,6 @@ export default function DisneyTracker() {
                         </div>
                       )}
 
-                      {/* 🎵 POSSIBLE SONGS INFO BOX */}
-                      {(() => {
-                        const lower = rideName.toLowerCase();
-                        const isMuppets = lower.includes('muppet') || lower.includes('rock') || lower.includes('roller');
-                        const isGuardians = lower.includes('guardians') || lower.includes('cosmic');
-
-                        if (!isMuppets && !isGuardians) return null;
-
-                        const muppetsSongs = [
-                          '"Song 2"',
-                          '"Born to Be Wild" (featuring Camilla the Chicken)',
-                          '"Love Rollercoaster"'
-                        ];
-
-                        const guardiansSongs = [
-                          '“September” by Earth, Wind & Fire',
-                          '“Disco Inferno” by The Trammps',
-                          '“Everybody Wants to Rule the World” by Tears for Fears',
-                          '“I Ran (So Far Away)” by A Flock of Seagulls',
-                          '“One Way or Another” by Blondie',
-                          '“Conga” by Gloria Estefan'
-                        ];
-
-                        const songs = isMuppets ? muppetsSongs : guardiansSongs;
-
-                        return (
-                          <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', padding: '10px 12px', borderRadius: '12px', marginTop: '2px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
-                            <div style={{ fontWeight: '800', color: '#7E22CE', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              🎵 Possible Songs:
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
-                              {songs.map((song, i) => (
-                                <li key={i} style={{ marginBottom: i === songs.length - 1 ? 0 : '3px' }}>
-                                  {song}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        );
-                      })()}
-
                       {queueStartTimestamp ? (
                         <div style={{ background: '#FFFDF5', border: '1px solid #FEEBC8', padding: '14px', borderRadius: '14px', textAlign: 'center' }}>
                           <div style={{ fontSize: '11px', fontWeight: '900', color: '#C05621', letterSpacing: '0.5px' }}>⏱️ LIVE QUEUE TIMER RUNNING</div>
@@ -1694,6 +1604,47 @@ export default function DisneyTracker() {
                               <div>{hiddenMickey}</div>
                             )}
                           </div>
+
+                          {/* 🎵 POSSIBLE SONGS INFO BOX (Shown while in queue) */}
+                          {(() => {
+                            const lower = rideName.toLowerCase();
+                            const isMuppets = lower.includes('muppet') || lower.includes('rock') || lower.includes('roller');
+                            const isGuardians = lower.includes('guardians') || lower.includes('cosmic');
+
+                            if (!isMuppets && !isGuardians) return null;
+
+                            const muppetsSongs = [
+                              '"Song 2"',
+                              '"Born to Be Wild" (featuring Camilla the Chicken)',
+                              '"Love Rollercoaster"'
+                            ];
+
+                            const guardiansSongs = [
+                              '“September” by Earth, Wind & Fire',
+                              '“Disco Inferno” by The Trammps',
+                              '“Everybody Wants to Rule the World” by Tears for Fears',
+                              '“I Ran (So Far Away)” by A Flock of Seagulls',
+                              '“One Way or Another” by Blondie',
+                              '“Conga” by Gloria Estefan'
+                            ];
+
+                            const songs = isMuppets ? muppetsSongs : guardiansSongs;
+
+                            return (
+                              <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
+                                <div style={{ fontWeight: '800', color: '#7E22CE', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  🎵 Possible Songs:
+                                </div>
+                                <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
+                                  {songs.map((song, i) => (
+                                    <li key={i} style={{ marginBottom: i === songs.length - 1 ? 0 : '3px' }}>
+                                      {song}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })()}
 
                           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                             <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); setHiddenMickey(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
@@ -1798,7 +1749,7 @@ export default function DisneyTracker() {
                   </button>
                 </div>
               ) : (
-                /* VISIT A PARK FORM (Replaces "✨ Enter the Magic") */
+                /* VISIT A PARK FORM */
                 <form onSubmit={handleCheckIn} style={{ background: '#FFF', padding: '22px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' }}>
                   <h2 style={{ marginTop: 0, fontSize: '19px', fontWeight: '800', color: '#004487', marginBottom: '15px', textAlign: 'center' }}>Visit a Park</h2>
                   <div style={{ marginBottom: '15px' }}>
@@ -1827,16 +1778,17 @@ export default function DisneyTracker() {
 
                   <button
                     type="submit"
-                    className="always-glowing-btn"
                     style={{
                       width: '100%',
                       padding: '14px',
+                      background: '#38A169',
                       color: '#FFF',
                       border: 'none',
+                      borderRadius: '12px',
                       fontSize: '16px',
                       fontWeight: 'bold',
                       cursor: 'pointer',
-                      textShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                      boxShadow: '0 2px 6px rgba(56,161,105,0.3)'
                     }}
                   >
                     Here we go...🧚✨
