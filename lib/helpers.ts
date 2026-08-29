@@ -1,6 +1,8 @@
 import { RIDE_TRIVIA_DB, HIDDEN_MICKEYS_DB } from './constants';
 import { Visit, Activity } from './types';
 
+export { compressImageToWebP } from './imageCompressor';
+
 export const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
@@ -122,8 +124,4 @@ export const getHiddenMickeyFact = (rideName: string, parkName: string): string 
     return list[Math.floor(Math.random() * list.length)];
   }
   return `Keep an eye on queue walls, rusty gears, and floor tile patterns near the loading area for three circles forming a Mickey head!`;
-};
-
-export { compressImageToWebP } from './imageCompressor';
-  });
 };
