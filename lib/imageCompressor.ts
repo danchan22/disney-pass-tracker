@@ -42,3 +42,6 @@ export const compressImageToWebP = (file: File): Promise<Blob> => {
     reader.readAsDataURL(file);
   });
 };
+
+// Legacy alias to support existing components like ColorChallengeTab.tsx
+export const compressImage = compressImageToWebP;
