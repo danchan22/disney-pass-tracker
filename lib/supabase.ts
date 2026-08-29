@@ -5,5 +5,5 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Helper wrapper to support async calls from the refactored tabs
+// Helper function to maintain async compatibility across components
 export const getSupabase = async () => supabase;
