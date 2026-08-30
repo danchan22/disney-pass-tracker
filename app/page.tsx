@@ -101,20 +101,44 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-// 1. Sync rider selections when visit ID or party length changes
-useEffect(() => {
-  if (activeVisit) {
-    setSelectedRiders(activePartyList);
-    setDepartingMembers(activePartyList);
-  }
-}, [activeVisit?.id, activePartyList.length]);
+  // 1. Sync rider selections when visit ID or party length changes
+  useEffect(() => {
+    if (activeVisit) {
+      setSelectedRiders(activePartyList);
+      setDepartingMembers(activePartyList);
+    }
+  }, [activeVisit?.id, activePartyList.length]);
 
-// 2. ONLY reset default rideName when checking into a NEW visit or park
-useEffect(() => {
-  if (activeVisit?.parkName) {
-    setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
-  }
-}, [activeVisit?.id, activeVisit?.parkName]);
+  // 2. ONLY reset default rideName when checking into a NEW visit or park
+  useEffect(() => {
+    if (activeVisit?.parkName && !queueStartTimestamp) {
+      setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
+    }
+  }, [activeVisit?.id, activeVisit?.parkName]);
+
+  // 3. PERSISTED QUEUE TIMER SIGNAL LOSS RESILIENCE (Mount Restoration)
+  useEffect(() => {
+    const savedStart = localStorage.getItem('disney_queue_start_ts');
+    const savedStr = localStorage.getItem('disney_queue_start_str');
+    const savedRide = localStorage.getItem('disney_queue_ride_name');
+
+    if (savedStart && savedStr) {
+      const ts = Number(savedStart);
+      setQueueStartTimestamp(ts);
+      setQueueStartTimeStr(savedStr);
+      if (savedRide) {
+        setRideName(savedRide);
+      }
+    }
+  }, []);
+
+  // 4. Re-fetch Ride Trivia & Hidden Mickey if queue restored on reload
+  useEffect(() => {
+    if (queueStartTimestamp && activeVisit && rideName && !rideTrivia) {
+      fetchRideTrivia(rideName, activeVisit.parkName);
+      fetchHiddenMickey(rideName, activeVisit.parkName);
+    }
+  }, [queueStartTimestamp, activeVisit?.parkName, rideName]);
 
   useEffect(() => {
     let interval: any;
@@ -130,6 +154,12 @@ useEffect(() => {
     fetchCloudVisits();
     fetchPhotoGrids();
   }, []);
+
+  const clearQueueTimerStorage = () => {
+    localStorage.removeItem('disney_queue_start_ts');
+    localStorage.removeItem('disney_queue_start_str');
+    localStorage.removeItem('disney_queue_ride_name');
+  };
 
   const fetchCloudVisits = async () => {
     setLoading(true);
@@ -584,12 +614,27 @@ useEffect(() => {
   const handleStartQueueTimer = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
-    setQueueStartTimestamp(now.getTime());
+    const ts = now.getTime();
+
+    setQueueStartTimestamp(ts);
     setQueueStartTimeStr(timeString);
+
+    localStorage.setItem('disney_queue_start_ts', ts.toString());
+    localStorage.setItem('disney_queue_start_str', timeString);
+    localStorage.setItem('disney_queue_ride_name', rideName);
+
     if (activeVisit) {
       fetchRideTrivia(rideName, activeVisit.parkName);
       fetchHiddenMickey(rideName, activeVisit.parkName);
     }
+  };
+
+  const handleCancelQueueTimer = () => {
+    clearQueueTimerStorage();
+    setQueueStartTimestamp(null);
+    setQueueStartTimeStr(null);
+    setRideTrivia(null);
+    setHiddenMickey(null);
   };
 
   const handleEndQueueTimer = async () => {
@@ -646,6 +691,8 @@ useEffect(() => {
     };
 
     setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, newActivity] });
+    
+    clearQueueTimerStorage();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setCharacterName('');
@@ -818,6 +865,8 @@ useEffect(() => {
 
     setShowCheckoutModal(false);
     await fetchCloudVisits();
+    
+    clearQueueTimerStorage();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setRideTrivia(null);
@@ -963,6 +1012,7 @@ useEffect(() => {
           mickeyLoading={mickeyLoading}
           handleStartQueueTimer={handleStartQueueTimer}
           handleEndQueueTimer={handleEndQueueTimer}
+          handleCancelQueueTimer={handleCancelQueueTimer}
           handleAddRideLive={handleAddRideLive}
           editingActivityId={editingActivityId}
           editingVisitId={editingVisitId}
