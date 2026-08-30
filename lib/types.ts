@@ -29,7 +29,17 @@ export interface PhotoGridRecord {
   created_at?: string;
 }
 
+export interface ParkingLog {
+  id: string;
+  created_at?: string;
+  park_name: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
+  section_name: string;
+  spot_name: string;
+  row_number: string;
+  parked_by: string;
+}
+
 export type MainTab = 'tracker' | 'analytics' | 'checklist' | 'rainbow';
-export type TrackerSubTab = 'Visit a Park' | 'Past Visits';
+export type TrackerSubTab = 'Today' | 'History' | 'Parking';
 export type AnalyticsSubTab = 'averages' | 'top10' | 'cards';
 export type RainbowSubTab = 'stream' | 'badges';
