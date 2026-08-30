@@ -2,6 +2,7 @@ import React from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, calculateVisitDuration, parseAttendees, getPersonEndTime, formatMinutes } from '../../lib/helpers';
+import { ParkingSubtab } from './ParkingSubtab';
 
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
@@ -128,8 +129,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
 }) => {
   return (
     <div>
-      {/* Subtab: Visit a Park */}
-      {trackerSubTab === 'Visit a Park' && (
+      {/* Subtab: Today */}
+      {trackerSubTab === 'Today' && (
         <div>
           {activeVisit ? (
             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
@@ -475,8 +476,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Past Visits */}
-      {trackerSubTab === 'Past Visits' && (
+      {/* Subtab: History */}
+      {trackerSubTab === 'History' && (
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '12px', color: '#004487', paddingLeft: '5px' }}>
             Past Visits ({filteredVisits.length})
@@ -605,6 +606,11 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
             })
           )}
         </div>
+      )}
+
+      {/* Subtab: Parking */}
+      {trackerSubTab === 'Parking' && (
+        <ParkingSubtab />
       )}
     </div>
   );
