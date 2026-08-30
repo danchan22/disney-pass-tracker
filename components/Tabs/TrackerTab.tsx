@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, calculateVisitDuration, parseAttendees, getPersonEndTime, formatMinutes } from '../../lib/helpers';
 import { ParkingSubtab } from './ParkingSubtab';
+import { AddPersonModal } from '../Modals/AddPersonModal';
 
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
@@ -51,6 +52,7 @@ interface TrackerTabProps {
   deleteActivity: (id: string) => void;
   setDepartingMembers: (members: string[]) => void;
   setShowCheckoutModal: (show: boolean) => void;
+  handleAddMembersToActiveVisit: (newMembers: string[]) => void;
   selectedAttendee: string;
   totalDays: number;
   totalActivities: number;
@@ -113,6 +115,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   deleteActivity,
   setDepartingMembers,
   setShowCheckoutModal,
+  handleAddMembersToActiveVisit,
   selectedAttendee,
   totalDays,
   totalActivities,
@@ -127,6 +130,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   openEditVisit,
   deleteVisit,
 }) => {
+  const [showAddPersonModal, setShowAddPersonModal] = useState(false);
+
   return (
     <div>
       {/* Subtab: Today */}
@@ -144,13 +149,33 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
               </h2>
 
-              <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px', fontWeight: '600' }}>
+              <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '12px', fontWeight: '600' }}>
                 📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
               </div>
 
-              <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#F7FAFC' }}>
-                👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
-              </p>
+              {/* ACTIVE PARTY & ADD SOMEONE BUTTON */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ fontSize: '14px', color: '#F7FAFC' }}>
+                  👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPersonModal(true)}
+                  style={{
+                    background: '#D4AF37',
+                    color: '#003366',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  Add Someone
+                </button>
+              </div>
 
               {/* TRACK ATTRACTION CARD */}
               <div style={{ background: '#FFF', padding: '16px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
@@ -612,6 +637,14 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
       {trackerSubTab === 'Parking' && (
         <ParkingSubtab />
       )}
+
+      {/* ADD PERSON MODAL */}
+      <AddPersonModal
+        show={showAddPersonModal}
+        onClose={() => setShowAddPersonModal(false)}
+        currentParty={activePartyList}
+        onAddMembers={handleAddMembersToActiveVisit}
+      />
     </div>
   );
 };
