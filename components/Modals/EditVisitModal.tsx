@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Visit } from '../../lib/types';
-import { formatDisplayDate, parseAttendees } from '../../lib/helpers';
+import { formatDisplayDate, parseAttendees, format12Hour } from '../../lib/helpers';
 
 interface EditVisitModalProps {
   editingVisit: Visit | null;
@@ -9,6 +9,8 @@ interface EditVisitModalProps {
   setEditVisitStartTime: (val: string) => void;
   editVisitEndTime: string;
   setEditVisitEndTime: (val: string) => void;
+  editVisitMemberStartTimes: Record<string, string>;
+  setEditVisitMemberStartTimes: (val: Record<string, string>) => void;
   editVisitMemberEndTimes: Record<string, string>;
   setEditVisitMemberEndTimes: (val: Record<string, string>) => void;
   handleSaveVisitEdit: () => void;
@@ -21,11 +23,15 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
   setEditVisitStartTime,
   editVisitEndTime,
   setEditVisitEndTime,
+  editVisitMemberStartTimes,
+  setEditVisitMemberStartTimes,
   editVisitMemberEndTimes,
   setEditVisitMemberEndTimes,
   handleSaveVisitEdit,
 }) => {
   if (!editingVisit) return null;
+
+  const partyList = parseAttendees(editingVisit.attendees);
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
@@ -37,52 +43,78 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
           {editingVisit.parkName} • {formatDisplayDate(editingVisit.visitDate)}
         </p>
 
-        <div style={{ marginBottom: '14px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
-            ⏰ ARRIVAL TIME (HH:MM / e.g. 08:59 or 14:30)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. 08:59"
-            value={editVisitStartTime}
-            onChange={(e) => setEditVisitStartTime(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }}
-          />
+        {/* OVERALL TIMES */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+          <div>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
+              ⏰ MAIN ARRIVAL TIME
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 8:59 AM"
+              value={editVisitStartTime}
+              onChange={(e) => setEditVisitStartTime(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
+              🚪 MAIN DEPARTURE TIME
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 9:50 PM"
+              value={editVisitEndTime}
+              onChange={(e) => setEditVisitEndTime(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }}
+            />
+          </div>
         </div>
 
-        <div style={{ marginBottom: '14px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>
-            🚪 MAIN DEPARTURE TIME (e.g. 21:50)
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. 21:50"
-            value={editVisitEndTime}
-            onChange={(e) => setEditVisitEndTime(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }}
-          />
-        </div>
-
+        {/* MEMBER TIMES TABLE */}
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '6px' }}>
-            👥 MEMBER DEPARTURE TIMES
+          <label style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '8px' }}>
+            👥 MEMBER ARRIVAL & DEPARTURE TIMES
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {parseAttendees(editingVisit.attendees).map(member => (
-              <div key={member} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#2D3748' }}>👤 {member}</span>
-                <input
-                  type="text"
-                  placeholder={editVisitEndTime || "HH:MM"}
-                  value={editVisitMemberEndTimes[member] || ''}
-                  onChange={(e) => {
-                    setEditVisitMemberEndTimes({
-                      ...editVisitMemberEndTimes,
-                      [member]: e.target.value
-                    });
-                  }}
-                  style={{ width: '110px', padding: '6px 8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '13px', textAlign: 'center' }}
-                />
+            {partyList.map(member => (
+              <div key={member} style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#2D3748', marginBottom: '6px' }}>
+                  👤 {member}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '9px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '2px' }}>ARRIVED</label>
+                    <input
+                      type="text"
+                      placeholder={format12Hour(editVisitStartTime) || "e.g. 10:30 AM"}
+                      value={editVisitMemberStartTimes[member] || ''}
+                      onChange={(e) => {
+                        setEditVisitMemberStartTimes({
+                          ...editVisitMemberStartTimes,
+                          [member]: e.target.value
+                        });
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '12px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '9px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '2px' }}>DEPARTED</label>
+                    <input
+                      type="text"
+                      placeholder={format12Hour(editVisitEndTime) || "e.g. 9:30 PM"}
+                      value={editVisitMemberEndTimes[member] || ''}
+                      onChange={(e) => {
+                        setEditVisitMemberEndTimes({
+                          ...editVisitMemberEndTimes,
+                          [member]: e.target.value
+                        });
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: '8px', border: '1px solid #CBD5E0', fontSize: '12px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
