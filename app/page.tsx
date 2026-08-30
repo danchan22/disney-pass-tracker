@@ -90,7 +90,7 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-  // Sync rider selections when visit ID or party length changes
+  // 1. Sync rider selections when visit ID or party length changes
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
@@ -98,14 +98,14 @@ export default function DisneyTracker() {
     }
   }, [activeVisit?.id, activePartyList.length]);
 
-  // Reset default rideName ONLY when checking into a NEW visit or park
+  // 2. ONLY reset default rideName when checking into a NEW visit or park
   useEffect(() => {
     if (activeVisit?.parkName && !queueStartTimestamp) {
       setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
     }
   }, [activeVisit?.id, activeVisit?.parkName]);
 
-  // Persistent Queue Timer Mount Restoration
+  // 3. Persistent Queue Timer Mount Restoration
   useEffect(() => {
     const savedStart = localStorage.getItem('disney_queue_start_ts');
     const savedStr = localStorage.getItem('disney_queue_start_str');
@@ -118,7 +118,7 @@ export default function DisneyTracker() {
     }
   }, []);
 
-  // Re-fetch AI Trivia if queue timer restored on page refresh
+  // 4. Re-fetch AI Trivia if queue timer restored on page refresh
   useEffect(() => {
     if (queueStartTimestamp && activeVisit && rideName && !rideTrivia) {
       fetchRideTrivia(rideName, activeVisit.parkName);
@@ -319,6 +319,15 @@ export default function DisneyTracker() {
   };
 
   const rideCountsMap = getRideCountsMap(filteredVisits, selectedAttendee);
+
+  const toggleDepartingMember = (name: string) => {
+    if (departingMembers.includes(name)) {
+      if (departingMembers.length === 1) return;
+      setDepartingMembers(departingMembers.filter(m => m !== name));
+    } else {
+      setDepartingMembers([...departingMembers, name]);
+    }
+  };
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
