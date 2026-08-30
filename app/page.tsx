@@ -26,7 +26,7 @@ export default function DisneyTracker() {
 
   // Main Nav State
   const [mainTab, setMainTab] = useState<MainTab>('tracker');
-  const [trackerSubTab, setTrackerSubTab] = useState<TrackerSubTab>('Visit a Park');
+  const [trackerSubTab, setTrackerSubTab] = useState<TrackerSubTab>('Today');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<AnalyticsSubTab>('averages');
   const [rainbowSubTab, setRainbowSubTab] = useState<RainbowSubTab>('stream');
 
