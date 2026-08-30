@@ -125,3 +125,14 @@ export const getHiddenMickeyFact = (rideName: string, parkName: string): string 
   }
   return `Keep an eye on queue walls, rusty gears, and floor tile patterns near the loading area for three circles forming a Mickey head!`;
 };
+
+export const get6AMCutoffISO = (): string => {
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setHours(6, 0, 0, 0);
+
+  if (now < cutoff) {
+    cutoff.setDate(cutoff.getDate() - 1);
+  }
+  return cutoff.toISOString();
+};
