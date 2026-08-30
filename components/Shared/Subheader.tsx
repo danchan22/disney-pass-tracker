@@ -23,12 +23,26 @@ export const Subheader: React.FC<SubheaderProps> = ({
   if (mainTab === 'tracker') {
     return (
       <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '12px' }}>
-        <button onClick={() => setTrackerSubTab('Visit a Park')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: trackerSubTab === 'Visit a Park' ? '#004487' : 'transparent', color: trackerSubTab === 'Visit a Park' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Visit a Park
-        </button>
-        <button onClick={() => setTrackerSubTab('Past Visits')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: trackerSubTab === 'Past Visits' ? '#004487' : 'transparent', color: trackerSubTab === 'Past Visits' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Past Visits
-        </button>
+        {(['Today', 'History', 'Parking'] as TrackerSubTab[]).map((sub) => (
+          <button
+            key={sub}
+            onClick={() => setTrackerSubTab(sub)}
+            style={{
+              flex: 1,
+              padding: '9px 2px',
+              border: 'none',
+              borderRadius: '9px',
+              fontWeight: '800',
+              fontSize: '12px',
+              cursor: 'pointer',
+              background: trackerSubTab === sub ? '#004487' : 'transparent',
+              color: trackerSubTab === sub ? '#FFF' : '#4A5568',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {sub}
+          </button>
+        ))}
       </div>
     );
   }
