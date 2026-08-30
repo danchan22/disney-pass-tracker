@@ -29,6 +29,29 @@ export const parseMemberEndTimes = (raw: any, notes?: string): Record<string, st
   return {};
 };
 
+export const fetchGeminiQueueHint = async (promptText: string): Promise<string | null> => {
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+      }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      return json.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    }
+  } catch (err) {
+    console.warn("Gemini fetch error:", err);
+  }
+  return null;
+};
+
 export const parseMemberStartTimes = (raw: any, notes?: string): Record<string, string> => {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
   if (typeof raw === 'string' && raw.includes('|STARTTIMES:')) {
