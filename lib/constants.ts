@@ -61,6 +61,26 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
   ]
 };
 
+export const PARKING_OPTIONS: Record<
+  string,
+  { section?: string; spots: string[] }[]
+> = {
+  'Magic Kingdom': [
+    { section: 'Heroes', spots: ['Woody', 'Aladdin', 'Peter Pan', 'Simba', 'Rapunzel', 'Mulan'] },
+    { section: 'Villains', spots: ['Jafar', 'Zurg', 'Scar', 'Hook', 'Cruella', 'Ursula'] },
+  ],
+  'Epcot': [
+    { section: 'Earth', spots: ['Moana (Amaze)', 'HeiHei (Journey)', 'Crush (Discover)', 'Dory (Create)'] },
+    { section: 'Space', spots: ['Wall-E (Imagine)', 'Gamora (Wonder)', 'Rocket (Explore)'] },
+  ],
+  'Hollywood Studios': [
+    { spots: ['Mickey', 'Minnie', 'Jessie', 'Buzz', 'Olaf', 'BB-8'] }
+  ],
+  'Animal Kingdom': [
+    { spots: ['Peacock', 'Butterfly', 'Giraffe', 'Dinosaur', 'Yeti', 'Unicorn'] }
+  ]
+};
+
 export const RIDE_TRIVIA_DB: Record<string, string[]> = {
   'Space Mountain': [
     'Did you know? Astronaut Gordon Cooper served as a consultant on Space Mountain to make the launch feel like real spaceflight!',
