@@ -101,13 +101,20 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-  useEffect(() => {
-    if (activeVisit) {
-      setSelectedRiders(activePartyList);
-      setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
-      setDepartingMembers(activePartyList);
-    }
-  }, [activeVisit, activePartyList.length]);
+// 1. Sync rider selections when visit ID or party length changes
+useEffect(() => {
+  if (activeVisit) {
+    setSelectedRiders(activePartyList);
+    setDepartingMembers(activePartyList);
+  }
+}, [activeVisit?.id, activePartyList.length]);
+
+// 2. ONLY reset default rideName when checking into a NEW visit or park
+useEffect(() => {
+  if (activeVisit?.parkName) {
+    setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
+  }
+}, [activeVisit?.id, activeVisit?.parkName]);
 
   useEffect(() => {
     let interval: any;
