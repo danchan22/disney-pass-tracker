@@ -15,6 +15,7 @@ export interface Visit {
   endTime?: string;
   attendees?: string | string[];
   memberEndTimes?: Record<string, string>;
+  memberStartTimes?: Record<string, string>;
   notes?: string;
   activities: Activity[];
 }
