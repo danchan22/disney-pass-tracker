@@ -6,7 +6,7 @@ export { compressImageToWebP } from './imageCompressor';
 export const parseAttendees = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => s.trim()).filter(Boolean);
-  const attendeesPart = raw.split('|ENDTIMES:')[0];
+  const attendeesPart = raw.split('|ENDTIMES:')[0].split('|STARTTIMES:')[0];
   return attendeesPart.split(',').map(s => s.trim()).filter(Boolean);
 };
 
@@ -15,7 +15,7 @@ export const parseMemberEndTimes = (raw: any, notes?: string): Record<string, st
   if (typeof raw === 'string') {
     if (raw.includes('|ENDTIMES:')) {
       try {
-        const jsonStr = raw.split('|ENDTIMES:')[1];
+        const jsonStr = raw.split('|ENDTIMES:')[1].split('|')[0];
         return JSON.parse(jsonStr);
       } catch (e) {}
     }
@@ -25,6 +25,17 @@ export const parseMemberEndTimes = (raw: any, notes?: string): Record<string, st
   }
   if (notes && typeof notes === 'string' && notes.trim().startsWith('{')) {
     try { return JSON.parse(notes); } catch (e) {}
+  }
+  return {};
+};
+
+export const parseMemberStartTimes = (raw: any, notes?: string): Record<string, string> => {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.includes('|STARTTIMES:')) {
+    try {
+      const jsonStr = raw.split('|STARTTIMES:')[1].split('|')[0];
+      return JSON.parse(jsonStr);
+    } catch (e) {}
   }
   return {};
 };
@@ -40,6 +51,7 @@ export const formatDisplayDate = (dateStr: string) => {
 
 export const format12Hour = (timeStr?: string) => {
   if (!timeStr) return '';
+  if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
   const [h, m] = timeStr.split(':').map(Number);
   if (isNaN(h) || isNaN(m)) return timeStr;
   const period = h >= 12 ? 'PM' : 'AM';
@@ -49,7 +61,19 @@ export const format12Hour = (timeStr?: string) => {
 
 export const parseTimeToMinutes = (timeStr?: string) => {
   if (!timeStr) return 0;
-  const [hrs, mins] = timeStr.split(':').map(Number);
+  // Standardize AM/PM string parsing if present
+  let cleanTime = timeStr.trim();
+  let isPM = cleanTime.toUpperCase().includes('PM');
+  let isAM = cleanTime.toUpperCase().includes('AM');
+  cleanTime = cleanTime.replace(/AM|PM/gi, '').trim();
+
+  const [hrsRaw, minsRaw] = cleanTime.split(':').map(Number);
+  let hrs = isNaN(hrsRaw) ? 0 : hrsRaw;
+  const mins = isNaN(minsRaw) ? 0 : minsRaw;
+
+  if (isPM && hrs < 12) hrs += 12;
+  if (isAM && hrs === 12) hrs = 0;
+
   return (hrs * 60) + mins;
 };
 
@@ -70,6 +94,13 @@ export const formatMinutes = (totalMins: number) => {
   const remMins = Math.round(totalMins % 60);
   if (hrs === 0) return `${remMins}m`;
   return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+};
+
+export const getPersonStartTime = (v: Visit, person: string) => {
+  if (v.memberStartTimes && v.memberStartTimes[person]) {
+    return v.memberStartTimes[person];
+  }
+  return v.startTime || '';
 };
 
 export const getPersonEndTime = (v: Visit, person: string) => {
