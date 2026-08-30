@@ -118,6 +118,8 @@ export const isPersonRider = (activity: Activity, visit: Visit, person: string) 
   return parseAttendees(visit.attendees).includes(person);
 };
 
+
+
 export const getRideTriviaFact = (rideName: string, parkName: string): string => {
   if (RIDE_TRIVIA_DB[rideName] && RIDE_TRIVIA_DB[rideName].length > 0) {
     const facts = RIDE_TRIVIA_DB[rideName];
@@ -147,6 +149,17 @@ export const getRideTriviaFact = (rideName: string, parkName: string): string =>
     'Did you know? Disney Imagineers hide unique details, props, and story clues throughout every line in the park!'
   ];
   return list[Math.floor(Math.random() * list.length)];
+};
+
+export const encodeVisitAttendeesPayload = (
+  attendees: string[],
+  startTimes: Record<string, string> = {},
+  endTimes: Record<string, string> = {}
+): string => {
+  const rawStr = attendees.join(', ');
+  const startJson = JSON.stringify(startTimes);
+  const endJson = JSON.stringify(endTimes);
+  return `${rawStr}|ENDTIMES:${endJson}|STARTTIMES:${startJson}`;
 };
 
 export const getHiddenMickeyFact = (rideName: string, parkName: string): string => {
