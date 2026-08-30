@@ -1,46 +1,104 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { PhotoGridRecord, RainbowSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARK_EMOJIS, RAINBOW_COLORS } from '../../lib/constants';
+import { getSupabase } from '../../lib/supabase';
+import { compressImageToWebP } from '../../lib/helpers';
+import { UploadPhotoModal } from '../Modals/UploadPhotoModal';
+import { LightboxModal } from '../Modals/LightboxModal';
 
 interface RainbowTabProps {
   rainbowSubTab: RainbowSubTab;
-  filterPhotographer: string;
-  setFilterPhotographer: React.Dispatch<React.SetStateAction<string>>;
-  filterPark: string;
-  setFilterPark: React.Dispatch<React.SetStateAction<string>>;
-  filterColor: string;
-  setFilterColor: React.Dispatch<React.SetStateAction<string>>;
-  badgePhotographer: string;
-  setBadgePhotographer: (name: string) => void;
-  filteredPhotos: PhotoGridRecord[];
-  photoLoading: boolean;
   photoGrids: PhotoGridRecord[];
-  setLightboxGrid: (grid: PhotoGridRecord | null) => void;
-  setUploadUser: (user: string) => void;
-  setUploadPark: (park: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom') => void;
-  setUploadColor: (color: string) => void;
-  setUploadModalOpen: (open: boolean) => void;
+  photoLoading: boolean;
+  fetchPhotoGrids: () => Promise<void>;
 }
 
 export const RainbowTab: React.FC<RainbowTabProps> = ({
   rainbowSubTab,
-  filterPhotographer,
-  setFilterPhotographer,
-  filterPark,
-  setFilterPark,
-  filterColor,
-  setFilterColor,
-  badgePhotographer,
-  setBadgePhotographer,
-  filteredPhotos,
-  photoLoading,
   photoGrids,
-  setLightboxGrid,
-  setUploadUser,
-  setUploadPark,
-  setUploadColor,
-  setUploadModalOpen,
+  photoLoading,
+  fetchPhotoGrids,
 }) => {
+  // Localized filter states
+  const [filterPhotographer, setFilterPhotographer] = useState<string>('ALL');
+  const [filterPark, setFilterPark] = useState<string>('ALL');
+  const [filterColor, setFilterColor] = useState<string>('ALL');
+  const [badgePhotographer, setBadgePhotographer] = useState<string>('Dan');
+
+  // Localized Modal states
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadUser, setUploadUser] = useState<string>('Dan');
+  const [uploadPark, setUploadPark] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
+  const [uploadColor, setUploadColor] = useState<string>('Red');
+  const [uploadCaption, setUploadCaption] = useState<string>('');
+  const [selectedGridFile, setSelectedGridFile] = useState<File | null>(null);
+  const [uploadingGrid, setUploadingGrid] = useState<boolean>(false);
+
+  const [lightboxGrid, setLightboxGrid] = useState<PhotoGridRecord | null>(null);
+
+  const filteredPhotos = useMemo(() => {
+    return photoGrids.filter(p => {
+      if (filterPhotographer !== 'ALL' && p.user_name !== filterPhotographer) return false;
+      if (filterPark !== 'ALL' && p.park_name !== filterPark) return false;
+      if (filterColor !== 'ALL' && p.color !== filterColor) return false;
+      return true;
+    });
+  }, [photoGrids, filterPhotographer, filterPark, filterColor]);
+
+  const handleGridUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGridFile) return;
+
+    setUploadingGrid(true);
+    try {
+      const compressedBlob = await compressImageToWebP(selectedGridFile);
+      const fileName = `${uploadUser.toLowerCase()}_${uploadPark.replace(/\s+/g, '')}_${uploadColor}_${Date.now()}.webp`;
+      const filePath = `grids/${fileName}`;
+
+      const supabase = await getSupabase();
+      const { error: storageError } = await supabase.storage
+        .from('color-grids')
+        .upload(filePath, compressedBlob, { contentType: 'image/webp', upsert: true });
+
+      if (storageError) throw storageError;
+
+      const { data: urlData } = supabase.storage.from('color-grids').getPublicUrl(filePath);
+      const imageUrl = urlData.publicUrl;
+
+      const { error: dbError } = await supabase.from('photo_grids').insert({
+        user_name: uploadUser,
+        park_name: uploadPark,
+        color: uploadColor,
+        image_url: imageUrl,
+        caption: uploadCaption || undefined
+      });
+
+      if (dbError) throw dbError;
+
+      setUploadModalOpen(false);
+      setSelectedGridFile(null);
+      setUploadCaption('');
+      await fetchPhotoGrids();
+    } catch (err: any) {
+      alert("Upload failed: " + (err.message || err));
+    } finally {
+      setUploadingGrid(false);
+    }
+  };
+
+  const handleDeleteGridPhoto = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this photo grid?")) return;
+
+    try {
+      const supabase = await getSupabase();
+      await supabase.from('photo_grids').delete().eq('id', id);
+      setLightboxGrid(null);
+      await fetchPhotoGrids();
+    } catch (err: any) {
+      alert("Error deleting image: " + err.message);
+    }
+  };
+
   return (
     <div>
       {/* Header Subtitle Box */}
@@ -249,6 +307,31 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
         </div>
       )}
+
+      {/* LOCALIZED MODALS */}
+      <UploadPhotoModal
+        uploadModalOpen={uploadModalOpen}
+        setUploadModalOpen={setUploadModalOpen}
+        uploadUser={uploadUser}
+        setUploadUser={setUploadUser}
+        uploadPark={uploadPark}
+        setUploadPark={setUploadPark}
+        uploadColor={uploadColor}
+        setUploadColor={setUploadColor}
+        uploadCaption={uploadCaption}
+        setUploadCaption={setUploadCaption}
+        selectedGridFile={selectedGridFile}
+        setSelectedGridFile={setSelectedGridFile}
+        uploadingGrid={uploadingGrid}
+        handleGridUploadSubmit={handleGridUploadSubmit}
+      />
+
+      <LightboxModal
+        lightboxGrid={lightboxGrid}
+        setLightboxGrid={setLightboxGrid}
+        handleDeleteGridPhoto={handleDeleteGridPhoto}
+      />
+
     </div>
   );
 };
