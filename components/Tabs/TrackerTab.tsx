@@ -35,6 +35,7 @@ interface TrackerTabProps {
   mickeyLoading: boolean;
   handleStartQueueTimer: () => void;
   handleEndQueueTimer: () => void;
+  handleCancelQueueTimer: () => void;
   handleAddRideLive: () => void;
   editingActivityId: string | null;
   editingVisitId: string | null;
@@ -98,6 +99,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   mickeyLoading,
   handleStartQueueTimer,
   handleEndQueueTimer,
+  handleCancelQueueTimer,
   handleAddRideLive,
   editingActivityId,
   editingVisitId,
@@ -308,7 +310,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                       })()}
 
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <button type="button" onClick={() => { setQueueStartTimestamp(null); setQueueStartTimeStr(null); setRideTrivia(null); setHiddenMickey(null); }} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                        <button type="button" onClick={handleCancelQueueTimer} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                           Cancel
                         </button>
                         <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
