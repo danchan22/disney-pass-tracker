@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Visit, Activity, PhotoGridRecord, MainTab, TrackerSubTab, AnalyticsSubTab, RainbowSubTab } from '../lib/types';
 import { PARK_ATTRACTIONS } from '../lib/constants';
 import { getSupabase } from '../lib/supabase';
-import { parseAttendees, parseMemberEndTimes, compressImageToWebP, getPersonEndTime, parseTimeToMinutes, isPersonRider, getRideTriviaFact, getHiddenMickeyFact } from '../lib/helpers';
+import { parseAttendees, parseMemberEndTimes, parseMemberStartTimes, compressImageToWebP, getPersonEndTime, parseTimeToMinutes, isPersonRider, getRideTriviaFact, getHiddenMickeyFact, format12Hour } from '../lib/helpers';
 
 import { Header } from '../components/Shared/Header';
 import { Subheader } from '../components/Shared/Subheader';
@@ -68,6 +68,7 @@ export default function DisneyTracker() {
   const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
   const [editVisitStartTime, setEditVisitStartTime] = useState('');
   const [editVisitEndTime, setEditVisitEndTime] = useState('');
+  const [editVisitMemberStartTimes, setEditVisitMemberStartTimes] = useState<Record<string, string>>({});
   const [editVisitMemberEndTimes, setEditVisitMemberEndTimes] = useState<Record<string, string>>({});
 
   // Checkout Modal State
@@ -142,6 +143,7 @@ export default function DisneyTracker() {
           parkName: v.parkName || v.parkname,
           attendees: parseAttendees(v.attendees),
           memberEndTimes: parseMemberEndTimes(v.memberEndTimes || v.member_end_times || v.attendees, v.notes),
+          memberStartTimes: parseMemberStartTimes(v.memberStartTimes || v.member_start_times || v.attendees, v.notes),
           notes: v.notes,
           activities: (v.activities || []).map((a: any) => ({
             id: a.id,
@@ -387,7 +389,7 @@ export default function DisneyTracker() {
     e.preventDefault();
     const now = new Date();
     const localDate = now.toLocaleDateString('en-CA');
-    const localTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
 
     const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
     const attendeesDbStr = newAttendeesList.join(', ');
@@ -425,6 +427,39 @@ export default function DisneyTracker() {
     setSelectedRiders(newAttendeesList);
     setDepartingMembers(newAttendeesList);
     setSelectedAttendees([]);
+  };
+
+  const handleAddMembersToActiveVisit = async (joiningMembers: string[]) => {
+    if (!activeVisit) return;
+
+    const currentAttendees = parseAttendees(activeVisit.attendees);
+    const updatedAttendees = Array.from(new Set([...currentAttendees, ...joiningMembers]));
+    const nowTimeStr = new Date().toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
+
+    const updatedStartTimes: Record<string, string> = {
+      ...(activeVisit.memberStartTimes || {})
+    };
+    joiningMembers.forEach(m => {
+      updatedStartTimes[m] = nowTimeStr;
+    });
+
+    const rawAttendeesStr = updatedAttendees.join(', ');
+    const endTimesJson = JSON.stringify(activeVisit.memberEndTimes || {});
+    const startTimesJson = JSON.stringify(updatedStartTimes);
+    const dbAttendeesPayload = `${rawAttendeesStr}|ENDTIMES:${endTimesJson}|STARTTIMES:${startTimesJson}`;
+
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('visits')
+        .update({ attendees: dbAttendeesPayload })
+        .eq('id', activeVisit.id);
+
+      if (error) throw error;
+      await fetchCloudVisits();
+    } catch (err: any) {
+      alert("Error adding members to active visit: " + (err.message || err));
+    }
   };
 
   const handleAddRideLive = async () => {
@@ -689,41 +724,56 @@ export default function DisneyTracker() {
 
   const openEditVisit = (v: Visit) => {
     setEditingVisit(v);
-    setEditVisitStartTime(v.startTime || '');
-    setEditVisitEndTime(v.endTime || '');
-    setEditVisitMemberEndTimes({ ...(v.memberEndTimes || {}) });
+    setEditVisitStartTime(format12Hour(v.startTime));
+    setEditVisitEndTime(format12Hour(v.endTime || ''));
+
+    const existingStarts = v.memberStartTimes || {};
+    const existingEnds = v.memberEndTimes || {};
+
+    const formattedStarts: Record<string, string> = {};
+    const formattedEnds: Record<string, string> = {};
+
+    parseAttendees(v.attendees).forEach(m => {
+      formattedStarts[m] = format12Hour(existingStarts[m] || v.startTime);
+      formattedEnds[m] = format12Hour(existingEnds[m] || v.endTime || '');
+    });
+
+    setEditVisitMemberStartTimes(formattedStarts);
+    setEditVisitMemberEndTimes(formattedEnds);
   };
 
   const handleSaveVisitEdit = async () => {
     if (!editingVisit) return;
+
     const rawAttendeesStr = parseAttendees(editingVisit.attendees).join(', ');
-    const jsonEndTimesStr = JSON.stringify(editVisitMemberEndTimes);
-    const attendeesWithEndTimes = `${rawAttendeesStr}|ENDTIMES:${jsonEndTimesStr}`;
+    const endTimesJson = JSON.stringify(editVisitMemberEndTimes);
+    const startTimesJson = JSON.stringify(editVisitMemberStartTimes);
+    const dbAttendeesPayload = `${rawAttendeesStr}|ENDTIMES:${endTimesJson}|STARTTIMES:${startTimesJson}`;
 
-    const supabase = await getSupabase();
-    const { error } = await supabase
-      .from('visits')
-      .update({
-        startTime: editVisitStartTime,
-        endTime: editVisitEndTime,
-        attendees: attendeesWithEndTimes,
-        notes: jsonEndTimesStr
-      })
-      .eq('id', editingVisit.id);
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('visits')
+        .update({
+          startTime: editVisitStartTime,
+          endTime: editVisitEndTime,
+          attendees: dbAttendeesPayload
+        })
+        .eq('id', editingVisit.id);
 
-    if (error) {
-      setErrorMessage("Error updating visit log: " + error.message);
-      return;
+      if (error) throw error;
+
+      setEditingVisit(null);
+      await fetchCloudVisits();
+    } catch (err: any) {
+      setErrorMessage("Error updating visit log: " + (err.message || err));
     }
-
-    setEditingVisit(null);
-    await fetchCloudVisits();
   };
 
   const processCheckout = async (checkoutType: 'selected' | 'everyone') => {
     if (!activeVisit) return;
     const now = new Date();
-    const endTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    const endTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
 
     const currentActive = activePartyList;
     const leavingParty = checkoutType === 'everyone' ? currentActive : departingMembers;
@@ -740,8 +790,9 @@ export default function DisneyTracker() {
     const finalEndTime = isVisitComplete ? endTime : '';
 
     const rawAttendeesStr = parseAttendees(activeVisit.attendees).join(', ');
-    const jsonEndTimesStr = JSON.stringify(updatedEndTimes);
-    const attendeesWithEndTimes = `${rawAttendeesStr}|ENDTIMES:${jsonEndTimesStr}`;
+    const endTimesJson = JSON.stringify(updatedEndTimes);
+    const startTimesJson = JSON.stringify(activeVisit.memberStartTimes || {});
+    const dbAttendeesPayload = `${rawAttendeesStr}|ENDTIMES:${endTimesJson}|STARTTIMES:${startTimesJson}`;
 
     const supabase = await getSupabase();
 
@@ -749,7 +800,7 @@ export default function DisneyTracker() {
       .from('visits')
       .update({
         endTime: finalEndTime,
-        attendees: attendeesWithEndTimes
+        attendees: dbAttendeesPayload
       })
       .eq('id', activeVisit.id);
 
@@ -922,6 +973,7 @@ export default function DisneyTracker() {
           deleteActivity={deleteActivity}
           setDepartingMembers={setDepartingMembers}
           setShowCheckoutModal={setShowCheckoutModal}
+          handleAddMembersToActiveVisit={handleAddMembersToActiveVisit}
           selectedAttendee={selectedAttendee}
           totalDays={totalDays}
           totalActivities={totalActivities}
@@ -1010,6 +1062,8 @@ export default function DisneyTracker() {
         setEditVisitStartTime={setEditVisitStartTime}
         editVisitEndTime={editVisitEndTime}
         setEditVisitEndTime={setEditVisitEndTime}
+        editVisitMemberStartTimes={editVisitMemberStartTimes}
+        setEditVisitMemberStartTimes={setEditVisitMemberStartTimes}
         editVisitMemberEndTimes={editVisitMemberEndTimes}
         setEditVisitMemberEndTimes={setEditVisitMemberEndTimes}
         handleSaveVisitEdit={handleSaveVisitEdit}
