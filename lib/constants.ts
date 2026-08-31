@@ -60,7 +60,6 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Zootopia: Better Together'
   ]
 };
-
 export const PARKING_OPTIONS: Record<
   string,
   { section?: string; spots: string[] }[]
@@ -70,8 +69,8 @@ export const PARKING_OPTIONS: Record<
     { section: 'Villains', spots: ['Jafar', 'Zurg', 'Scar', 'Hook', 'Cruella', 'Ursula'] },
   ],
   'Epcot': [
-    { section: 'Earth', spots: ['Moana (Amaze)', 'HeiHei (Journey)', 'Crush (Discover)', 'Dory (Create)'] },
-    { section: 'Space', spots: ['Wall-E (Imagine)', 'Gamora (Wonder)', 'Rocket (Explore)'] },
+    { section: 'Space', spots: ['Wall-E', 'Eve', 'Rocket', 'Gamora'] },
+    { section: 'Earth', spots: ['Moana', 'Heihei', 'Crush', 'Dory'] },
   ],
   'Hollywood Studios': [
     { spots: ['Mickey', 'Minnie', 'Jessie', 'Buzz', 'Olaf', 'BB-8'] }
