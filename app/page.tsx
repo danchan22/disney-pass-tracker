@@ -15,7 +15,8 @@ import {
   getHiddenMickeyFact,
   format12Hour,
   encodeVisitAttendeesPayload,
-  fetchGeminiQueueHint
+  fetchGeminiQueueHint,
+  getVisitTimestamp
 } from '../lib/helpers';
 
 import { Header } from '../components/Shared/Header';
@@ -41,6 +42,7 @@ export default function DisneyTracker() {
   const [rainbowSubTab, setRainbowSubTab] = useState<RainbowSubTab>('stream');
 
   const [loading, setLoading] = useState(true);
+  const [submittingRide, setSubmittingRide] = useState(false); // Prevents multi-click duplicate insertions
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
@@ -90,7 +92,6 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-  // 1. Sync rider selections when visit ID or party length changes
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
@@ -98,14 +99,12 @@ export default function DisneyTracker() {
     }
   }, [activeVisit?.id, activePartyList.length]);
 
-  // 2. ONLY reset default rideName when checking into a NEW visit or park
   useEffect(() => {
     if (activeVisit?.parkName && !queueStartTimestamp) {
       setRideName(PARK_ATTRACTIONS[activeVisit.parkName]?.[0] || '');
     }
   }, [activeVisit?.id, activeVisit?.parkName]);
 
-  // 3. Persistent Queue Timer Mount Restoration
   useEffect(() => {
     const savedStart = localStorage.getItem('disney_queue_start_ts');
     const savedStr = localStorage.getItem('disney_queue_start_str');
@@ -118,7 +117,6 @@ export default function DisneyTracker() {
     }
   }, []);
 
-  // 4. Re-fetch AI Trivia if queue timer restored on page refresh
   useEffect(() => {
     if (queueStartTimestamp && activeVisit && rideName && !rideTrivia) {
       fetchRideTrivia(rideName, activeVisit.parkName);
@@ -176,10 +174,11 @@ export default function DisneyTracker() {
           }))
         }));
 
+        // Reliable 12-hour AM/PM date sorting for History tab
         formattedVisits.sort((a, b) => {
-          const dateA = new Date(`${a.visitDate}T${a.startTime || '00:00'}`).getTime();
-          const dateB = new Date(`${b.visitDate}T${b.startTime || '00:00'}`).getTime();
-          return dateB - dateA;
+          const tsA = getVisitTimestamp(a.visitDate, a.startTime);
+          const tsB = getVisitTimestamp(b.visitDate, b.startTime);
+          return tsB - tsA;
         });
 
         setActiveVisit(formattedVisits.find(v => !v.endTime) || null);
@@ -320,62 +319,53 @@ export default function DisneyTracker() {
 
   const rideCountsMap = getRideCountsMap(filteredVisits, selectedAttendee);
 
-  const toggleDepartingMember = (name: string) => {
-    if (departingMembers.includes(name)) {
-      if (departingMembers.length === 1) return;
-      setDepartingMembers(departingMembers.filter(m => m !== name));
-    } else {
-      setDepartingMembers([...departingMembers, name]);
+  const handleCheckIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (selectedAttendees.length === 0) {
+      setErrorMessage("Please select at least one attendee before checking in.");
+      return;
     }
-  };
 
-const handleCheckIn = async (e: React.FormEvent) => {
-  e.preventDefault();
+    const now = new Date();
+    const localDate = now.toLocaleDateString('en-CA');
+    const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
 
-  if (selectedAttendees.length === 0) {
-    setErrorMessage("Please select at least one attendee before checking in.");
-    return;
-  }
+    const attendeesDbStr = selectedAttendees.join(', ');
 
-  const now = new Date();
-  const localDate = now.toLocaleDateString('en-CA');
-  const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
+      .from('visits')
+      .insert({
+        visitDate: localDate,
+        startTime: localTime,
+        endTime: '',
+        parkName,
+        attendees: attendeesDbStr
+      })
+      .select()
+      .single();
 
-  const attendeesDbStr = selectedAttendees.join(', ');
+    if (error) {
+      setErrorMessage("Error checking in to park: " + error.message);
+      return;
+    }
 
-  const supabase = await getSupabase();
-  const { data, error } = await supabase
-    .from('visits')
-    .insert({
+    setActiveVisit({
+      id: data.id,
       visitDate: localDate,
       startTime: localTime,
       endTime: '',
       parkName,
-      attendees: attendeesDbStr
-    })
-    .select()
-    .single();
+      attendees: selectedAttendees,
+      memberEndTimes: {},
+      activities: []
+    });
 
-  if (error) {
-    setErrorMessage("Error checking in to park: " + error.message);
-    return;
-  }
-
-  setActiveVisit({
-    id: data.id,
-    visitDate: localDate,
-    startTime: localTime,
-    endTime: '',
-    parkName,
-    attendees: selectedAttendees,
-    memberEndTimes: {},
-    activities: []
-  });
-
-  setSelectedRiders(selectedAttendees);
-  setDepartingMembers(selectedAttendees);
-  setSelectedAttendees([]);
-};
+    setSelectedRiders(selectedAttendees);
+    setDepartingMembers(selectedAttendees);
+    setSelectedAttendees([]);
+  };
 
   const handleAddMembersToActiveVisit = async (joiningMembers: string[]) => {
     if (!activeVisit) return;
@@ -400,25 +390,29 @@ const handleCheckIn = async (e: React.FormEvent) => {
   };
 
   const handleAddRideLive = async () => {
-    if (!activeVisit || !rideName) return;
+    if (!activeVisit || !rideName || submittingRide) return;
     const waitMins = parseInt(waitTime) || 0;
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
 
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
-      .from('activities')
-      .insert({ visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders.join(', ') })
-      .select()
-      .single();
+    setSubmittingRide(true);
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from('activities')
+        .insert({ visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders.join(', ') })
+        .select()
+        .single();
 
-    if (error) {
-      setErrorMessage("Error adding attraction: " + error.message);
-      return;
+      if (error) throw error;
+
+      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders }] });
+      setWaitTime('');
+      setCharacterName('');
+    } catch (err: any) {
+      setErrorMessage("Error adding attraction: " + (err.message || err));
+    } finally {
+      setSubmittingRide(false);
     }
-
-    setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders }] });
-    setWaitTime('');
-    setCharacterName('');
   };
 
   const fetchRideTrivia = async (attractionName: string, park: string) => {
@@ -466,31 +460,35 @@ const handleCheckIn = async (e: React.FormEvent) => {
   };
 
   const handleEndQueueTimer = async () => {
-    if (!activeVisit || !queueStartTimestamp) return;
+    if (!activeVisit || !queueStartTimestamp || submittingRide) return;
     const diffMs = Date.now() - queueStartTimestamp;
     let calculatedWait = Math.max(1, Math.round(diffMs / 60000));
     const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
 
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
-      .from('activities')
-      .insert({ visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders.join(', ') })
-      .select()
-      .single();
+    setSubmittingRide(true);
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from('activities')
+        .insert({ visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders.join(', ') })
+        .select()
+        .single();
 
-    if (error) {
-      alert("Error logging timer activity: " + error.message);
-      return;
+      if (error) throw error;
+
+      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders }] });
+      clearQueueTimerStorage();
+      setQueueStartTimestamp(null);
+      setQueueStartTimeStr(null);
+      setCharacterName('');
+      setWaitTime('');
+      setRideTrivia(null);
+      setHiddenMickey(null);
+    } catch (err: any) {
+      alert("Error logging timer activity: " + (err.message || err));
+    } finally {
+      setSubmittingRide(false);
     }
-
-    setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders }] });
-    clearQueueTimerStorage();
-    setQueueStartTimestamp(null);
-    setQueueStartTimeStr(null);
-    setCharacterName('');
-    setWaitTime('');
-    setRideTrivia(null);
-    setHiddenMickey(null);
   };
 
   const openEditVisit = (v: Visit) => {
