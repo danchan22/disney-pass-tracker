@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { ParkingLog } from '../../lib/types';
-import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARK_EMOJIS, PARKING_OPTIONS } from '../../lib/constants';
+import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARK_EMOJIS, PARKING_OPTIONS, ParkingSpotDetail } from '../../lib/constants';
 import { getSupabase } from '../../lib/supabase';
 import { get6AMCutoffISO } from '../../lib/helpers';
 
 export const ParkingSubtab: React.FC = () => {
-  const [parkingAttendees, setParkingAttendees] = useState<string[]>([]);
+  const [parkingAttendees, setParkingAttendees] = useState<string[]>(['Dan']);
   const [selectedPark, setSelectedPark] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
-  const [selectedSection, setSelectedSection] = useState<string>('');
-  const [selectedSpot, setSelectedSpot] = useState<string>('');
+  const [selectedSection, setSelectedSection] = useState<string>('Heroes');
+  const [selectedSpot, setSelectedSpot] = useState<ParkingSpotDetail>(PARKING_OPTIONS['Magic Kingdom'][0].spots[0]);
   const [rowNumber, setRowNumber] = useState<string>('');
-  
+
   const [parkingLogs, setParkingLogs] = useState<ParkingLog[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Sync default spot selection when park changes
+  // Sync default spot when changing parks
   useEffect(() => {
     const parkData = PARKING_OPTIONS[selectedPark];
     if (parkData && parkData.length > 0) {
       setSelectedSection(parkData[0].section || '');
-      setSelectedSpot(parkData[0].spots[0] || '');
+      setSelectedSpot(parkData[0].spots[0]);
     }
   }, [selectedPark]);
 
@@ -33,7 +33,7 @@ export const ParkingSubtab: React.FC = () => {
     try {
       const supabase = await getSupabase();
       const cutoff = get6AMCutoffISO();
-      
+
       const { data, error } = await supabase
         .from('parking_logs')
         .select('*')
@@ -43,7 +43,7 @@ export const ParkingSubtab: React.FC = () => {
       if (error) throw error;
       if (data) setParkingLogs(data as ParkingLog[]);
     } catch (err) {
-      console.warn("Could not fetch parking logs:", err);
+      console.warn('Could not fetch parking logs:', err);
     } finally {
       setLoading(false);
     }
@@ -51,6 +51,7 @@ export const ParkingSubtab: React.FC = () => {
 
   const toggleAttendee = (name: string) => {
     if (parkingAttendees.includes(name)) {
+      if (parkingAttendees.length === 1) return; // Retain at least one attendee
       setParkingAttendees(parkingAttendees.filter(a => a !== name));
     } else {
       setParkingAttendees([...parkingAttendees, name]);
@@ -59,19 +60,19 @@ export const ParkingSubtab: React.FC = () => {
 
   const handleSaveParking = async () => {
     if (!rowNumber.trim()) {
-      alert("Please enter a row number.");
+      alert('Please enter a row number.');
       return;
     }
 
     setSaving(true);
-    const parkedByStr = parkingAttendees.length > 0 ? parkingAttendees.join(', ') : 'Just Me';
+    const parkedByStr = parkingAttendees.length > 0 ? parkingAttendees.join(', ') : 'Dan';
 
     try {
       const supabase = await getSupabase();
       const { error } = await supabase.from('parking_logs').insert({
         park_name: selectedPark,
         section_name: selectedSection,
-        spot_name: selectedSpot,
+        spot_name: selectedSpot.name,
         row_number: rowNumber.trim(),
         parked_by: parkedByStr,
       });
@@ -81,17 +82,25 @@ export const ParkingSubtab: React.FC = () => {
       setRowNumber('');
       await fetchTodayParking();
     } catch (err: any) {
-      alert("Error saving parking spot: " + (err.message || err));
+      alert('Error saving parking spot: ' + (err.message || err));
     } finally {
       setSaving(false);
     }
+  };
+
+  const findSpotConfig = (parkName: string, spotName: string): ParkingSpotDetail => {
+    const parkGroups = PARKING_OPTIONS[parkName] || [];
+    for (const group of parkGroups) {
+      const match = group.spots.find(s => s.name === spotName);
+      if (match) return match;
+    }
+    return { name: spotName, image: '', bgColor: '#004487' };
   };
 
   const currentParkOptions = PARKING_OPTIONS[selectedPark] || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      
       {/* FORM CONTAINER */}
       <div style={{ background: '#FFF', padding: '18px', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
         <h2 style={{ marginTop: 0, fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '14px' }}>
@@ -104,7 +113,7 @@ export const ParkingSubtab: React.FC = () => {
             WHO'S PARKING?
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-            {FIXED_FAMILY_MEMBERS.map((name) => {
+            {FIXED_FAMILY_MEMBERS.map(name => {
               const isSelected = parkingAttendees.includes(name);
               return (
                 <button
@@ -119,7 +128,7 @@ export const ParkingSubtab: React.FC = () => {
                     color: isSelected ? '#FFF' : '#2D3748',
                     fontSize: '12px',
                     fontWeight: isSelected ? '800' : '600',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
                   }}
                 >
                   {isSelected ? `✓ ${name}` : name}
@@ -135,7 +144,7 @@ export const ParkingSubtab: React.FC = () => {
             WHICH PARK?
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-            {PARK_NAMES.map((p) => {
+            {PARK_NAMES.map(p => {
               const isSelected = selectedPark === p;
               return (
                 <button
@@ -150,7 +159,7 @@ export const ParkingSubtab: React.FC = () => {
                     color: isSelected ? '#FFF' : '#4A5568',
                     fontSize: '12px',
                     fontWeight: '800',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
                   }}
                 >
                   {PARK_EMOJIS[p]} {p}
@@ -174,11 +183,11 @@ export const ParkingSubtab: React.FC = () => {
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                  {group.spots.map((spot) => {
-                    const isSelected = selectedSpot === spot;
+                  {group.spots.map(spot => {
+                    const isSelected = selectedSpot.name === spot.name;
                     return (
                       <button
-                        key={spot}
+                        key={spot.name}
                         type="button"
                         onClick={() => {
                           setSelectedSpot(spot);
@@ -192,10 +201,10 @@ export const ParkingSubtab: React.FC = () => {
                           border: isSelected ? '2px solid #D4AF37' : '1px solid #CBD5E0',
                           background: isSelected ? '#FFFDF5' : '#FFF',
                           color: isSelected ? '#C05621' : '#4A5568',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
                         }}
                       >
-                        {spot}
+                        {spot.name}
                       </button>
                     );
                   })}
@@ -214,9 +223,9 @@ export const ParkingSubtab: React.FC = () => {
             type="number"
             inputMode="numeric"
             pattern="[0-9]*"
-            placeholder="e.g. 220"
+            placeholder="e.g. 315"
             value={rowNumber}
-            onChange={(e) => setRowNumber(e.target.value)}
+            onChange={e => setRowNumber(e.target.value)}
             style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '15px', fontWeight: 'bold', boxSizing: 'border-box' }}
           />
         </div>
@@ -236,7 +245,7 @@ export const ParkingSubtab: React.FC = () => {
             fontSize: '15px',
             fontWeight: 'bold',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(56,161,105,0.3)'
+            boxShadow: '0 2px 6px rgba(56,161,105,0.3)',
           }}
         >
           {saving ? 'Saving...' : '💾 Save My Spot'}
@@ -257,53 +266,54 @@ export const ParkingSubtab: React.FC = () => {
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {parkingLogs.map((log) => (
-              <div
-                key={log.id}
-                style={{
-                  background: '#E53E3E', // Card accent color
-                  color: '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '16px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  boxShadow: '0 4px 14px rgba(229, 62, 62, 0.35)',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <div style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '50%',
-                  background: '#FFF',
-                  color: '#1A202C',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '22px',
-                  flexShrink: 0
-                }}>
-                  {PARK_EMOJIS[log.park_name] || '🚗'}
-                </div>
+            {parkingLogs.map(log => {
+              const spotConfig = findSpotConfig(log.park_name, log.spot_name);
+              const textColor = spotConfig.darkText ? '#1A202C' : '#FFFFFF';
+              const displayLot = log.section_name ? `${log.section_name} - ${log.spot_name}` : log.spot_name;
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1.1' }}>
-                    Row {log.row_number}
-                  </div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', marginTop: '3px', opacity: 0.95 }}>
-                    {log.spot_name} {log.section_name ? `(${log.section_name})` : ''} • {log.park_name}
-                  </div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', marginTop: '4px', opacity: 0.85 }}>
-                    {log.parked_by}
+              return (
+                <div
+                  key={log.id}
+                  style={{
+                    background: spotConfig.bgColor,
+                    color: textColor,
+                    borderRadius: '20px',
+                    padding: '16px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    boxShadow: `0 4px 14px ${spotConfig.bgColor}44`,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {spotConfig.image && (
+                    <img
+                      src={spotConfig.image}
+                      alt={log.spot_name}
+                      onError={e => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                      style={{ width: '56px', height: '56px', objectFit: 'contain', flexShrink: 0 }}
+                    />
+                  )}
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1.1' }}>
+                      Row {log.row_number}
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', marginTop: '3px', opacity: 0.95 }}>
+                      {displayLot}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', marginTop: '4px', opacity: 0.85 }}>
+                      {log.parked_by}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-
     </div>
   );
 };
