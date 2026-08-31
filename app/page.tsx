@@ -329,30 +329,53 @@ export default function DisneyTracker() {
     }
   };
 
-  const handleCheckIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const now = new Date();
-    const localDate = now.toLocaleDateString('en-CA');
-    const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
+const handleCheckIn = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const newAttendeesList = selectedAttendees.length > 0 ? selectedAttendees : ['Just Me'];
-    const supabase = await getSupabase();
-    const { data, error } = await supabase
-      .from('visits')
-      .insert({ visitDate: localDate, startTime: localTime, endTime: '', parkName, attendees: newAttendeesList.join(', ') })
-      .select()
-      .single();
+  if (selectedAttendees.length === 0) {
+    setErrorMessage("Please select at least one attendee before checking in.");
+    return;
+  }
 
-    if (error) {
-      setErrorMessage("Error checking in to park: " + error.message);
-      return;
-    }
+  const now = new Date();
+  const localDate = now.toLocaleDateString('en-CA');
+  const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
 
-    setActiveVisit({ id: data.id, visitDate: localDate, startTime: localTime, endTime: '', parkName, attendees: newAttendeesList, memberEndTimes: {}, activities: [] });
-    setSelectedRiders(newAttendeesList);
-    setDepartingMembers(newAttendeesList);
-    setSelectedAttendees([]);
-  };
+  const attendeesDbStr = selectedAttendees.join(', ');
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('visits')
+    .insert({
+      visitDate: localDate,
+      startTime: localTime,
+      endTime: '',
+      parkName,
+      attendees: attendeesDbStr
+    })
+    .select()
+    .single();
+
+  if (error) {
+    setErrorMessage("Error checking in to park: " + error.message);
+    return;
+  }
+
+  setActiveVisit({
+    id: data.id,
+    visitDate: localDate,
+    startTime: localTime,
+    endTime: '',
+    parkName,
+    attendees: selectedAttendees,
+    memberEndTimes: {},
+    activities: []
+  });
+
+  setSelectedRiders(selectedAttendees);
+  setDepartingMembers(selectedAttendees);
+  setSelectedAttendees([]);
+};
 
   const handleAddMembersToActiveVisit = async (joiningMembers: string[]) => {
     if (!activeVisit) return;
