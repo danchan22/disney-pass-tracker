@@ -5,7 +5,8 @@ import { getSupabase } from '../../lib/supabase';
 import { get6AMCutoffISO } from '../../lib/helpers';
 
 export const ParkingSubtab: React.FC = () => {
-  const [parkingAttendees, setParkingAttendees] = useState<string[]>(['Dan']);
+  // Start with no one selected by default
+  const [parkingAttendees, setParkingAttendees] = useState<string[]>([]);
   const [selectedPark, setSelectedPark] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedSection, setSelectedSection] = useState<string>('Heroes');
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpotDetail>(PARKING_OPTIONS['Magic Kingdom'][0].spots[0]);
@@ -51,7 +52,6 @@ export const ParkingSubtab: React.FC = () => {
 
   const toggleAttendee = (name: string) => {
     if (parkingAttendees.includes(name)) {
-      if (parkingAttendees.length === 1) return; // Retain at least one attendee
       setParkingAttendees(parkingAttendees.filter(a => a !== name));
     } else {
       setParkingAttendees([...parkingAttendees, name]);
@@ -59,13 +59,18 @@ export const ParkingSubtab: React.FC = () => {
   };
 
   const handleSaveParking = async () => {
+    if (parkingAttendees.length === 0) {
+      alert("Please select who is parking.");
+      return;
+    }
+
     if (!rowNumber.trim()) {
       alert('Please enter a row number.');
       return;
     }
 
     setSaving(true);
-    const parkedByStr = parkingAttendees.length > 0 ? parkingAttendees.join(', ') : 'Dan';
+    const parkedByStr = parkingAttendees.join(', ');
 
     try {
       const supabase = await getSupabase();
@@ -80,6 +85,7 @@ export const ParkingSubtab: React.FC = () => {
       if (error) throw error;
 
       setRowNumber('');
+      setParkingAttendees([]); // Reset selection after saving
       await fetchTodayParking();
     } catch (err: any) {
       alert('Error saving parking spot: ' + (err.message || err));
@@ -126,9 +132,10 @@ export const ParkingSubtab: React.FC = () => {
                     border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
                     background: isSelected ? '#004487' : '#F8FAFC',
                     color: isSelected ? '#FFF' : '#2D3748',
-                    fontSize: '12px',
-                    fontWeight: isSelected ? '800' : '600',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? '800' : '500',
                     cursor: 'pointer',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   {isSelected ? `✓ ${name}` : name}
