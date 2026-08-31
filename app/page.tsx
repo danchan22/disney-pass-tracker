@@ -42,7 +42,7 @@ export default function DisneyTracker() {
   const [rainbowSubTab, setRainbowSubTab] = useState<RainbowSubTab>('stream');
 
   const [loading, setLoading] = useState(true);
-  const [submittingRide, setSubmittingRide] = useState(false); // Prevents multi-click duplicate insertions
+  const [submittingRide, setSubmittingRide] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
@@ -174,7 +174,6 @@ export default function DisneyTracker() {
           }))
         }));
 
-        // Reliable 12-hour AM/PM date sorting for History tab
         formattedVisits.sort((a, b) => {
           const tsA = getVisitTimestamp(a.visitDate, a.startTime);
           const tsB = getVisitTimestamp(b.visitDate, b.startTime);
@@ -318,6 +317,15 @@ export default function DisneyTracker() {
   };
 
   const rideCountsMap = getRideCountsMap(filteredVisits, selectedAttendee);
+
+  const toggleDepartingMember = (name: string) => {
+    if (departingMembers.includes(name)) {
+      if (departingMembers.length === 1) return;
+      setDepartingMembers(departingMembers.filter(m => m !== name));
+    } else {
+      setDepartingMembers([...departingMembers, name]);
+    }
+  };
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
