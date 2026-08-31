@@ -63,6 +63,31 @@ export const parseMemberStartTimes = (raw: any, notes?: string): Record<string, 
   return {};
 };
 
+export const getVisitTimestamp = (visitDate: string, startTimeStr?: string): number => {
+  if (!visitDate) return 0;
+  const [year, month, day] = visitDate.split('-').map(Number);
+  if (!year || !month || !day) return 0;
+
+  let hours = 0;
+  let minutes = 0;
+
+  if (startTimeStr) {
+    let cleanTime = startTimeStr.trim();
+    const isPM = cleanTime.toUpperCase().includes('PM');
+    const isAM = cleanTime.toUpperCase().includes('AM');
+    cleanTime = cleanTime.replace(/AM|PM/gi, '').trim();
+
+    const [h, m] = cleanTime.split(':').map(Number);
+    hours = isNaN(h) ? 0 : h;
+    minutes = isNaN(m) ? 0 : m;
+
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+  }
+
+  return new Date(year, month - 1, day, hours, minutes).getTime();
+};
+
 export const formatDisplayDate = (dateStr: string) => {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);
