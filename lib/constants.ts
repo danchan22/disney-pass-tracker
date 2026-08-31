@@ -60,24 +60,88 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Zootopia: Better Together'
   ]
 };
-export const PARKING_OPTIONS: Record<
-  string,
-  { section?: string; spots: string[] }[]
-> = {
+
+export interface ParkingSpotDetail {
+  name: string;
+  image: string;
+  bgColor: string;
+  darkText?: boolean;
+}
+
+export interface ParkingSectionGroup {
+  section?: string;
+  spots: ParkingSpotDetail[];
+}
+
+export const PARKING_OPTIONS: Record<string, ParkingSectionGroup[]> = {
   'Magic Kingdom': [
-    { section: 'Heroes', spots: ['Woody', 'Aladdin', 'Peter Pan', 'Simba', 'Rapunzel', 'Mulan'] },
-    { section: 'Villains', spots: ['Jafar', 'Zurg', 'Scar', 'Hook', 'Cruella', 'Ursula'] },
+    {
+      section: 'Heroes',
+      spots: [
+        { name: 'Woody', image: '/parking-mk-woody.png', bgColor: '#228ef1' },
+        { name: 'Aladdin', image: '/parking-mk-aladdin.png', bgColor: '#228ef1' },
+        { name: 'Peter Pan', image: '/parking-mk-peter-pan.png', bgColor: '#228ef1' },
+        { name: 'Simba', image: '/parking-mk-simba.png', bgColor: '#228ef1' },
+        { name: 'Rapunzel', image: '/parking-mk-rapunzel.png', bgColor: '#228ef1' },
+        { name: 'Mulan', image: '/parking-mk-mulan.png', bgColor: '#228ef1' },
+      ],
+    },
+    {
+      section: 'Villains',
+      spots: [
+        { name: 'Jafar', image: '/parking-mk-jafar.png', bgColor: '#ca2931' },
+        { name: 'Zurg', image: '/parking-mk-zurg.png', bgColor: '#ca2931' },
+        { name: 'Scar', image: '/parking-mk-scar.png', bgColor: '#ca2931' },
+        { name: 'Hook', image: '/parking-mk-hook.png', bgColor: '#ca2931' },
+        { name: 'Cruella', image: '/parking-mk-cruella.png', bgColor: '#ca2931' },
+        { name: 'Ursula', image: '/parking-mk-ursula.png', bgColor: '#ca2931' },
+      ],
+    },
   ],
   'Epcot': [
-    { section: 'Space', spots: ['Wall-E', 'Eve', 'Rocket', 'Gamora'] },
-    { section: 'Earth', spots: ['Moana', 'Heihei', 'Crush', 'Dory'] },
+    {
+      section: 'Space',
+      spots: [
+        { name: 'Wall-E', image: '/parking-epcot-wall-e.png', bgColor: '#6760ad' },
+        { name: 'Eve', image: '/parking-epcot-eve.png', bgColor: '#6760ad' },
+        { name: 'Rocket', image: '/parking-epcot-rocket.png', bgColor: '#6760ad' },
+        { name: 'Gamora', image: '/parking-epcot-gamora.png', bgColor: '#6760ad' },
+      ],
+    },
+    {
+      section: 'Earth',
+      spots: [
+        { name: 'Moana', image: '/parking-epcot-moana.png', bgColor: '#aec735', darkText: true },
+        { name: 'Heihei', image: '/parking-epcot-heihei.png', bgColor: '#aec735', darkText: true },
+        { name: 'Crush', image: '/parking-epcot-crush.png', bgColor: '#aec735', darkText: true },
+        { name: 'Dory', image: '/parking-epcot-dory.png', bgColor: '#aec735', darkText: true },
+      ],
+    },
   ],
   'Hollywood Studios': [
-    { spots: ['Mickey', 'Minnie', 'Jessie', 'Buzz', 'Olaf', 'BB-8'] }
+    {
+      spots: [
+        { name: 'Mickey', image: '/parking-studios-mickey.png', bgColor: '#c08713' },
+        { name: 'Minnie', image: '/parking-studios-minnie.png', bgColor: '#da0851' },
+        { name: 'Jessie', image: '/parking-studios-jesse.png', bgColor: '#29511f' },
+        { name: 'Buzz', image: '/parking-studios-buzz.png', bgColor: '#661e82' },
+        { name: 'Olaf', image: '/parking-studios-olaf.png', bgColor: '#0274aa' },
+        { name: 'BB-8', image: '/parking-studios-bb8.png', bgColor: '#cd6d06' },
+      ],
+    },
   ],
   'Animal Kingdom': [
-    { spots: ['Peacock', 'Butterfly', 'Giraffe', 'Dinosaur', 'Yeti', 'Unicorn'] }
-  ]
+    {
+      spots: [
+        { name: 'Peacock', image: '/parking-ak-peacock.png', bgColor: '#003c1c' },
+        { name: 'Butterfly', image: '/parking-ak-butterfly.png', bgColor: '#003c1c' },
+        { name: 'Giraffe', image: '/parking-ak-giraffe.png', bgColor: '#003c1c' },
+        { name: 'Dinosaur', image: '/parking-ak-dinosaur.png', bgColor: '#003c1c' },
+        { name: 'Yeti', image: '/parking-ak-yeti.png', bgColor: '#003c1c' },
+        { name: 'Unicorn', image: '/parking-ak-unicorn.png', bgColor: '#003c1c' },
+      ],
+    },
+  ],
 };
 
 export const RIDE_TRIVIA_DB: Record<string, string[]> = {
