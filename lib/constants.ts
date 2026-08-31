@@ -28,20 +28,21 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
   'Magic Kingdom': [
     'Astro Orbiter', 'The Barnstormer', 'Big Thunder Mountain Railroad', 'Buzz Lightyear’s Space Ranger Spin',
     'Carousel of Progress', 'Country Bear Musical Jamboree', 'Dumbo the Flying Elephant', 'Enchanted Tales with Belle',
-    'The Hall of Presidents', 'Haunted Mansion', '“it’s a small world”', 'Jungle Cruise', 'Mad Tea Party',
-    'The Magic Carpets of Aladdin', 'The Many Adventures of Winnie the Pooh', 'Mickey’s PhilharMagic',
-    'Peter Pan’s Flight', 'Pirates of the Caribbean', 'Prince Charming Regal Carrousel', 'Seven Dwarfs Mine Train',
-    'Space Mountain', 'Swiss Family Treehouse', 'Tiana’s Bayou Adventure', 'Tomorrowland Speedway',
-    'Tomorrowland Transit Authority PeopleMover', 'TRON Lightcycle / Run', 'Under the Sea ~ Journey of The Little Mermaid',
-    'Walt Disney Enchanted Tiki Room', 'Walt Disney World Railroad'
+    'The Hall of Presidents', 'Haunted Mansion', '“it’s a small world”', 'Jessie’s Roundup: A Rip-Roaring Revue',
+    'Jungle Cruise', 'Mad Tea Party', 'The Magic Carpets of Aladdin', 'The Many Adventures of Winnie the Pooh',
+    'Mickey’s PhilharMagic', 'Monsters, Inc. Laugh Floor', 'Peter Pan’s Flight', 'Pirates of the Caribbean',
+    'Prince Charming Regal Carrousel', 'Seven Dwarfs Mine Train', 'Space Mountain', 'Swiss Family Treehouse',
+    'Tiana’s Bayou Adventure', 'Tomorrowland Speedway', 'Tomorrowland Transit Authority PeopleMover',
+    'TRON Lightcycle / Run', 'Under the Sea ~ Journey of The Little Mermaid', 'Walt Disney Enchanted Tiki Room',
+    'Walt Disney World Railroad'
   ],
   'Epcot': [
     'Beauty and the Beast Sing-Along', 'Canada Circle-Vision 360', 'Disney and Pixar Short Film Festival',
     'Frozen Ever After', 'Gran Fiesta Tour Starring The Three Caballeros', 'Guardians of the Galaxy: Cosmic Rewind',
-    'ImageWorks What If Labs', 'Journey into Imagination with Figment', 'Journey of Water, Inspired by Moana',
-    'Living with the Land', 'Mission: SPACE (Green)', 'Mission: SPACE (Orange)', 'Reflections of China',
-    'Remy’s Ratatouille Adventure', 'Soarin', 'Spaceship Earth', 'Test Track',
-    'The Seas with Nemo & Friends', 'Turtle Talk with Crush'
+    'ImageWorks What If Labs', 'Impressions de France', 'Journey into Imagination with Figment',
+    'Journey of Water, Inspired by Moana', 'Living with the Land', 'Mission: SPACE (Green)',
+    'Mission: SPACE (Orange)', 'Reflections of China', 'Remy’s Ratatouille Adventure', 'Soarin',
+    'Spaceship Earth', 'Test Track', 'The Seas with Nemo & Friends', 'Turtle Talk with Crush'
   ],
   'Hollywood Studios': [
     'Alien Swirling Saucers', 'Beauty and the Beast Live on Stage', 'Disney Junior Play & Dance!',
