@@ -94,13 +94,13 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 <img src={PARK_BANNERS[park]} alt={park} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
 
                 <div style={{ padding: '18px' }}>
-                  {/* Park Title Header */}
+                  {/* Park Title Header with Group Visits */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #EDF2F7', paddingBottom: '10px' }}>
                     <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>
                       {PARK_EMOJIS[park]} {park}
                     </h3>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#718096', background: '#F8FAFC', padding: '4px 10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                      {stats.visits} Visits
+                      {stats.visits} {stats.visits === 1 ? 'Group Visit' : 'Group Visits'}
                     </span>
                   </div>
 
@@ -133,7 +133,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Mathematically Exact Conic Pie Chart Component */}
+                  {/* Mathematically Exact Conic Pie Chart Component with 2-Line Label */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div
                       style={{
@@ -147,8 +147,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
-                      <div style={{ fontSize: '12px', color: '#2D3748' }}>
-                        <span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}% waiting in lines</span> • <span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}% not waiting in lines</span>
+                      <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
+                        <div><span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}%</span> waiting in lines</div>
+                        <div><span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}%</span> not waiting in lines</div>
                       </div>
                     </div>
                   </div>
@@ -206,7 +207,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                                   Total Park Time: <strong>{formatMinutes(item.timeInPark)}</strong> • Avg Visit: <strong>{formatMinutes(item.avgVisit)}</strong>
                                 </div>
                               </div>
-                              <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169' }}>{item.visits} visits</div>
+                              <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169' }}>
+                                {item.visits} {item.visits === 1 ? 'visit' : 'visits'}
+                              </div>
                             </div>
                           );
                         })}
@@ -221,7 +224,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Attendees (Original UI Design) */}
+      {/* Subtab: Attendees */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '900', color: '#003366', margin: '0 0 4px 4px' }}>
@@ -267,7 +270,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
                   </div>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
-                    {pDays} Park Visits
+                    {pDays} {pDays === 1 ? 'Park Visit' : 'Park Visits'}
                   </div>
                 </div>
 
@@ -344,7 +347,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Top 10s (Original UI Design) */}
+      {/* Subtab: Top 10s */}
       {analyticsSubTab === 'top10' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
@@ -384,7 +387,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
           {/* Longest Waits */}
           <div>
             <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
-              <h2 style={{ margin: '0', fontSize: '20px', fontWeight: '900', color: '#C53030', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#C53030', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '22px' }}>⏳</span> Longest Average Waits
               </h2>
             </div>
@@ -417,7 +420,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
           {/* Shortest Waits */}
           <div>
             <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
-              <h2 style={{ margin: '0', fontSize: '20px', fontWeight: '900', color: '#276749', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#276749', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '22px' }}>⚡</span> Shortest Average Waits
               </h2>
             </div>
