@@ -133,7 +133,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Mathematically Exact Conic Pie Chart Component */}
+                  {/* Mathematically Exact Conic Pie Chart Component with 2-Line Label */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div
                       style={{
@@ -263,7 +263,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const pLinePercent = Math.round((pLineTime / pTotalTime) * 100);
 
             const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
-            const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0 };
+            const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0, avgWait: 0 };
 
             return (
               <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
@@ -329,24 +329,24 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Favorite Ride Block */}
+                {/* Favorite Ride Block with Avg Wait */}
                 <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                     <span>⭐</span> FAVORITE RIDE
                   </div>
                   <div style={{ fontSize: '16px', fontWeight: '900', color: '#1A202C' }}>{topPersonRide.name}</div>
                   <div style={{ fontSize: '12px', color: '#718096', marginTop: '4px' }}>
-                    Ridden {topPersonRide.count}x • Total Wait: {formatMinutes(topPersonRide.totalWait || 0)}
+                    Ridden {topPersonRide.count}x • Avg Wait: {topPersonRide.avgWait || 0}m • Total Wait: {formatMinutes(topPersonRide.totalWait || 0)}
                   </div>
                 </div>
 
-                {/* Ride Everything Progress Layout */}
+                {/* Activities Logged Bar Charts Per Park */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: '900', color: '#2D3748', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
-                    <span>🎡</span> RIDE EVERYTHING PROGRESS:
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+                    ACTIVITIES LOGGED
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {PARK_NAMES.map(park => {
                       const parkCounts = getRideCountsMap(personVisits, person);
                       const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
@@ -354,12 +354,17 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                       const percentComplete = Math.round((riddenInPark / totalParkRides) * 100);
 
                       return (
-                        <div key={park} style={{ background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A202C', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {PARK_EMOJIS[park]} {park}
+                        <div key={park} style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {PARK_EMOJIS[park]} {park}
+                            </span>
+                            <span style={{ color: '#004487', fontWeight: '900' }}>
+                              {riddenInPark} / {totalParkRides} ({percentComplete}%)
+                            </span>
                           </div>
-                          <div style={{ fontSize: '13px', fontWeight: '900', color: '#004487' }}>
-                            {riddenInPark}/{totalParkRides} ({percentComplete}%)
+                          <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{ width: `${percentComplete}%`, height: '100%', background: 'linear-gradient(to right, #0056b3, #D4AF37)', transition: 'width 0.3s ease' }}></div>
                           </div>
                         </div>
                       );
