@@ -35,6 +35,7 @@ export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
 
+  // Nav States
   const [mainTab, setMainTab] = useState<MainTab>('tracker');
   const [trackerSubTab, setTrackerSubTab] = useState<TrackerSubTab>('Today');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<AnalyticsSubTab>('averages');
@@ -45,6 +46,7 @@ export default function DisneyTracker() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
+  // Check-In & Attraction Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [rideName, setRideName] = useState('');
@@ -52,6 +54,7 @@ export default function DisneyTracker() {
   const [characterName, setCharacterName] = useState('');
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
 
+  // Live Queue Timer State
   const [queueStartTimestamp, setQueueStartTimestamp] = useState<number | null>(null);
   const [queueStartTimeStr, setQueueStartTimeStr] = useState<string | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
@@ -60,6 +63,7 @@ export default function DisneyTracker() {
   const [hiddenMickey, setHiddenMickey] = useState<string | null>(null);
   const [mickeyLoading, setMickeyLoading] = useState<boolean>(false);
 
+  // Editing States
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [editRideName, setEditRideName] = useState('');
@@ -73,9 +77,11 @@ export default function DisneyTracker() {
   const [editVisitMemberStartTimes, setEditVisitMemberStartTimes] = useState<Record<string, string>>({});
   const [editVisitMemberEndTimes, setEditVisitMemberEndTimes] = useState<Record<string, string>>({});
 
+  // Checkout Modal State
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
 
+  // Rainbow State
   const [photoGrids, setPhotoGrids] = useState<PhotoGridRecord[]>([]);
   const [photoLoading, setPhotoLoading] = useState<boolean>(false);
 
@@ -391,10 +397,11 @@ export default function DisneyTracker() {
     }
   };
 
-  const handleAddRideLive = async () => {
+  const handleAddRideLive = async (isWalkOn = false) => {
     if (!activeVisit || !rideName || submittingRide) return;
-    const waitMins = parseInt(waitTime) || 0;
-    const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+    const waitMins = isWalkOn ? 0 : (parseInt(waitTime) || 0);
+    const notesBase = rideName === 'Character Meeting' && characterName ? characterName : '';
+    const notesVal = isWalkOn ? `${notesBase} [Walk On]`.trim() : (notesBase || undefined);
 
     setSubmittingRide(true);
     try {
@@ -407,7 +414,7 @@ export default function DisneyTracker() {
 
       if (error) throw error;
 
-      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders }] });
+      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders, isWalkOn }] });
       setWaitTime('');
       setCharacterName('');
     } catch (err: any) {
@@ -461,11 +468,12 @@ export default function DisneyTracker() {
     setHiddenMickey(null);
   };
 
-  const handleEndQueueTimer = async () => {
+  const handleEndQueueTimer = async (isWalkOn = false) => {
     if (!activeVisit || !queueStartTimestamp || submittingRide) return;
     const diffMs = Date.now() - queueStartTimestamp;
-    let calculatedWait = Math.max(1, Math.round(diffMs / 60000));
-    const notesVal = rideName === 'Character Meeting' && characterName ? characterName : undefined;
+    let calculatedWait = isWalkOn ? 0 : Math.max(1, Math.round(diffMs / 60000));
+    const notesBase = rideName === 'Character Meeting' && characterName ? characterName : '';
+    const notesVal = isWalkOn ? `${notesBase} [Walk On]`.trim() : (notesBase || undefined);
 
     setSubmittingRide(true);
     try {
@@ -478,7 +486,7 @@ export default function DisneyTracker() {
 
       if (error) throw error;
 
-      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders }] });
+      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders, isWalkOn }] });
       clearQueueTimerStorage();
       setQueueStartTimestamp(null);
       setQueueStartTimeStr(null);
@@ -583,7 +591,6 @@ export default function DisneyTracker() {
     return mins === 0 ? `${secs}s` : `${mins} mins ${secs > 0 ? `${secs}s` : ''}`;
   };
 
-  // Preserves array index order when saving activity edits
   const saveEditedActivity = async () => {
     if (!editingActivityId) return;
 
@@ -607,7 +614,6 @@ export default function DisneyTracker() {
       return;
     }
 
-    // Update state while preserving activity array order
     if (editingVisitId === null && activeVisit) {
       const updatedActivities = activeVisit.activities.map(a =>
         a.id === editingActivityId
