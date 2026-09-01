@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
-import { formatDisplayDate, format12Hour, calculateVisitDuration, parseAttendees, getPersonEndTime, formatMinutes } from '../../lib/helpers';
+import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
 import { ParkingSubtab } from './ParkingSubtab';
 import { AddPersonModal } from '../Modals/AddPersonModal';
 
@@ -59,7 +59,7 @@ interface TrackerTabProps {
   totalActivities: number;
   totalParkMinutes: number;
   totalWaitMinutes: number;
-  topActivity: { name: string; count: number; totalWait?: number };
+  topActivity: { name: string; count: number; totalWait?: number; avgWait?: number };
   avgActivitiesPerDay: string;
   avgParkMinutesPerDay: number;
   avgWaitPerActivity: number;
@@ -87,15 +87,11 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   selectedRiders,
   toggleRiderSelection,
   queueStartTimestamp,
-  setQueueStartTimestamp,
   queueStartTimeStr,
-  setQueueStartTimeStr,
   getElapsedQueueTimeString,
   rideTrivia,
-  setRideTrivia,
   triviaLoading,
   hiddenMickey,
-  setHiddenMickey,
   mickeyLoading,
   handleStartQueueTimer,
   handleEndQueueTimer,
@@ -230,7 +226,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   {rideName === 'Character Meeting' && (
                     <div style={{ background: '#FFF5F7', padding: '10px', borderRadius: '10px', border: '1px solid #FF8DA1' }}>
                       <label style={{ fontSize: '11px', fontWeight: '800', color: '#D61F40', display: 'block', marginBottom: '4px' }}>✨ WHICH CHARACTER?</label>
-                      <input type="text" placeholder="Mickey, Cinderella, etc." value={characterName} onChange={(e) => setCharacterName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #FFCBD4', fontSize: '14px' }} />
+                      <input type="text" placeholder="Mickey, Cinderella, etc." value={characterName} onChange={(e) => setCharacterName(e.target.value)} disabled={!!queueStartTimestamp} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #FFCBD4', fontSize: '14px', boxSizing: 'border-box' }} />
                     </div>
                   )}
 
@@ -268,47 +264,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                         )}
                       </div>
 
-                      {/* 🎵 POSSIBLE SONGS INFO BOX */}
-                      {(() => {
-                        const lower = rideName.toLowerCase();
-                        const isMuppets = lower.includes('muppet') || lower.includes('rock') || lower.includes('roller');
-                        const isGuardians = lower.includes('guardians') || lower.includes('cosmic');
-
-                        if (!isMuppets && !isGuardians) return null;
-
-                        const muppetsSongs = [
-                          '"Song 2"',
-                          '"Born to Be Wild" (featuring Camilla the Chicken)',
-                          '"Love Rollercoaster"'
-                        ];
-
-                        const guardiansSongs = [
-                          '“September” by Earth, Wind & Fire',
-                          '“Disco Inferno” by The Trammps',
-                          '“Everybody Wants to Rule the World” by Tears for Fears',
-                          '“I Ran (So Far Away)” by A Flock of Seagulls',
-                          '“One Way or Another” by Blondie',
-                          '“Conga” by Gloria Estefan'
-                        ];
-
-                        const songs = isMuppets ? muppetsSongs : guardiansSongs;
-
-                        return (
-                          <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
-                            <div style={{ fontWeight: '800', color: '#7E22CE', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              🎵 Possible Songs:
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
-                              {songs.map((song, i) => (
-                                <li key={i} style={{ marginBottom: i === songs.length - 1 ? 0 : '3px' }}>
-                                  {song}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        );
-                      })()}
-
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                         <button type="button" onClick={handleCancelQueueTimer} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                           Cancel
@@ -330,7 +285,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                       </div>
 
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px' }} />
+                        <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px', boxSizing: 'border-box' }} />
                         <button type="button" onClick={handleAddRideLive} style={{ padding: '11px 22px', background: '#EDF2F7', color: '#2D3748', border: '1px solid #CBD5E0', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
                           Log
                         </button>
@@ -348,7 +303,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                         const actRidersList = parseAttendees(act.riders);
 
                         return isEditingThis ? (
-                          <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                          <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
                             <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
                             <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
                               <optgroup label="Park Rides & Shows">
@@ -377,9 +332,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               </div>
                             </div>
                             
-                            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                              <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
+                              <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                             </div>
 
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -389,11 +344,15 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
+                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
                             <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{act.rideName}</div>
+                              <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{act.rideName}</div>
                               <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                ⏱️ {act.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {act.notes ? `• ${act.notes}` : ''}
+                                ⏱️ {act.waitTimeMinutes} mins wait {act.notes ? `• ${act.notes}` : ''}
+                              </div>
+                              {/* Dedicated row for riders */}
+                              <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
+                                👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
                               </div>
                             </div>
                             <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
@@ -476,11 +435,12 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               </div>
             </div>
 
+            {/* Top Activity Card with Avg Wait */}
             <div style={{ background: '#FFFDF5', padding: '12px 15px', borderRadius: '14px', border: '1px solid #FEEBC8', borderLeft: '5px solid #D4AF37', marginBottom: '18px' }}>
               <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621', marginBottom: '3px', letterSpacing: '0.5px' }}>⭐ TOP ACTIVITY</div>
               <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '15px' }}>{topActivity.name}</div>
               <div style={{ color: '#4A5568', marginTop: '3px', fontSize: '12px' }}>
-                Logged <strong>{topActivity.count}x</strong> | Total Wait: <strong style={{ color: '#C05621' }}>{formatMinutes(topActivity.totalWait || 0)}</strong>
+                Logged <strong>{topActivity.count}x</strong> | Avg Wait: <strong style={{ color: '#C05621' }}>{topActivity.avgWait || 0}m</strong>
               </div>
             </div>
 
@@ -516,15 +476,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
           ) : (
             filteredVisits.map((v) => {
               const partyList = parseAttendees(v.attendees);
-              const departureGroups: Record<string, string[]> = {};
-              partyList.forEach(m => {
-                const pTime = getPersonEndTime(v, m);
-                if (!departureGroups[pTime]) departureGroups[pTime] = [];
-                departureGroups[pTime].push(m);
-              });
-
-              const uniqueDepTimes = Object.keys(departureGroups);
-              const hasStaggeredCheckout = uniqueDepTimes.length > 1;
 
               return (
                 <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
@@ -537,21 +488,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
 
                   <div style={{ fontSize: '13px', color: '#4A5568', marginBottom: '10px' }}>
                     👥 <strong>Party:</strong> {partyList.join(', ')} <br />
-                    
-                    {!hasStaggeredCheckout ? (
-                      <div style={{ marginTop: '2px' }}>
-                        ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)} <span style={{ color: '#2B6CB0', fontWeight: 'bold' }}>{calculateVisitDuration(v.startTime, v.endTime)}</span>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: '6px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>⏱️ HOURS:</div>
-                        {uniqueDepTimes.map(depTime => (
-                          <div key={depTime} style={{ fontSize: '12px', color: '#2D3748', marginTop: '2px' }}>
-                            • <strong>{departureGroups[depTime].join(', ')}:</strong> {format12Hour(v.startTime)} - {format12Hour(depTime)} <span style={{ color: '#2B6CB0', fontWeight: '600' }}>{calculateVisitDuration(v.startTime, depTime)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    ⏱️ <strong>Hours:</strong> {format12Hour(v.startTime)} - {format12Hour(v.endTime)}
                   </div>
 
                   {v.activities.length > 0 && (
@@ -562,7 +499,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                           const actRidersList = parseAttendees(a.riders);
 
                           return isEditingThis ? (
-                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px' }}>
+                            <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
                               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
                               <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
                                 <optgroup label="Park Rides & Shows">
@@ -591,9 +528,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               </div>
                               
-                              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
-                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px' }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
+                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                               </div>
 
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -603,11 +540,14 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.rideName}</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{a.rideName}</div>
                                 <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                  ⏱️ {a.waitTimeMinutes} mins wait {actRidersList.length > 0 ? `• 👥 ${actRidersList.join(', ')}` : ''} {a.notes ? `• ${a.notes}` : ''}
+                                  ⏱️ {a.waitTimeMinutes} mins wait {a.notes ? `• ${a.notes}` : ''}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
+                                  👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
                                 </div>
                               </div>
                               <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
