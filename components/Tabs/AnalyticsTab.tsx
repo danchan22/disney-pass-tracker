@@ -133,7 +133,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Mathematically Exact Conic Pie Chart Component with 2-Line Label */}
+                  {/* Mathematically Exact Conic Pie Chart Component */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div
                       style={{
@@ -257,6 +257,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const pAvgPark = pDays > 0 ? pParkMinutes / pDays : 0;
             const pAvgWait = pActivities > 0 ? Math.round(pWaitMinutes / pActivities) : 0;
 
+            // Personal Pie Chart Calculations
+            const pTotalTime = Math.max(1, pParkMinutes);
+            const pLineTime = Math.min(pWaitMinutes, pTotalTime);
+            const pLinePercent = Math.round((pLineTime / pTotalTime) * 100);
+
             const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
             const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0 };
 
@@ -274,32 +279,53 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* 2x3 White Grid with Gray Borders */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#1A202C' }}>{pActivities}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>ACTIVITIES</div>
+                {/* 2x3 Grid Stats matching Parks tab formatting */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
                   </div>
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>TIME IN PARKS</div>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
                   </div>
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>TIME IN LINES</div>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
                   </div>
 
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{pAvgActs}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG ACTIVITIES</div>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgActs}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
                   </div>
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{formatMinutes(pAvgPark)}</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG DURATION</div>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(pAvgPark)}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
                   </div>
-                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{pAvgWait}m</div>
-                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG WAIT</div>
+                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgWait}m</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+                  </div>
+                </div>
+
+                {/* Personalized Conic Pie Chart Component */}
+                <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '50%',
+                      background: `conic-gradient(#ED8936 0% ${pLinePercent}%, #9F7AEA ${pLinePercent}% 100%)`,
+                      flexShrink: 0,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
+                    <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
+                      <div><span style={{ color: '#ED8936', fontWeight: '800' }}>{pLinePercent}%</span> waiting in lines</div>
+                      <div><span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - pLinePercent}%</span> not waiting in lines</div>
+                    </div>
                   </div>
                 </div>
 
