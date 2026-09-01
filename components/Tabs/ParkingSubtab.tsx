@@ -5,7 +5,6 @@ import { getSupabase } from '../../lib/supabase';
 import { get6AMCutoffISO } from '../../lib/helpers';
 
 export const ParkingSubtab: React.FC = () => {
-  // Start with no one selected by default
   const [parkingAttendees, setParkingAttendees] = useState<string[]>([]);
   const [selectedPark, setSelectedPark] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedSection, setSelectedSection] = useState<string>('Heroes');
@@ -16,7 +15,6 @@ export const ParkingSubtab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Sync default spot when changing parks
   useEffect(() => {
     const parkData = PARKING_OPTIONS[selectedPark];
     if (parkData && parkData.length > 0) {
@@ -85,7 +83,7 @@ export const ParkingSubtab: React.FC = () => {
       if (error) throw error;
 
       setRowNumber('');
-      setParkingAttendees([]); // Reset selection after saving
+      setParkingAttendees([]);
       await fetchTodayParking();
     } catch (err: any) {
       alert('Error saving parking spot: ' + (err.message || err));
@@ -107,7 +105,6 @@ export const ParkingSubtab: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* FORM CONTAINER */}
       <div style={{ background: '#FFF', padding: '18px', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
         <h2 style={{ marginTop: 0, fontSize: '18px', fontWeight: '900', color: '#004487', marginBottom: '14px' }}>
           🚗 Log Your Parking
@@ -189,7 +186,8 @@ export const ParkingSubtab: React.FC = () => {
                     {group.section}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                {/* 2-column full-width grid for Epcot and other sections */}
+                <div style={{ display: 'grid', gridTemplateColumns: selectedPark === 'Epcot' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '6px' }}>
                   {group.spots.map(spot => {
                     const isSelected = selectedSpot.name === spot.name;
                     return (
@@ -201,14 +199,16 @@ export const ParkingSubtab: React.FC = () => {
                           if (group.section) setSelectedSection(group.section);
                         }}
                         style={{
-                          padding: '8px 4px',
+                          padding: '10px 6px',
                           borderRadius: '8px',
-                          fontSize: '11px',
+                          fontSize: '12px',
                           fontWeight: '800',
                           border: isSelected ? '2px solid #D4AF37' : '1px solid #CBD5E0',
                           background: isSelected ? '#FFFDF5' : '#FFF',
                           color: isSelected ? '#C05621' : '#4A5568',
                           cursor: 'pointer',
+                          width: '100%',
+                          boxSizing: 'border-box'
                         }}
                       >
                         {spot.name}
