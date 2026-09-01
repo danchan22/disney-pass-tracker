@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Visit } from '../../lib/types';
 import { formatDisplayDate, parseAttendees, format12Hour } from '../../lib/helpers';
 
