@@ -30,7 +30,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 }) => {
   return (
     <div>
-      {/* Subtab: Parks (Formerly Averages) */}
+      {/* Subtab: Parks */}
       {analyticsSubTab === 'averages' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {PARK_NAMES.map((park) => {
@@ -44,19 +44,19 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const lineTime = Math.min(stats.waitTime, totalTime);
             const linePercent = Math.round((lineTime / totalTime) * 100);
 
-            // Ride Everything Progress
+            // Activities Logged Progress
             const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
             const parkVisits = visits.filter(v => v.parkName === park);
             const rideCounts = getRideCountsMap(parkVisits, selectedAttendee);
             const riddenCount = PARK_ATTRACTIONS[park]?.filter(r => (rideCounts[r] || 0) > 0).length || 0;
             const rideEverythingPercent = Math.round((riddenCount / totalParkRides) * 100);
 
-            // Top 5 Popular Rides for this Park
+            // Top 5 Popular Rides
             const parkRides = getRideBreakdown(parkVisits, selectedAttendee)
               .sort((a, b) => b.count - a.count)
               .slice(0, 5);
 
-            // Who Visits Most Leaderboard (Ascending)
+            // Who Visits Most Leaderboard
             const visitorStats: Record<string, { visits: number; timeInPark: number }> = {};
             FIXED_FAMILY_MEMBERS.forEach(m => { visitorStats[m] = { visits: 0, timeInPark: 0 }; });
 
@@ -122,28 +122,34 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Pie Chart Component */}
+                {/* Mathematically Exact Conic Pie Chart Component */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <svg width="60" height="60" viewBox="0 0 32 32" style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
-                    <circle r="16" cx="16" cy="16" fill="#9F7AEA" />
-                    <circle r="8" cx="16" cy="16" fill="transparent" stroke="#ED8936" strokeWidth="16" strokeDasharray={`${linePercent} 100`} />
-                  </svg>
+                  <div
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '50%',
+                      background: `conic-gradient(#ED8936 0% ${linePercent}%, #9F7AEA ${linePercent}% 100%)`,
+                      flexShrink: 0,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                    }}
+                  />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
                     <div style={{ fontSize: '12px', color: '#2D3748' }}>
-                      <span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}%</span> waiting in lines • <span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}%</span> enjoying park
+                      <span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}% waiting in lines</span> • <span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}% not waiting in lines</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Ride Everything Progress */}
+                {/* Activities Logged Progress Bar with Checklist Gradient */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '6px' }}>
-                    <span>RIDE EVERYTHING PROGRESS</span>
+                    <span>ACTIVITIES LOGGED</span>
                     <span style={{ color: '#004487' }}>{riddenCount} / {totalParkRides} ({rideEverythingPercent}%)</span>
                   </div>
                   <div style={{ width: '100%', height: '10px', background: '#E2E8F0', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${rideEverythingPercent}%`, height: '100%', background: '#38A169', transition: 'width 0.3s ease' }}></div>
+                    <div style={{ width: `${rideEverythingPercent}%`, height: '100%', background: 'linear-gradient(to right, #0056b3, #D4AF37)', transition: 'width 0.3s ease' }}></div>
                   </div>
                 </div>
 
@@ -197,7 +203,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Attendees (Formerly Attendee Cards) */}
+      {/* Subtab: Attendees */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {FIXED_FAMILY_MEMBERS.map(person => {
