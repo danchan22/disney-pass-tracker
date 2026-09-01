@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
