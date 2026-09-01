@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
@@ -69,6 +69,31 @@ interface TrackerTabProps {
   deleteVisit: (id: string) => void;
 }
 
+const WEEKDAYS = [
+  { label: 'M', dayIndex: 1 },
+  { label: 'T', dayIndex: 2 },
+  { label: 'W', dayIndex: 3 },
+  { label: 'T', dayIndex: 4 },
+  { label: 'F', dayIndex: 5 },
+  { label: 'S', dayIndex: 6 },
+  { label: 'S', dayIndex: 0 },
+];
+
+const MONTH_ORDER = [
+  { label: 'Jun', monthIndex: 5 },
+  { label: 'Jul', monthIndex: 6 },
+  { label: 'Aug', monthIndex: 7 },
+  { label: 'Sep', monthIndex: 8 },
+  { label: 'Oct', monthIndex: 9 },
+  { label: 'Nov', monthIndex: 10 },
+  { label: 'Dec', monthIndex: 11 },
+  { label: 'Jan', monthIndex: 0 },
+  { label: 'Feb', monthIndex: 1 },
+  { label: 'Mar', monthIndex: 2 },
+  { label: 'Apr', monthIndex: 3 },
+  { label: 'May', monthIndex: 4 },
+];
+
 export const TrackerTab: React.FC<TrackerTabProps> = ({
   trackerSubTab,
   activeVisit,
@@ -128,7 +153,29 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   openEditVisit,
   deleteVisit,
 }) => {
-  const [showAddPersonModal, setShowAddPersonModal] = useState(false);
+  const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
+
+  // Days of the Week Calculation for Totals Card
+  const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  filteredVisits.forEach(v => {
+    if (v.visitDate) {
+      const [y, m, d] = v.visitDate.split('-').map(Number);
+      const dayIndex = new Date(y, m - 1, d).getDay();
+      dayVisitsMap[dayIndex] = (dayVisitsMap[dayIndex] || 0) + 1;
+    }
+  });
+  const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
+
+  // Months Calculation for Totals Card (June -> May)
+  const monthVisitsMap: Record<number, number> = {};
+  filteredVisits.forEach(v => {
+    if (v.visitDate) {
+      const [y, m] = v.visitDate.split('-').map(Number);
+      const monthIndex = m - 1; // 0-based
+      monthVisitsMap[monthIndex] = (monthVisitsMap[monthIndex] || 0) + 1;
+    }
+  });
+  const maxMonthVisits = Math.max(1, ...Object.values(monthVisitsMap));
 
   return (
     <div>
@@ -445,19 +492,19 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#004487' }}>{totalDays}</div>
                 <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>PARK VISITS</div>
               </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '22px', fontWeight: '800', color: '#38A169' }}>{totalActivities}</div>
                 <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TOTAL ACTIVITIES</div>
               </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(totalParkMinutes)}</div>
                 <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARKS</div>
               </div>
-              <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '20px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(totalWaitMinutes)}</div>
                 <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
               </div>
@@ -473,20 +520,89 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
             </div>
 
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '18px' }}>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgActivitiesPerDay}</div>
                 <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Activities</div>
               </div>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{formatMinutes(avgParkMinutesPerDay)}</div>
                 <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Duration</div>
               </div>
-              <div style={{ background: '#F7FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgWaitPerActivity}m</div>
                 <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Wait Time</div>
               </div>
             </div>
+
+            {/* Days of the Week Bar Chart */}
+            <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '16px', marginBottom: '18px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>DAYS OF THE WEEK</h3>
+              <div style={{ background: '#F8FAFC', padding: '16px 12px 12px 16px', borderRadius: '16px', border: '1px solid #EDF2F7' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', alignItems: 'end', height: '110px' }}>
+                  {WEEKDAYS.map((day) => {
+                    const count = dayVisitsMap[day.dayIndex] || 0;
+                    const heightPercent = count > 0 ? Math.max(16, Math.round((count / maxDayVisits) * 100)) : 0;
+
+                    return (
+                      <div key={day.label + day.dayIndex} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: count > 0 ? '#004487' : '#A0AEC0', marginBottom: '4px' }}>
+                          {count}
+                        </div>
+                        <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <div
+                            style={{
+                              width: '18px',
+                              height: `${heightPercent}%`,
+                              background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0',
+                              borderRadius: '6px 6px 4px 4px',
+                              transition: 'height 0.3s ease'
+                            }}
+                          />
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
+                          {day.label}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Months Horizontal Bar Chart */}
+            <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>MONTHS</h3>
+              <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {MONTH_ORDER.map((mObj) => {
+                  const mCount = monthVisitsMap[mObj.monthIndex] || 0;
+                  const barWidthPercent = mCount > 0 ? Math.max(8, Math.round((mCount / maxMonthVisits) * 100)) : 0;
+
+                  return (
+                    <div key={mObj.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', fontSize: '11px', fontWeight: '800', color: '#4A5568', flexShrink: 0 }}>
+                        {mObj.label}
+                      </div>
+                      <div style={{ flex: 1, height: '14px', background: '#E2E8F0', borderRadius: '7px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${barWidthPercent}%`,
+                            height: '100%',
+                            background: mCount > 0 ? 'linear-gradient(to right, #004487, #2B6CB0)' : 'transparent',
+                            borderRadius: '7px',
+                            transition: 'width 0.3s ease'
+                          }}
+                        />
+                      </div>
+                      <div style={{ width: '20px', fontSize: '11px', fontWeight: '900', color: mCount > 0 ? '#004487' : '#A0AEC0', textAlign: 'right', flexShrink: 0 }}>
+                        {mCount}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
       )}
