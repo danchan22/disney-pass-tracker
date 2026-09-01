@@ -122,7 +122,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Mathematically Exact Conic Pie Chart Component */}
+                {/* Pie Chart Component */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div
                     style={{
@@ -137,12 +137,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
                     <div style={{ fontSize: '12px', color: '#2D3748' }}>
-                      <span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}% waiting in lines</span> • <span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}% not waiting in lines</span>
+                      <span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}%</span> waiting in lines • <span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}%</span> not waiting in lines
                     </div>
                   </div>
                 </div>
 
-                {/* Activities Logged Progress Bar with Checklist Gradient */}
+                {/* Activities Logged Progress */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '6px' }}>
                     <span>ACTIVITIES LOGGED</span>
@@ -203,9 +203,13 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Attendees */}
+      {/* Subtab: Attendees (Original UI Design) */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '900', color: '#003366', margin: '0 0 4px 4px' }}>
+            <span style={{ fontSize: '24px' }}>👥</span> Attendee Cards
+          </h2>
+          
           {FIXED_FAMILY_MEMBERS.map(person => {
             const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
             const pDays = personVisits.length;
@@ -233,92 +237,193 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const pAvgWait = pActivities > 0 ? Math.round(pWaitMinutes / pActivities) : 0;
 
             const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
-            const topPersonRide = personRides[0] || { name: 'None Yet', count: 0 };
+            const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0 };
 
             return (
-              <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #EDF2F7', paddingBottom: '10px' }}>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>
-                    👤 {person}
-                  </h3>
-                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#718096', background: '#F8FAFC', padding: '4px 10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    {pDays} Trips
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
+              <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
+                
+                {/* Header: Name and Visit Count Pill */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '24px', color: '#2B6CB0' }}>👤</span>
+                    <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
                   </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>PARK TIME</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>LINE TIME</div>
-                  </div>
-
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgActs}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(pAvgPark)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgWait}m</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
+                    {pDays} Park Visits
                   </div>
                 </div>
 
-                <div style={{ background: '#FFFDF5', padding: '10px 12px', borderRadius: '12px', border: '1px solid #FEEBC8' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '900', color: '#C05621' }}>⭐ TOP ATTRACTION: </span>
-                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#2D3748' }}>{topPersonRide.name} ({topPersonRide.count}x)</span>
+                {/* 2x3 White Grid with Gray Borders */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#1A202C' }}>{pActivities}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>ACTIVITIES</div>
+                  </div>
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>TIME IN PARKS</div>
+                  </div>
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#A0AEC0', marginTop: '2px', textTransform: 'uppercase' }}>TIME IN LINES</div>
+                  </div>
+
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{pAvgActs}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG ACTIVITIES</div>
+                  </div>
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{formatMinutes(pAvgPark)}</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG DURATION</div>
+                  </div>
+                  <div style={{ background: '#FFF', padding: '12px 8px', borderRadius: '12px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#4A5568' }}>{pAvgWait}m</div>
+                    <div style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E0', marginTop: '2px', textTransform: 'uppercase' }}>AVG WAIT</div>
+                  </div>
                 </div>
+
+                {/* Favorite Ride Block */}
+                <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    <span>⭐</span> FAVORITE RIDE
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#1A202C' }}>{topPersonRide.name}</div>
+                  <div style={{ fontSize: '12px', color: '#718096', marginTop: '4px' }}>
+                    Ridden {topPersonRide.count}x • Total Wait: {formatMinutes(topPersonRide.totalWait || 0)}
+                  </div>
+                </div>
+
+                {/* Ride Everything Progress Layout */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '900', color: '#2D3748', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+                    <span>🎡</span> RIDE EVERYTHING PROGRESS:
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {PARK_NAMES.map(park => {
+                      const parkCounts = getRideCountsMap(personVisits, person);
+                      const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
+                      const riddenInPark = PARK_ATTRACTIONS[park]?.filter(r => (parkCounts[r] || 0) > 0).length || 0;
+                      const percentComplete = Math.round((riddenInPark / totalParkRides) * 100);
+
+                      return (
+                        <div key={park} style={{ background: '#F8FAFC', padding: '12px', borderRadius: '10px', border: '1px solid #EDF2F7' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#1A202C', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {PARK_EMOJIS[park]} {park}
+                          </div>
+                          <div style={{ fontSize: '13px', fontWeight: '900', color: '#004487' }}>
+                            {riddenInPark}/{totalParkRides} ({percentComplete}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Subtab: Top 10s */}
+      {/* Subtab: Top 10s (Original UI Design) */}
       {analyticsSubTab === 'top10' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          <div style={{ background: '#FFF', borderRadius: '20px', padding: '16px', border: '1px solid #E2E8F0' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '900', color: '#004487' }}>🏆 MOST RIDDEN ATTRACTIONS</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Most Ridden */}
+          <div>
+            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '22px' }}>🏆</span> Most Ridden Attractions
+              </h2>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {mostTimesRidden.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#F8FAFC', borderRadius: '8px', fontSize: '12px' }}>
-                  <span style={{ fontWeight: '700', color: '#2D3748' }}>{idx + 1}. {item.name}</span>
-                  <span style={{ fontWeight: '900', color: '#004487' }}>{item.count}x</span>
+                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#EBF8FF', borderRadius: '12px', border: '1px solid #BEE3F8' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '28px', height: '28px', background: '#2B6CB0', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
+                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {PARK_EMOJIS[item.park]} <span style={{ color: '#2B6CB0' }}>{item.park}</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
+                        Avg Wait: {item.avgWait}m<br/>
+                        Total Wait: {formatMinutes(item.totalWait)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ background: '#C3DAFE', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#2B6CB0' }}>
+                    {item.count}x
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ background: '#FFF', borderRadius: '20px', padding: '16px', border: '1px solid #E2E8F0' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '900', color: '#C05621' }}>⏳ LONGEST AVERAGE WAITS</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Longest Waits */}
+          <div>
+            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#C53030', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '22px' }}>⏳</span> Longest Average Waits
+              </h2>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {longestWaitTimes.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#FFF5F5', borderRadius: '8px', fontSize: '12px' }}>
-                  <span style={{ fontWeight: '700', color: '#C53030' }}>{idx + 1}. {item.name}</span>
-                  <span style={{ fontWeight: '900', color: '#C53030' }}>{item.avgWait}m avg</span>
+                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#FFF5F5', borderRadius: '12px', border: '1px solid #FED7D7' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '28px', height: '28px', background: '#C53030', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
+                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {PARK_EMOJIS[item.park]} <span style={{ color: '#C53030' }}>{item.park}</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
+                        Total Times Ridden: {item.count}x<br/>
+                        Total Wait Time: {formatMinutes(item.totalWait)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ background: '#FEB2B2', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#9B2C2C' }}>
+                    {item.avgWait}m
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ background: '#FFF', borderRadius: '20px', padding: '16px', border: '1px solid #E2E8F0' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '900', color: '#276749' }}>⚡ SHORTEST AVERAGE WAITS</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Shortest Waits */}
+          <div>
+            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#276749', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '22px' }}>⚡</span> Shortest Average Waits
+              </h2>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {shortestWaitTimes.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: '#F0FFF4', borderRadius: '8px', fontSize: '12px' }}>
-                  <span style={{ fontWeight: '700', color: '#276749' }}>{idx + 1}. {item.name}</span>
-                  <span style={{ fontWeight: '900', color: '#276749' }}>{item.avgWait}m avg</span>
+                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#F0FFF4', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '28px', height: '28px', background: '#2F855A', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
+                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {PARK_EMOJIS[item.park]} <span style={{ color: '#276749' }}>{item.park}</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
+                        Total Times Ridden: {item.count}x<br/>
+                        Total Wait Time: {formatMinutes(item.totalWait)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ background: '#9AE6B4', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#22543D' }}>
+                    {item.avgWait}m
+                  </div>
                 </div>
               ))}
             </div>
