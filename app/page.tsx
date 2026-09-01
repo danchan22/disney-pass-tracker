@@ -35,7 +35,6 @@ export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
 
-  // Nav States
   const [mainTab, setMainTab] = useState<MainTab>('tracker');
   const [trackerSubTab, setTrackerSubTab] = useState<TrackerSubTab>('Today');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<AnalyticsSubTab>('averages');
@@ -46,7 +45,6 @@ export default function DisneyTracker() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAttendee, setSelectedAttendee] = useState<string>('ALL');
 
-  // Check-In & Attraction Form States
   const [parkName, setParkName] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [rideName, setRideName] = useState('');
@@ -54,7 +52,6 @@ export default function DisneyTracker() {
   const [characterName, setCharacterName] = useState('');
   const [selectedRiders, setSelectedRiders] = useState<string[]>([]);
 
-  // Live Queue Timer State
   const [queueStartTimestamp, setQueueStartTimestamp] = useState<number | null>(null);
   const [queueStartTimeStr, setQueueStartTimeStr] = useState<string | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState<number>(Date.now());
@@ -63,7 +60,6 @@ export default function DisneyTracker() {
   const [hiddenMickey, setHiddenMickey] = useState<string | null>(null);
   const [mickeyLoading, setMickeyLoading] = useState<boolean>(false);
 
-  // Editing States
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [editRideName, setEditRideName] = useState('');
@@ -77,11 +73,9 @@ export default function DisneyTracker() {
   const [editVisitMemberStartTimes, setEditVisitMemberStartTimes] = useState<Record<string, string>>({});
   const [editVisitMemberEndTimes, setEditVisitMemberEndTimes] = useState<Record<string, string>>({});
 
-  // Checkout Modal State
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [departingMembers, setDepartingMembers] = useState<string[]>([]);
 
-  // Rainbow State
   const [photoGrids, setPhotoGrids] = useState<PhotoGridRecord[]>([]);
   const [photoLoading, setPhotoLoading] = useState<boolean>(false);
 
@@ -297,7 +291,7 @@ export default function DisneyTracker() {
   const mostTimesRidden = [...rideStats].sort((a, b) => b.count !== a.count ? b.count - a.count : b.totalWait - a.totalWait).slice(0, 10);
   const longestWaitTimes = [...rideStats].sort((a, b) => b.avgWait !== a.avgWait ? b.avgWait - a.avgWait : b.count - a.count).slice(0, 10);
   const shortestWaitTimes = [...rideStats].sort((a, b) => a.avgWait !== b.avgWait ? a.avgWait - b.avgWait : b.count - a.count).slice(0, 10);
-  const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0 };
+  const topActivity = mostTimesRidden[0] || { name: 'None Yet ✨', count: 0, totalWait: 0, avgWait: 0 };
 
   const getRideCountsMap = (visitList: Visit[], personFilter: string) => {
     const counts: Record<string, number> = {};
@@ -589,6 +583,58 @@ export default function DisneyTracker() {
     return mins === 0 ? `${secs}s` : `${mins} mins ${secs > 0 ? `${secs}s` : ''}`;
   };
 
+  // Preserves array index order when saving activity edits
+  const saveEditedActivity = async () => {
+    if (!editingActivityId) return;
+
+    const waitMins = parseInt(editWaitTime) || 0;
+    const notesVal = editNotes.trim() ? editNotes : null;
+    const ridersStr = editRiders.join(', ');
+
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from('activities')
+      .update({
+        rideName: editRideName,
+        waitTimeMinutes: waitMins,
+        notes: notesVal,
+        riders: ridersStr
+      })
+      .eq('id', editingActivityId);
+
+    if (error) {
+      setErrorMessage("Error saving edits: " + error.message);
+      return;
+    }
+
+    // Update state while preserving activity array order
+    if (editingVisitId === null && activeVisit) {
+      const updatedActivities = activeVisit.activities.map(a =>
+        a.id === editingActivityId
+          ? { ...a, rideName: editRideName, waitTimeMinutes: waitMins, notes: notesVal || undefined, riders: editRiders }
+          : a
+      );
+      setActiveVisit({ ...activeVisit, activities: updatedActivities });
+    } else if (editingVisitId) {
+      setVisits(prev =>
+        prev.map(v => {
+          if (v.id === editingVisitId) {
+            const updatedActivities = v.activities.map(a =>
+              a.id === editingActivityId
+                ? { ...a, rideName: editRideName, waitTimeMinutes: waitMins, notes: notesVal || undefined, riders: editRiders }
+                : a
+            );
+            return { ...v, activities: updatedActivities };
+          }
+          return v;
+        })
+      );
+    }
+
+    setEditingActivityId(null);
+    setEditingVisitId(null);
+  };
+
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px 15px 30px 15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
 
@@ -667,12 +713,7 @@ export default function DisneyTracker() {
             setEditRiders(parseAttendees(act.riders));
           }}
           cancelEditing={() => { setEditingActivityId(null); setEditingVisitId(null); }}
-          saveEditedActivity={async () => {
-            const supabase = await getSupabase();
-            await supabase.from('activities').update({ rideName: editRideName, waitTimeMinutes: parseInt(editWaitTime) || 0, notes: editNotes, riders: editRiders.join(', ') }).eq('id', editingActivityId);
-            setEditingActivityId(null);
-            await fetchCloudVisits();
-          }}
+          saveEditedActivity={saveEditedActivity}
           deleteActivity={async (id) => {
             const supabase = await getSupabase();
             await supabase.from('activities').delete().eq('id', id);
