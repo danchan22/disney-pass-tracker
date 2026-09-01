@@ -34,9 +34,9 @@ interface TrackerTabProps {
   setHiddenMickey: (mickey: string | null) => void;
   mickeyLoading: boolean;
   handleStartQueueTimer: () => void;
-  handleEndQueueTimer: () => void;
+  handleEndQueueTimer: (isWalkOn?: boolean) => void;
   handleCancelQueueTimer: () => void;
-  handleAddRideLive: () => void;
+  handleAddRideLive: (isWalkOn?: boolean) => void;
   editingActivityId: string | null;
   editingVisitId: string | null;
   editRideName: string;
@@ -264,20 +264,29 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                        <button type="button" onClick={handleCancelQueueTimer} style={{ flex: 1, padding: '10px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+                      {/* TIMER BUTTONS INCLUDING WALK ON */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 2fr', gap: '6px', marginTop: '12px' }}>
+                        <button type="button" onClick={handleCancelQueueTimer} style={{ padding: '10px 4px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
                           Cancel
                         </button>
-                        <button type="button" onClick={handleEndQueueTimer} style={{ flex: 2, padding: '10px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
-                          ✅ On Ride Now!
+                        <button type="button" onClick={() => handleEndQueueTimer(true)} style={{ padding: '10px 4px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(214,158,46,0.3)' }}>
+                          Walk On
+                        </button>
+                        <button type="button" onClick={() => handleEndQueueTimer(false)} style={{ padding: '10px 4px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(56,161,105,0.2)' }}>
+                          On Ride Now
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div style={{ borderTop: '1px solid #EDF2F7', paddingTop: '10px', marginTop: '5px' }}>
-                      <button type="button" onClick={handleStartQueueTimer} style={{ width: '100%', padding: '12px', background: '#004487', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        ⏱️ Start Line Timer
-                      </button>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                        <button type="button" onClick={handleStartQueueTimer} style={{ padding: '12px', background: '#004487', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          ⏱️ Start Line Timer
+                        </button>
+                        <button type="button" onClick={() => handleAddRideLive(true)} style={{ padding: '12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 2px 4px rgba(214,158,46,0.3)' }}>
+                          Walk On
+                        </button>
+                      </div>
 
                       <div style={{ textAlign: 'center', fontSize: '11px', color: '#A0AEC0', fontWeight: 'bold', marginBottom: '12px', position: 'relative' }}>
                         <span style={{ background: '#FFF', padding: '0 10px', position: 'relative', zIndex: 2 }}>OR LOG MANUALLY</span>
@@ -286,7 +295,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
 
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input type="number" placeholder="Enter wait time (mins)" value={waitTime} onChange={(e) => setWaitTime(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #CBD5E0', fontSize: '14px', boxSizing: 'border-box' }} />
-                        <button type="button" onClick={handleAddRideLive} style={{ padding: '11px 22px', background: '#EDF2F7', color: '#2D3748', border: '1px solid #CBD5E0', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
+                        <button type="button" onClick={() => handleAddRideLive(false)} style={{ padding: '11px 22px', background: '#EDF2F7', color: '#2D3748', border: '1px solid #CBD5E0', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>
                           Log
                         </button>
                       </div>
@@ -348,9 +357,13 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                             <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                               <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{act.rideName}</div>
                               <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                ⏱️ {act.waitTimeMinutes} mins wait {act.notes ? `• ${act.notes}` : ''}
+                                {act.isWalkOn || act.notes?.includes('[Walk On]') ? (
+                                  <span style={{ color: '#D69E2E', fontWeight: '800' }}>⚡ Walk On (0m wait)</span>
+                                ) : (
+                                  `⏱️ ${act.waitTimeMinutes} mins wait`
+                                )}
+                                {act.notes && !act.notes.includes('[Walk On]') ? ` • ${act.notes}` : ''}
                               </div>
-                              {/* Dedicated row for riders */}
                               <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
                                 👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
                               </div>
@@ -366,8 +379,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 )}
               </div>
 
+              {/* LEAVE THE PARK BUTTON (NO EMOJI) */}
               <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
-                👋 Leave the Park & Save Day
+                Leave the Park & Save Day
               </button>
             </div>
           ) : (
@@ -544,7 +558,12 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                                 <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{a.rideName}</div>
                                 <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                  ⏱️ {a.waitTimeMinutes} mins wait {a.notes ? `• ${a.notes}` : ''}
+                                  {a.isWalkOn || a.notes?.includes('[Walk On]') ? (
+                                    <span style={{ color: '#D69E2E', fontWeight: '800' }}>⚡ Walk On (0m wait)</span>
+                                  ) : (
+                                    `⏱️ ${a.waitTimeMinutes} mins wait`
+                                  )}
+                                  {a.notes && !a.notes.includes('[Walk On]') ? ` • ${a.notes}` : ''}
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
                                   👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
