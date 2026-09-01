@@ -19,13 +19,11 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
   photoLoading,
   fetchPhotoGrids,
 }) => {
-  // Localized filter states
   const [filterPhotographer, setFilterPhotographer] = useState<string>('ALL');
   const [filterPark, setFilterPark] = useState<string>('ALL');
   const [filterColor, setFilterColor] = useState<string>('ALL');
   const [badgePhotographer, setBadgePhotographer] = useState<string>('Dan');
 
-  // Localized Modal states
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadUser, setUploadUser] = useState<string>('Dan');
   const [uploadPark, setUploadPark] = useState<'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom'>('Magic Kingdom');
@@ -101,7 +99,6 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
   return (
     <div>
-      {/* Header Subtitle Box */}
       <div style={{ textAlign: 'center', marginBottom: '14px', background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: '0 0 4px 0' }}>Rainbow Challenge</h2>
         <p style={{ margin: 0, fontSize: '12px', color: '#718096', fontWeight: '600' }}>
@@ -113,26 +110,61 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
       {rainbowSubTab === 'stream' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* TOGGLE FILTERS */}
-          <div style={{ background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* UPLOAD BUTTON DIRECTLY ON STREAM */}
+          <button
+            type="button"
+            onClick={() => {
+              setUploadUser('Dan');
+              setUploadPark('Magic Kingdom');
+              setUploadColor('Red');
+              setUploadModalOpen(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: '#004487',
+              color: '#FFF',
+              border: 'none',
+              borderRadius: '14px',
+              fontSize: '15px',
+              fontWeight: '800',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0, 68, 135, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            📸 Upload Photo Grid
+          </button>
+
+          {/* PARKING-STYLE SELECTOR BOXES */}
+          <div style={{ background: '#FFF', padding: '16px', borderRadius: '20px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             
             {/* Photographer */}
             <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>PHOTOGRAPHER</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PHOTOGRAPHER</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                 {FIXED_FAMILY_MEMBERS.map(m => {
                   const isSel = filterPhotographer === m;
                   return (
                     <button
                       key={m}
+                      type="button"
                       onClick={() => setFilterPhotographer(prev => prev === m ? 'ALL' : m)}
                       style={{
-                        padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold',
-                        border: isSel ? '2px solid #004487' : '1px solid #CBD5E0',
-                        background: isSel ? '#004487' : '#FFF', color: isSel ? '#FFF' : '#4A5568', cursor: 'pointer'
+                        padding: '8px 4px',
+                        borderRadius: '10px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
+                        background: isSel ? '#004487' : '#F8FAFC',
+                        color: isSel ? '#FFF' : '#2D3748',
+                        cursor: 'pointer'
                       }}
                     >
-                      {m}
+                      {isSel ? `✓ ${m}` : m}
                     </button>
                   );
                 })}
@@ -141,18 +173,24 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
             {/* Park */}
             <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>PARK</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PARK</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
                 {PARK_NAMES.map(p => {
                   const isSel = filterPark === p;
                   return (
                     <button
                       key={p}
+                      type="button"
                       onClick={() => setFilterPark(prev => prev === p ? 'ALL' : p)}
                       style={{
-                        padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold',
-                        border: isSel ? '2px solid #004487' : '1px solid #CBD5E0',
-                        background: isSel ? '#004487' : '#FFF', color: isSel ? '#FFF' : '#4A5568', cursor: 'pointer'
+                        padding: '8px',
+                        borderRadius: '10px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
+                        background: isSel ? '#004487' : '#FFF',
+                        color: isSel ? '#FFF' : '#4A5568',
+                        cursor: 'pointer'
                       }}
                     >
                       {PARK_EMOJIS[p]} {p}
@@ -162,22 +200,29 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
               </div>
             </div>
 
-            {/* Color */}
+            {/* Color Selector: 4x2 Full Width Grid */}
             <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '4px' }}>COLOR</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>COLOR</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                 {RAINBOW_COLORS.map(c => {
                   const isSel = filterColor === c.name;
                   return (
                     <button
                       key={c.name}
+                      type="button"
                       onClick={() => setFilterColor(prev => prev === c.name ? 'ALL' : c.name)}
                       style={{
-                        padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold',
+                        padding: '10px 2px',
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        fontWeight: '800',
                         border: isSel ? `2px solid ${c.name === 'White' ? '#A0AEC0' : c.hex}` : '1px solid #CBD5E0',
                         background: isSel ? c.hex : c.bgTint,
                         color: isSel ? (c.name === 'White' ? '#1A202C' : '#FFF') : c.textHex,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        boxSizing: 'border-box',
+                        width: '100%'
                       }}
                     >
                       {c.name}
@@ -234,11 +279,11 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
       {rainbowSubTab === 'badges' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+          <div style={{ background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
             <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PHOTOGRAPHER</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
               {FIXED_FAMILY_MEMBERS.map(m => (
-                <button key={m} onClick={() => setBadgePhotographer(m)} style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', border: badgePhotographer === m ? '2px solid #004487' : '1px solid #CBD5E0', background: badgePhotographer === m ? '#004487' : '#FFF', color: badgePhotographer === m ? '#FFF' : '#4A5568', cursor: 'pointer' }}>{m}</button>
+                <button key={m} onClick={() => setBadgePhotographer(m)} style={{ padding: '8px 4px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', border: badgePhotographer === m ? '2px solid #004487' : '1px solid #CBD5E0', background: badgePhotographer === m ? '#004487' : '#FFF', color: badgePhotographer === m ? '#FFF' : '#4A5568', cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
@@ -308,7 +353,7 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
         </div>
       )}
 
-      {/* LOCALIZED MODALS */}
+      {/* MODALS */}
       <UploadPhotoModal
         uploadModalOpen={uploadModalOpen}
         setUploadModalOpen={setUploadModalOpen}
