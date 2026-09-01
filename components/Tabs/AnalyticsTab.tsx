@@ -77,7 +77,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const visitorStats: Record<string, { visits: number; timeInPark: number }> = {};
             FIXED_FAMILY_MEMBERS.forEach(m => { visitorStats[m] = { visits: 0, timeInPark: 0 }; });
 
-            visits.filter(v => v.parkName === park).forEach(v => {
+            parkVisits.forEach(v => {
               const party = parseAttendees(v.attendees);
               party.forEach(m => {
                 if (visitorStats[m]) {
@@ -96,6 +96,18 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               .map(m => ({ name: m, ...visitorStats[m], avgVisit: visitorStats[m].visits > 0 ? visitorStats[m].timeInPark / visitorStats[m].visits : 0 }))
               .filter(item => item.visits > 0)
               .sort((a, b) => b.visits - a.visits);
+
+            // Days of the Week Group Visits Calculation for Park
+            const parkDayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            parkVisits.forEach(v => {
+              if (v.visitDate) {
+                const [y, m, d] = v.visitDate.split('-').map(Number);
+                const dayIndex = new Date(y, m - 1, d).getDay();
+                parkDayVisitsMap[dayIndex] = (parkDayVisitsMap[dayIndex] || 0) + 1;
+              }
+            });
+
+            const maxParkDayVisits = Math.max(1, ...Object.values(parkDayVisitsMap));
 
             return (
               <div key={park} style={{ background: '#FFF', borderRadius: '24px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
@@ -202,7 +214,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
                   {/* Who Visits Most Leaderboard */}
                   {leaderboard.length > 0 && (
-                    <div>
+                    <div style={{ marginBottom: '16px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '8px', letterSpacing: '0.8px' }}>
                         WHO VISITS MOST
                       </div>
@@ -226,6 +238,44 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Days of the Week Vertical Bar Chart Widget */}
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+                      DAYS OF THE WEEK
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', padding: '16px 12px 12px 16px', borderRadius: '16px', border: '1px solid #EDF2F7' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', alignItems: 'end', height: '110px' }}>
+                        {WEEKDAYS.map((day) => {
+                          const count = parkDayVisitsMap[day.dayIndex] || 0;
+                          const heightPercent = count > 0 ? Math.max(16, Math.round((count / maxParkDayVisits) * 100)) : 0;
+
+                          return (
+                            <div key={day.label + day.dayIndex} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '900', color: count > 0 ? '#004487' : '#A0AEC0', marginBottom: '4px' }}>
+                                {count}
+                              </div>
+                              <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                                <div
+                                  style={{
+                                    width: '18px',
+                                    height: `${heightPercent}%`,
+                                    background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0',
+                                    borderRadius: '6px 6px 4px 4px',
+                                    transition: 'height 0.3s ease'
+                                  }}
+                                />
+                              </div>
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
+                                {day.label}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
 
                 </div>
               </div>
