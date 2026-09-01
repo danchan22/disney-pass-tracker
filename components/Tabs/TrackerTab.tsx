@@ -348,9 +348,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                   type="button"
                                   onClick={() => {
                                     setEditWaitTime('0');
-                                if (!editNotes.includes('[Walk On]')) {
-                                  setEditNotes(`${editNotes} [Walk On]`.trim());
-                                }
+                                    if (!editNotes.includes('[Walk On]')) {
+                                      setEditNotes(`${editNotes} [Walk On]`.trim());
+                                    }
                                   }}
                                   style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
                                 >
@@ -564,7 +564,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                     onClick={() => {
                                       setEditWaitTime('0');
                                       if (!editNotes.includes('[Walk On]')) {
-                                        setEditNotes(prev => `${prev} [Walk On]`.trim());
+                                        setEditNotes(`${editNotes} [Walk On]`.trim());
                                       }
                                     }}
                                     style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
