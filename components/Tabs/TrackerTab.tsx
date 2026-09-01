@@ -342,7 +342,21 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                             </div>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
-                              <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditWaitTime('0');
+                                    if (!editNotes.includes('[Walk On]')) {
+                                      setEditNotes(prev => `${prev} [Walk On]`.trim());
+                                    }
+                                  }}
+                                  style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
+                                >
+                                  ⚡ Walk On
+                                </button>
+                              </div>
                               <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                             </div>
 
@@ -379,7 +393,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 )}
               </div>
 
-              {/* LEAVE THE PARK BUTTON (NO EMOJI) */}
+              {/* LEAVE THE PARK BUTTON */}
               <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
                 Leave the Park & Save Day
               </button>
@@ -543,7 +557,21 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               </div>
                               
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
-                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditWaitTime('0');
+                                      if (!editNotes.includes('[Walk On]')) {
+                                        setEditNotes(prev => `${prev} [Walk On]`.trim());
+                                      }
+                                    }}
+                                    style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    ⚡ Walk On
+                                  </button>
+                                </div>
                                 <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                               </div>
 
