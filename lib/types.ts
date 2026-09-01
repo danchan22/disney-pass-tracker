@@ -3,6 +3,7 @@ export interface Activity {
   visit_id: string;
   rideName: string;
   waitTimeMinutes: number;
+  isWalkOn?: boolean;
   notes?: string;
   riders?: string | string[];
 }
