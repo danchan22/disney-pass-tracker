@@ -745,7 +745,7 @@ export default function DisneyTracker() {
       )}
 
       {mainTab === 'analytics' && (
-        <AnalyticsTab
+<AnalyticsTab
           analyticsSubTab={analyticsSubTab}
           parkStats={parkStats}
           mostTimesRidden={mostTimesRidden}
@@ -756,6 +756,8 @@ export default function DisneyTracker() {
           visits={visits}
           getRideBreakdown={getRideBreakdown}
           getRideCountsMap={getRideCountsMap}
+          setSelectedAttendee={setSelectedAttendee}
+          setMainTab={setMainTab}
         />
       )}
 
