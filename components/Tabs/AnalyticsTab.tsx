@@ -33,8 +33,6 @@ const WEEKDAYS = [
   { label: 'S', dayIndex: 0 },
 ];
 
-const PARK_FILTERS = ['ALL', 'Magic Kingdom', 'Epcot', 'Hollywood Studios', 'Animal Kingdom'];
-
 type SortField = 'park' | 'name' | 'ridden' | 'avgWait' | 'totalWait' | 'maxWait' | 'minWait' | 'walkOns';
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
@@ -49,8 +47,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   getRideBreakdown,
   getRideCountsMap,
 }) => {
-  // State for Park Filter in Rides Tab
-  const [selectedPark, setSelectedPark] = useState<string>('ALL');
+  // State for Park Filter in Rides Tab (null = ALL)
+  const [selectedPark, setSelectedPark] = useState<string | null>(null);
 
   // State for Table Sorting (Default: Ridden Descending)
   const [sortField, setSortField] = useState<SortField>('ridden');
@@ -77,7 +75,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
   visits.forEach(v => {
     // Filter by Selected Park
-    if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
+    if (selectedPark && v.parkName !== selectedPark) return;
 
     // Filter by Selected Attendee
     const party = parseAttendees(v.attendees);
@@ -586,42 +584,43 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Rides (Replaced Top 10s) */}
+      {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* Header */}
-          <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '10px', marginBottom: '14px' }}>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '22px' }}>🎢</span> Ride Breakdown
-            </h2>
-          </div>
-
-          {/* Park Filter Bar (Rainbow Style) */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
-            {PARK_FILTERS.map(p => {
-              const isSelected = selectedPark === p;
-              return (
-                <button
-                  key={p}
-                  onClick={() => setSelectedPark(p)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '20px',
-                    border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
-                    background: isSelected ? '#004487' : '#FFF',
-                    color: isSelected ? '#FFF' : '#4A5568',
-                    fontSize: '12px',
-                    fontWeight: '800',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    boxShadow: isSelected ? '0 2px 6px rgba(0,68,135,0.2)' : 'none',
-                    flexShrink: 0
-                  }}
-                >
-                  {p === 'ALL' ? '🌈 All Parks' : `${PARK_EMOJIS[p]} ${p}`}
-                </button>
-              );
-            })}
+          {/* Park Filter Bar (2x2 Grid Style) */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+              PARK
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {PARK_NAMES.map(park => {
+                const isSelected = selectedPark === park;
+                return (
+                  <button
+                    key={park}
+                    onClick={() => setSelectedPark(isSelected ? null : park)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '12px',
+                      borderRadius: '14px',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#EBF8FF' : '#FFF',
+                      color: isSelected ? '#004487' : '#2D3748',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <span>{PARK_EMOJIS[park]}</span>
+                    <span>{park}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Rides Sortable Table Container */}
@@ -727,9 +726,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                             {r.name}
                           </td>
 
-                          {/* Ridden */}
+                          {/* Ridden (Clean Count without 'x') */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
-                            {r.ridden}x
+                            {r.ridden}
                           </td>
 
                           {/* Avg Wait */}
