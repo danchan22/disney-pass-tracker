@@ -4,6 +4,7 @@ import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITI
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
 import { ParkingSubtab } from './ParkingSubtab';
 import { AddPersonModal } from '../Modals/AddPersonModal';
+import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimesWidget';
 
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
@@ -222,6 +223,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 </button>
               </div>
 
+<LiveWaitTimesWidget parkName={activeVisit.parkName} />
+              
               {/* TRACK ATTRACTION CARD */}
               <div style={{ background: '#FFF', padding: '16px', borderRadius: '18px', marginBottom: '15px', color: '#1A202C' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '800', color: '#004487' }}>Track an Attraction:</h3>
