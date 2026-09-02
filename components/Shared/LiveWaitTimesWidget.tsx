@@ -18,6 +18,43 @@ interface LiveWaitTimesWidgetProps {
   parkName: string;
 }
 
+// Helper to determine wait time pill color styling
+const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
+  if (!isOperating || waitTime === null) {
+    return {
+      bg: '#FFF5F5',
+      color: '#9B2C2C',
+      border: '#FEB2B2',
+    };
+  }
+
+  if (waitTime <= 29) {
+    return {
+      bg: '#E6FFFA',
+      color: '#22543D',
+      border: '#B2F5EA',
+    };
+  } else if (waitTime <= 44) {
+    return {
+      bg: '#FEFCBF',
+      color: '#744210',
+      border: '#F6E05E',
+    };
+  } else if (waitTime <= 59) {
+    return {
+      bg: '#FEEBC8',
+      color: '#7B341E',
+      border: '#FBD38D',
+    };
+  } else {
+    return {
+      bg: '#FFF5F5',
+      color: '#9B2C2C',
+      border: '#FEB2B2',
+    };
+  }
+};
+
 export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkName }) => {
   const [viewType, setViewType] = useState<'rides' | 'shows'>('rides');
   const [rides, setRides] = useState<AttractionLive[]>([]);
@@ -111,7 +148,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
             transition: 'all 0.15s ease'
           }}
         >
-          🎢 Rides ({rides.length})
+          Rides
         </button>
         <button
           type="button"
@@ -129,7 +166,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
             transition: 'all 0.15s ease'
           }}
         >
-          🎆 Shows & Parades ({shows.length})
+          Shows
         </button>
       </div>
 
@@ -139,7 +176,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
           {error}
         </div>
       ) : viewType === 'rides' ? (
-        /* RIDES VIEW */
+        /* RIDES VIEW WITH COLOR CODING */
         rides.length === 0 && !loading ? (
           <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
             No matching park attractions found right now.
@@ -149,6 +186,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
             {rides.map((att) => {
               const isOperating = att.status === 'OPERATING';
               const displayWait = isOperating && att.waitTime !== null ? `${att.waitTime}m` : att.status;
+              const pillStyle = getWaitTimeStyle(isOperating, att.waitTime);
 
               return (
                 <div
@@ -174,9 +212,9 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
                       padding: '3px 8px',
                       borderRadius: '8px',
                       flexShrink: 0,
-                      background: isOperating ? '#E6FFFA' : '#FFF5F5',
-                      color: isOperating ? '#234E52' : '#9B2C2C',
-                      border: isOperating ? '1px solid #B2F5EA' : '1px solid #FEB2B2'
+                      background: pillStyle.bg,
+                      color: pillStyle.color,
+                      border: `1px solid ${pillStyle.border}`
                     }}
                   >
                     {displayWait}
