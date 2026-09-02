@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 
-// ThemeParks.wiki Entity UUIDs for Walt Disney World Parks
 const PARK_ENTITY_IDS: Record<string, string> = {
-  'Magic Kingdom': '754884A6-D926-4F9A-B020-00A231221927',
-  'Epcot': '47F90A27-0487-4315-A2B0-0D642C9D040A',
-  'Hollywood Studios': '2888B78F-1CAF-4E2F-82B3-7634289A0837',
-  'Animal Kingdom': '1C84A229-886B-4B38-9B9D-142D0E760F81',
+  'Magic Kingdom': '754884a6-d926-4f9a-b020-00a231221927',
+  'Epcot': '47f90a27-0487-4315-a2b0-0d642c9d040a',
+  'Hollywood Studios': '2888b78f-1caf-4e2f-82b3-7634289a0837',
+  'Animal Kingdom': '1c84a229-886b-4b38-9b9d-142d0e760f81',
 };
 
 export async function GET(request: Request) {
@@ -20,10 +19,36 @@ export async function GET(request: Request) {
   try {
     const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`, {
       headers: { 'Accept': 'application/json' },
-      next: { revalidate: 60 }, // Cache on server for 60 seconds
+      next: { revalidate: 60 },
     });
 
-    if (!res.ok) throw new Error(`ThemeParks API returned status ${res.status}`);
+    if (!res.ok) {
+      // Fallback to WDW Resort-wide live feed if individual park entity 404s
+      const fallbackRes = await fetch(`https://api.themeparks.wiki/v1/entity/e957da17-1526-4352-a369-e54e70a21272/live`, {
+        headers: { 'Accept': 'application/json' },
+        next: { revalidate: 60 },
+      });
+
+      if (!fallbackRes.ok) throw new Error(`ThemeParks API error (${res.status})`);
+      const fallbackData = await fallbackRes.json();
+      const liveData = fallbackData.liveData || [];
+
+      const attractions = liveData
+        .filter((item: any) => item.entityType === 'ATTRACTION' && item.parkId === entityId)
+        .map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          status: item.status,
+          waitTime: item.queue?.STANDBY?.waitTime ?? null,
+        }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      return NextResponse.json({
+        parkName,
+        lastUpdated: new Date().toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' }),
+        attractions,
+      });
+    }
 
     const data = await res.json();
     const liveData = data.liveData || [];
@@ -33,7 +58,7 @@ export async function GET(request: Request) {
       .map((item: any) => ({
         id: item.id,
         name: item.name,
-        status: item.status, // OPERATING, DOWN, CLOSED, REFURBISHMENT
+        status: item.status,
         waitTime: item.queue?.STANDBY?.waitTime ?? null,
       }))
       .sort((a: any, b: any) => a.name.localeCompare(b.name));
