@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { PARK_ATTRACTIONS } from '@/lib/constants';
 
-// Verified ThemeParks.wiki Park Entity UUIDs for Walt Disney World
+// ThemeParks.wiki Park Entity UUIDs
 const PARK_ENTITY_IDS: Record<string, string> = {
   'Magic Kingdom': '75ea578a-adc8-4116-a54d-dccb60765ef9',
   'Epcot': '47f90d2c-e191-4239-a466-5892ef59a88b',
@@ -30,8 +31,17 @@ export async function GET(request: Request) {
     const data = await res.json();
     const liveData = data.liveData || [];
 
-    const attractions = liveData
-      .filter((item: any) => item.entityType === 'ATTRACTION' || item.type === 'ATTRACTION')
+    // Valid attraction list for current park
+    const knownAttractions = (PARK_ATTRACTIONS[parkName] || []).map(a => a.toLowerCase().trim());
+
+    // 1. Process Rides (Filtered against PARK_ATTRACTIONS)
+    const rides = liveData
+      .filter((item: any) => {
+        const isAttraction = item.entityType === 'ATTRACTION' || item.type === 'ATTRACTION';
+        if (!isAttraction) return false;
+        const nameLower = (item.name || '').toLowerCase().trim();
+        return knownAttractions.some(known => nameLower.includes(known) || known.includes(nameLower));
+      })
       .map((item: any) => ({
         id: item.id,
         name: item.name,
@@ -40,10 +50,46 @@ export async function GET(request: Request) {
       }))
       .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
+    // 2. Process Shows & Parades (Unfiltered SHOW / EVENT entities with showtimes)
+    const shows = liveData
+      .filter((item: any) => {
+        const isShow = item.entityType === 'SHOW' || item.entityType === 'EVENT' || item.type === 'SHOW' || item.type === 'EVENT';
+        return isShow && item.showtimes && item.showtimes.length > 0;
+      })
+      .map((item: any) => {
+        const formattedTimes = (item.showtimes || []).map((st: any) => {
+          const rawTime = st.startTime || st;
+          try {
+            return new Date(rawTime).toLocaleTimeString('en-US', {
+              timeZone: 'America/New_York',
+              hour12: true,
+              hour: 'numeric',
+              minute: '2-digit'
+            });
+          } catch {
+            return '';
+          }
+        }).filter(Boolean);
+
+        return {
+          id: item.id,
+          name: item.name,
+          status: item.status || 'OPERATING',
+          showtimes: formattedTimes,
+        };
+      })
+      .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
     return NextResponse.json({
       parkName,
-      lastUpdated: new Date().toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' }),
-      attractions,
+      lastUpdated: new Date().toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York',
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit'
+      }),
+      rides,
+      shows,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch live wait times' }, { status: 500 });
