@@ -20,7 +20,7 @@ interface LiveWaitTimesWidgetProps {
 
 // Helper to determine wait time pill color styling
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
-  if (!isOperating || waitTime === null) {
+  if (!isOperating) {
     return {
       bg: '#FFF5F5',
       color: '#9B2C2C',
@@ -28,7 +28,8 @@ const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
     };
   }
 
-  if (waitTime <= 29) {
+  // Green tier for 0-29 mins OR general OPEN status
+  if (waitTime === null || waitTime <= 29) {
     return {
       bg: '#E6FFFA',
       color: '#22543D',
@@ -176,7 +177,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
           {error}
         </div>
       ) : viewType === 'rides' ? (
-        /* RIDES VIEW WITH COLOR CODING */
+        /* RIDES VIEW */
         rides.length === 0 && !loading ? (
           <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
             No matching park attractions found right now.
@@ -185,7 +186,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {rides.map((att) => {
               const isOperating = att.status === 'OPERATING';
-              const displayWait = isOperating && att.waitTime !== null ? `${att.waitTime}m` : att.status;
+              const displayWait = isOperating ? (att.waitTime !== null ? `${att.waitTime}m` : 'OPEN') : att.status;
               const pillStyle = getWaitTimeStyle(isOperating, att.waitTime);
 
               return (
