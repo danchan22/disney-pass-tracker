@@ -156,7 +156,38 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
 }) => {
   const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
 
-  // Days of the Week Calculation for Totals Card
+  // Group Visits Breakdown Per Park
+  const parkVisitsMap: Record<string, number> = {
+    'Magic Kingdom': 0,
+    'Epcot': 0,
+    'Hollywood Studios': 0,
+    'Animal Kingdom': 0,
+  };
+  filteredVisits.forEach(v => {
+    if (parkVisitsMap[v.parkName] !== undefined) {
+      parkVisitsMap[v.parkName] += 1;
+    }
+  });
+
+  // Unique Activities Logged Across All Parks
+  const allPossibleAttractionsCount = Object.values(PARK_ATTRACTIONS).reduce((sum, list) => sum + list.length, 0);
+  const uniqueRidesRidden = new Set<string>();
+  filteredVisits.forEach(v => {
+    v.activities.forEach(a => {
+      if (a.rideName && a.rideName !== 'Character Meeting') {
+        uniqueRidesRidden.add(a.rideName);
+      }
+    });
+  });
+  const riddenUniqueCount = uniqueRidesRidden.size;
+  const totalUniquePercent = Math.round((riddenUniqueCount / Math.max(1, allPossibleAttractionsCount)) * 100);
+
+  // Conic Pie Chart Calculation
+  const totalParkTime = Math.max(1, totalParkMinutes);
+  const lineTime = Math.min(totalWaitMinutes, totalParkTime);
+  const linePercent = Math.round((lineTime / totalParkTime) * 100);
+
+  // Days of the Week Calculation
   const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   filteredVisits.forEach(v => {
     if (v.visitDate) {
@@ -167,7 +198,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   });
   const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
-  // Months Calculation for Totals Card (June -> May)
+  // Months Calculation
   const monthVisitsMap: Record<number, number> = {};
   filteredVisits.forEach(v => {
     if (v.visitDate) {
@@ -185,8 +216,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
         <div>
           {activeVisit ? (
             <>
-              {/* CURRENTLY AT CARD */}
-              <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
+              {/* CURRENTLY AT CARD CONTAINER */}
+              <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
                 <div style={{ marginBottom: '10px' }}>
                   <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
                     ✨ CURRENTLY AT
@@ -449,7 +480,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 </button>
               </div>
 
-              {/* STANDALONE LIVE WAIT TIMES WIDGET BETWEEN CURRENTLY AT AND TOTALS */}
+              {/* STANDALONE LIVE WAIT TIMES WIDGET BETWEEN CURRENTLY AT AND GROUP STATS */}
               <LiveWaitTimesWidget parkName={activeVisit.parkName} />
             </>
           ) : (
@@ -493,52 +524,99 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
             </form>
           )}
 
-          {/* TOTALS WIDGET */}
+          {/* GROUP STATS CARD */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #E2E8F0' }}>
             <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 12px 0', letterSpacing: '0.8px' }}>
-              TOTALS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+              GROUP STATS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#004487' }}>{totalDays}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>PARK VISITS</div>
+
+            {/* Group Visits Box + Park Breakdown Grid */}
+            <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '24px', fontWeight: '900', color: '#004487' }}>{totalDays}</div>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>GROUP VISITS</div>
               </div>
-              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#38A169' }}>{totalActivities}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TOTAL ACTIVITIES</div>
-              </div>
-              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#9F7AEA' }}>{formatMinutes(totalParkMinutes)}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARKS</div>
-              </div>
-              <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#ED8936' }}>{formatMinutes(totalWaitMinutes)}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+
+              {/* Connected Park Visit Counts Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', paddingTop: '10px', borderTop: '1px dashed #E2E8F0' }}>
+                {Object.entries(PARK_EMOJIS).map(([pName, emoji]) => (
+                  <div key={pName} style={{ textAlign: 'center', background: '#FFF', padding: '6px 4px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '14px' }}>{emoji}</div>
+                    <div style={{ fontSize: '12px', fontWeight: '900', color: '#004487', marginTop: '2px' }}>
+                      {parkVisitsMap[pName] || 0}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Top Activity Card with Avg Wait */}
+            {/* 2x3 Grid Stats (No Rankings) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{totalActivities}</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(totalParkMinutes)}</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(totalWaitMinutes)}</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+              </div>
+
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{avgActivitiesPerDay}</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(avgParkMinutesPerDay)}</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
+              </div>
+              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{avgWaitPerActivity}m</div>
+                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+              </div>
+            </div>
+
+            {/* Time Spent in Line vs Park Pie Chart */}
+            <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  background: `conic-gradient(#ED8936 0% ${linePercent}%, #9F7AEA ${linePercent}% 100%)`,
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
+                <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
+                  <div><span style={{ color: '#ED8936', fontWeight: '800' }}>{linePercent}%</span> waiting in lines</div>
+                  <div><span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - linePercent}%</span> not waiting in lines</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Activities Logged Progress Bar Across All Parks */}
+            <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '6px' }}>
+                <span>ACTIVITIES LOGGED</span>
+                <span style={{ color: '#004487' }}>{riddenUniqueCount} / {allPossibleAttractionsCount} ({totalUniquePercent}%)</span>
+              </div>
+              <div style={{ width: '100%', height: '10px', background: '#E2E8F0', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ width: `${totalUniquePercent}%`, height: '100%', background: 'linear-gradient(to right, #0056b3, #D4AF37)', transition: 'width 0.3s ease' }}></div>
+              </div>
+            </div>
+
+            {/* Top Activity Card */}
             <div style={{ background: '#FFFDF5', padding: '12px 15px', borderRadius: '14px', border: '1px solid #FEEBC8', borderLeft: '5px solid #D4AF37', marginBottom: '18px' }}>
               <div style={{ fontSize: '10px', fontWeight: '900', color: '#C05621', marginBottom: '3px', letterSpacing: '0.5px' }}>⭐ TOP ACTIVITY</div>
               <div style={{ fontWeight: '800', color: '#1A202C', fontSize: '15px' }}>{topActivity.name}</div>
               <div style={{ color: '#4A5568', marginTop: '3px', fontSize: '12px' }}>
                 Logged <strong>{topActivity.count}x</strong> | Avg Wait: <strong style={{ color: '#C05621' }}>{topActivity.avgWait || 0}m</strong>
-              </div>
-            </div>
-
-            <h3 style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', margin: '0 0 10px 0', letterSpacing: '0.8px' }}>AVERAGES</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '18px' }}>
-              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgActivitiesPerDay}</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Activities</div>
-              </div>
-              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{formatMinutes(avgParkMinutesPerDay)}</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Duration</div>
-              </div>
-              <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '10px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#2D3748' }}>{avgWaitPerActivity}m</div>
-                <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>Wait Time</div>
               </div>
             </div>
 
