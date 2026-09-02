@@ -587,41 +587,43 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* Park Filter Bar (2x2 Grid Style) */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
-              PARK
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {PARK_NAMES.map(park => {
-                const isSelected = selectedPark === park;
-                return (
-                  <button
-                    key={park}
-                    onClick={() => setSelectedPark(isSelected ? null : park)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '12px',
-                      borderRadius: '14px',
-                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-                      background: isSelected ? '#EBF8FF' : '#FFF',
-                      color: isSelected ? '#004487' : '#2D3748',
-                      fontSize: '13px',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                    }}
-                  >
-                    <span>{PARK_EMOJIS[park]}</span>
-                    <span>{park}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+     {/* Park Filter Bar (Single Line Enforced) */}
+<div style={{ marginBottom: '16px' }}>
+  <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+    PARK
+  </div>
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+    {PARK_NAMES.map(park => {
+      const isSelected = selectedPark === park;
+      return (
+        <button
+          key={park}
+          onClick={() => setSelectedPark(isSelected ? null : park)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '10px 6px',
+            borderRadius: '14px',
+            border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+            background: isSelected ? '#EBF8FF' : '#FFF',
+            color: isSelected ? '#004487' : '#2D3748',
+            fontSize: '11px',
+            fontWeight: '800',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+            overflow: 'hidden'
+          }}
+        >
+          <span style={{ fontSize: '14px', flexShrink: 0 }}>{PARK_EMOJIS[park]}</span>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
+        </button>
+      );
+    })}
+  </div>
+</div>
 
           {/* Rides Sortable Table Container */}
           {sortedRides.length === 0 ? (
