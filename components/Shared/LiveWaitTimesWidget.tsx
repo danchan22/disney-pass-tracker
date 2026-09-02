@@ -27,7 +27,15 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       if (data.error) throw new Error(data.error);
 
       setAttractions(data.attractions || []);
-      setLastUpdated(data.lastUpdated || '');
+
+      // Format updated time explicitly to Eastern Time (America/New_York)
+      const nowET = new Date().toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York',
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+      setLastUpdated(nowET);
     } catch (err: any) {
       setError(err.message || 'Could not load live wait times.');
     } finally {
@@ -35,7 +43,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
     }
   }, [parkName]);
 
-  // Initial fetch and 2.5-minute auto-polling loop
   useEffect(() => {
     fetchWaitTimes();
     const interval = setInterval(fetchWaitTimes, 150000);
@@ -48,11 +55,11 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#004487' }}>
-            🏰 Live {parkName} Wait Times
+            ⏱️ Live Wait Times
           </h3>
           {lastUpdated && (
             <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-              Updated: {lastUpdated} • Auto-refreshes every 2.5m
+              Updated: {lastUpdated}
             </div>
           )}
         </div>
@@ -77,7 +84,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
         </button>
       </div>
 
-      {/* Content Display */}
+      {/* Content Display without Scroll Container */}
       {error ? (
         <div style={{ fontSize: '12px', color: '#C53030', background: '#FFF5F5', padding: '10px', borderRadius: '10px', fontStyle: 'italic' }}>
           {error}
@@ -87,7 +94,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
           No live wait times available right now.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {attractions.map((att) => {
             const isOperating = att.status === 'OPERATING';
             const displayWait = isOperating && att.waitTime !== null ? `${att.waitTime}m` : att.status;
