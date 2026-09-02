@@ -1,9 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
-import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
-import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider } from '../../lib/helpers';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Visit, Activity, PhotoGridRecord, MainTab, TrackerSubTab, AnalyticsSubTab, RainbowSubTab } from '../lib/types';
+import { PARK_ATTRACTIONS } from '../lib/constants';
+import { getSupabase } from '../lib/supabase';
+import {
+  parseAttendees,
+  parseMemberEndTimes,
+  parseMemberStartTimes,
+  getPersonEndTime,
+  parseTimeToMinutes,
+  isPersonRider,
+  getRideTriviaFact,
+  getHiddenMickeyFact,
+  format12Hour,
+  encodeVisitAttendeesPayload,
+  fetchGeminiQueueHint,
+  getVisitTimestamp
+} from '../lib/helpers';
 
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
