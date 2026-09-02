@@ -30,7 +30,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       setLastUpdated(data.lastUpdated || '');
     } catch (err: any) {
       setError(err.message || 'Could not load live wait times.');
-    } finally {
+    } fontally {
       setLoading(false);
     }
   }, [parkName]);
@@ -97,7 +97,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
                 key={att.id}
                 style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '8px 10px',
                   background: '#F8FAFC',
