@@ -37,7 +37,14 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
 
       setRides(data.rides || []);
       setShows(data.shows || []);
-      setLastUpdated(data.lastUpdated || '');
+
+      const nowET = new Date().toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York',
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+      setLastUpdated(nowET);
     } catch (err: any) {
       setError(err.message || 'Could not load live wait times.');
     } finally {
@@ -148,7 +155,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
                   key={att.id}
                   style={{
                     display: 'flex',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '8px 10px',
                     background: '#F8FAFC',
