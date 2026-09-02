@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
