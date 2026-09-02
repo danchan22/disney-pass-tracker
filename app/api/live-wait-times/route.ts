@@ -9,6 +9,19 @@ const PARK_ENTITY_IDS: Record<string, string> = {
   'Animal Kingdom': '1c84a229-8862-4648-9c71-378ddd2c7693',
 };
 
+// Patterns to exclude from Shows & Events
+const EXCLUDED_SHOW_PATTERNS = [
+  'meet ',
+  'meet&greet',
+  'not-so-scary',
+  'not so scary',
+  'hocus pocus',
+  'descendance',
+  'boo-to-you',
+  'mickey\'s boo',
+  'trick-or-treat',
+];
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parkName = searchParams.get('park') || '';
@@ -50,11 +63,17 @@ export async function GET(request: Request) {
       }))
       .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-    // 2. Process Shows & Parades (Unfiltered SHOW / EVENT entities with showtimes)
+    // 2. Process Shows & Parades (Excluding Meet & Greets + Not-So-Scary Events)
     const shows = liveData
       .filter((item: any) => {
         const isShow = item.entityType === 'SHOW' || item.entityType === 'EVENT' || item.type === 'SHOW' || item.type === 'EVENT';
-        return isShow && item.showtimes && item.showtimes.length > 0;
+        if (!isShow || !item.showtimes || item.showtimes.length === 0) return false;
+
+        const nameLower = (item.name || '').toLowerCase();
+        
+        // Exclude Meet & Greets and Halloween Party items
+        const isExcluded = EXCLUDED_SHOW_PATTERNS.some(pattern => nameLower.includes(pattern));
+        return !isExcluded;
       })
       .map((item: any) => {
         const formattedTimes = (item.showtimes || []).map((st: any) => {
