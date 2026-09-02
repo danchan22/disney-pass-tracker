@@ -2,9 +2,6 @@
 
 import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
-// ... rest of AnalyticsTab.tsx code
-import React, { useState } from 'react';
-import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider } from '../../lib/helpers';
 
@@ -75,6 +72,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   // State for Table Sorting (Default: Ridden Descending)
   const [sortField, setSortField] = useState<SortField>('ridden');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Handle Park Filter Toggle with Top Scroll Fix
+  const handleParkSelect = (park: string) => {
+    setSelectedPark(prev => (prev === park ? null : park));
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -231,7 +236,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const rWaitTime = getRank(parkWaitTimeArr, stats.waitTime, false);
             const rAvgActs = getRank(parkAvgActivitiesArr, avgActivitiesVal, false);
             const rAvgVisit = getRank(parkAvgVisitArr, avgVisitVal, false);
-            const rAvgWait = getRank(parkAvgWaitArr, avgWaitVal, true); // Lowest wait = #1
+            const rAvgWait = getRank(parkAvgWaitArr, avgWaitVal, true);
 
             // Pie Chart calculations
             const totalTime = Math.max(1, stats.timeInPark);
@@ -505,7 +510,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const rAttWaitMin = getRank(attWaitMinutesArr, pWaitMinutes, false);
             const rAttAvgActs = getRank(attAvgActsArr, pAvgActsVal, false);
             const rAttAvgPark = getRank(attAvgParkArr, pAvgParkVal, false);
-            const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true); // Lowest wait = #1
+            const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true);
 
             // Personal Pie Chart Calculations
             const pTotalTime = Math.max(1, pParkMinutes);
@@ -530,7 +535,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             return (
               <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
                 
-                {/* Header: Name and Visit Count Pill (Emoji Removed) */}
+                {/* Header: Name and Visit Count Pill */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
@@ -605,7 +610,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Activities Logged Bar Charts Per Park (Clickable -> Navigates to Checklist) */}
+                {/* Activities Logged Bar Charts Per Park (Click -> Filter Checklist) */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
                     ACTIVITIES LOGGED
@@ -699,7 +704,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* Park Filter Bar (2x2 Grid Style) */}
+          {/* Park Filter Bar */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
               PARK
@@ -710,7 +715,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 return (
                   <button
                     key={park}
-                    onClick={() => setSelectedPark(isSelected ? null : park)}
+                    onClick={() => handleParkSelect(park)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
