@@ -57,7 +57,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
           Attendees
         </button>
         <button onClick={() => setAnalyticsSubTab('top10')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'top10' ? '#004487' : 'transparent', color: analyticsSubTab === 'top10' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Top 10s
+          Rides
         </button>
       </div>
     );
