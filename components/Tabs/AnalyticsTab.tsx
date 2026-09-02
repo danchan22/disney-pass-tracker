@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider } from '../../lib/helpers';
@@ -33,6 +33,10 @@ const WEEKDAYS = [
   { label: 'S', dayIndex: 0 },
 ];
 
+const PARK_FILTERS = ['ALL', 'Magic Kingdom', 'Epcot', 'Hollywood Studios', 'Animal Kingdom'];
+
+type SortField = 'park' | 'name' | 'ridden' | 'avgWait' | 'totalWait' | 'maxWait' | 'minWait' | 'walkOns';
+
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   analyticsSubTab,
   parkStats,
@@ -45,6 +49,100 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   getRideBreakdown,
   getRideCountsMap,
 }) => {
+  // State for Park Filter in Rides Tab
+  const [selectedPark, setSelectedPark] = useState<string>('ALL');
+
+  // State for Table Sorting (Default: Ridden Descending)
+  const [sortField, setSortField] = useState<SortField>('ridden');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortField(field);
+      setSortOrder('desc'); // First click sorts descending
+    }
+  };
+
+  // Build Aggregated Ride Data
+  const rideStatsMap: Record<string, {
+    name: string;
+    park: string;
+    ridden: number;
+    totalWait: number;
+    waitTimes: number[];
+    walkOns: number;
+  }> = {};
+
+  visits.forEach(v => {
+    // Filter by Selected Park
+    if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
+
+    // Filter by Selected Attendee
+    const party = parseAttendees(v.attendees);
+    if (selectedAttendee !== 'ALL' && !party.includes(selectedAttendee)) return;
+
+    v.activities.forEach(act => {
+      // Check rider filter if person is selected
+      if (selectedAttendee !== 'ALL' && !isPersonRider(act, v, selectedAttendee)) return;
+
+      const rideKey = `${v.parkName}___${act.rideName}`;
+      if (!rideStatsMap[rideKey]) {
+        rideStatsMap[rideKey] = {
+          name: act.rideName,
+          park: v.parkName,
+          ridden: 0,
+          totalWait: 0,
+          waitTimes: [],
+          walkOns: 0
+        };
+      }
+
+      const wait = act.waitTimeMinutes || 0;
+      const isWalkOn = act.isWalkOn || wait === 0 || act.notes?.includes('[Walk On]');
+
+      rideStatsMap[rideKey].ridden += 1;
+      rideStatsMap[rideKey].totalWait += wait;
+      rideStatsMap[rideKey].waitTimes.push(wait);
+      if (isWalkOn) {
+        rideStatsMap[rideKey].walkOns += 1;
+      }
+    });
+  });
+
+  const rideList = Object.values(rideStatsMap).map(r => {
+    const avgWait = r.ridden > 0 ? Math.round(r.totalWait / r.ridden) : 0;
+    const maxWait = r.waitTimes.length > 0 ? Math.max(...r.waitTimes) : 0;
+    const minWait = r.waitTimes.length > 0 ? Math.min(...r.waitTimes) : 0;
+
+    return {
+      name: r.name,
+      park: r.park,
+      ridden: r.ridden,
+      totalWait: r.totalWait,
+      avgWait,
+      maxWait,
+      minWait,
+      walkOns: r.walkOns
+    };
+  });
+
+  // Sort Ride Data
+  const sortedRides = [...rideList].sort((a, b) => {
+    const valA = a[sortField];
+    const valB = b[sortField];
+
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB);
+      return sortOrder === 'asc' ? cmp : -cmp;
+    }
+
+    const numA = valA as number;
+    const numB = valB as number;
+    return sortOrder === 'asc' ? numA - numB : numB - numA;
+  });
+
   return (
     <div>
       {/* Subtab: Parks */}
@@ -155,7 +253,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Mathematically Exact Conic Pie Chart Component with 2-Line Label */}
+                  {/* Conic Pie Chart */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div
                       style={{
@@ -351,7 +449,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* 2x3 Grid Stats matching Parks tab formatting */}
+                {/* 2x3 Grid Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
@@ -380,7 +478,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Personalized Conic Pie Chart Component */}
+                {/* Personalized Conic Pie Chart */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div
                     style={{
@@ -401,7 +499,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Favorite Ride Block with Avg Wait */}
+                {/* Favorite Ride Block */}
                 <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                     <span>⭐</span> FAVORITE RIDE
@@ -488,109 +586,184 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Top 10s */}
+      {/* Subtab: Rides (Replaced Top 10s) */}
       {analyticsSubTab === 'top10' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Most Ridden */}
-          <div>
-            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '22px' }}>🏆</span> Most Ridden Attractions
-              </h2>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {mostTimesRidden.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#EBF8FF', borderRadius: '12px', border: '1px solid #BEE3F8' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '28px', height: '28px', background: '#2B6CB0', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
-                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {PARK_EMOJIS[item.park]} <span style={{ color: '#2B6CB0' }}>{item.park}</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
-                        Avg Wait: {item.avgWait}m<br/>
-                        Total Wait: {formatMinutes(item.totalWait)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ background: '#C3DAFE', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#2B6CB0' }}>
-                    {item.count}x
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div>
+          {/* Header */}
+          <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '10px', marginBottom: '14px' }}>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '22px' }}>🎢</span> Ride Breakdown
+            </h2>
           </div>
 
-          {/* Longest Waits */}
-          <div>
-            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#C53030', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '22px' }}>⏳</span> Longest Average Waits
-              </h2>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {longestWaitTimes.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#FFF5F5', borderRadius: '12px', border: '1px solid #FED7D7' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '28px', height: '28px', background: '#C53030', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
-                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {PARK_EMOJIS[item.park]} <span style={{ color: '#C53030' }}>{item.park}</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
-                        Total Times Ridden: {item.count}x<br/>
-                        Total Wait Time: {formatMinutes(item.totalWait)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ background: '#FEB2B2', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#9B2C2C' }}>
-                    {item.avgWait}m
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Park Filter Bar (Rainbow Style) */}
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
+            {PARK_FILTERS.map(p => {
+              const isSelected = selectedPark === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setSelectedPark(p)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
+                    background: isSelected ? '#004487' : '#FFF',
+                    color: isSelected ? '#FFF' : '#4A5568',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? '0 2px 6px rgba(0,68,135,0.2)' : 'none',
+                    flexShrink: 0
+                  }}
+                >
+                  {p === 'ALL' ? '🌈 All Parks' : `${PARK_EMOJIS[p]} ${p}`}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Shortest Waits */}
-          <div>
-            <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#276749', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '22px' }}>⚡</span> Shortest Average Waits
-              </h2>
+          {/* Rides Sortable Table Container */}
+          {sortedRides.length === 0 ? (
+            <div style={{ background: '#FFF', borderRadius: '16px', padding: '30px', textAlign: 'center', color: '#718096', border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
+              No rides logged matching your filter selection.
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {shortestWaitTimes.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#F0FFF4', borderRadius: '12px', border: '1px solid #C6F6D5' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '28px', height: '28px', background: '#2F855A', color: '#FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#1A202C' }}>{item.name}</div>
-                      <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {PARK_EMOJIS[item.park]} <span style={{ color: '#276749' }}>{item.park}</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
-                        Total Times Ridden: {item.count}x<br/>
-                        Total Wait Time: {formatMinutes(item.totalWait)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ background: '#9AE6B4', padding: '6px 14px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', color: '#22543D' }}>
-                    {item.avgWait}m
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <div style={{ background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+              
+              {/* Scrollable Container with Sticky First Column */}
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#4A5568', fontSize: '11px', fontWeight: '900' }}>
+                      
+                      {/* Park Emoji Header */}
+                      <th
+                        onClick={() => handleSort('park')}
+                        style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}
+                      >
+                        Park {sortField === 'park' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
 
+                      {/* Ride Name Header (Sticky Left) */}
+                      <th
+                        onClick={() => handleSort('name')}
+                        style={{
+                          padding: '12px 12px',
+                          cursor: 'pointer',
+                          position: 'sticky',
+                          left: 0,
+                          background: '#F8FAFC',
+                          zIndex: 2,
+                          boxShadow: '2px 0 5px rgba(0,0,0,0.04)',
+                          minWidth: '150px'
+                        }}
+                      >
+                        Ride {sortField === 'name' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Ridden */}
+                      <th onClick={() => handleSort('ridden')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Ridden {sortField === 'ridden' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Avg Wait */}
+                      <th onClick={() => handleSort('avgWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Avg Wait {sortField === 'avgWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Total Wait */}
+                      <th onClick={() => handleSort('totalWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Tot Wait {sortField === 'totalWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Max Wait */}
+                      <th onClick={() => handleSort('maxWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Max {sortField === 'maxWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Min Wait */}
+                      <th onClick={() => handleSort('minWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Min {sortField === 'minWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                      {/* Walk-Ons */}
+                      <th onClick={() => handleSort('walkOns')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                        Walk-Ons {sortField === 'walkOns' && (sortOrder === 'desc' ? '▼' : '▲')}
+                      </th>
+
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRides.map((r, idx) => {
+                      const isEven = idx % 2 === 0;
+                      const rowBg = isEven ? '#FFF' : '#F8FAFC';
+
+                      return (
+                        <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
+                          {/* Park Emoji Cell */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', borderRight: '1px solid #EDF2F7', background: rowBg }}>
+                            {PARK_EMOJIS[r.park] || '🏰'}
+                          </td>
+
+                          {/* Ride Name Sticky Cell */}
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              fontWeight: '800',
+                              color: '#1A202C',
+                              position: 'sticky',
+                              left: 0,
+                              background: rowBg,
+                              zIndex: 1,
+                              boxShadow: '2px 0 5px rgba(0,0,0,0.04)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '180px'
+                            }}
+                          >
+                            {r.name}
+                          </td>
+
+                          {/* Ridden */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
+                            {r.ridden}x
+                          </td>
+
+                          {/* Avg Wait */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#2D3748', background: rowBg }}>
+                            {r.avgWait}m
+                          </td>
+
+                          {/* Tot Wait */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#ED8936', background: rowBg }}>
+                            {r.totalWait}m
+                          </td>
+
+                          {/* Max Wait */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#C53030', background: rowBg }}>
+                            {r.maxWait}m
+                          </td>
+
+                          {/* Min Wait */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#276749', background: rowBg }}>
+                            {r.minWait}m
+                          </td>
+
+                          {/* Walk-Ons */}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#D69E2E', background: rowBg }}>
+                            {r.walkOns}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
