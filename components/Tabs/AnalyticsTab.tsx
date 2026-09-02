@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Visit, AnalyticsSubTab } from '../../lib/types';
+import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider } from '../../lib/helpers';
 
@@ -14,6 +14,8 @@ interface AnalyticsTabProps {
   visits: Visit[];
   getRideBreakdown: (visitList: Visit[], personFilter: string) => any[];
   getRideCountsMap: (visitList: Visit[], personFilter: string) => Record<string, number>;
+  setSelectedAttendee?: (attendee: string) => void;
+  setMainTab?: (tab: MainTab) => void;
 }
 
 const PARK_BANNERS: Record<string, string> = {
@@ -35,6 +37,19 @@ const WEEKDAYS = [
 
 type SortField = 'park' | 'name' | 'ridden' | 'avgWait' | 'totalWait' | 'maxWait' | 'minWait' | 'walkOns';
 
+// Helper to determine rank badge color
+const getRankColor = (rank: number, total: number) => {
+  if (rank === 1) return '#D4AF37'; // Gold
+  if (rank === total) return '#E53E3E'; // Red
+  return '#A0AEC0'; // Grey
+};
+
+// Helper to calculate rank (1-indexed) in an array of numbers
+const getRank = (values: number[], targetValue: number, ascending: boolean = false): number => {
+  const sorted = [...values].sort((a, b) => (ascending ? a - b : b - a));
+  return sorted.indexOf(targetValue) + 1;
+};
+
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   analyticsSubTab,
   parkStats,
@@ -46,6 +61,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   visits,
   getRideBreakdown,
   getRideCountsMap,
+  setSelectedAttendee,
+  setMainTab,
 }) => {
   // State for Park Filter in Rides Tab (null = ALL)
   const [selectedPark, setSelectedPark] = useState<string | null>(null);
@@ -59,11 +76,62 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
     } else {
       setSortField(field);
-      setSortOrder('desc'); // First click sorts descending
+      setSortOrder('desc');
     }
   };
 
-  // Build Aggregated Ride Data
+  // --- PRE-CALCULATE PARK METRICS FOR RANKINGS ---
+  const allParkMetrics = PARK_NAMES.map(park => {
+    const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
+    const avgActivities = stats.visits > 0 ? stats.activities / stats.visits : 0;
+    const avgVisit = stats.visits > 0 ? stats.timeInPark / stats.visits : 0;
+    const avgWait = stats.activities > 0 ? stats.waitTime / stats.activities : 0;
+    return { park, activities: stats.activities, timeInPark: stats.timeInPark, waitTime: stats.waitTime, avgActivities, avgVisit, avgWait };
+  });
+
+  const parkActivitiesArr = allParkMetrics.map(p => p.activities);
+  const parkTimeInParkArr = allParkMetrics.map(p => p.timeInPark);
+  const parkWaitTimeArr = allParkMetrics.map(p => p.waitTime);
+  const parkAvgActivitiesArr = allParkMetrics.map(p => p.avgActivities);
+  const parkAvgVisitArr = allParkMetrics.map(p => p.avgVisit);
+  const parkAvgWaitArr = allParkMetrics.map(p => p.avgWait);
+
+  // --- PRE-CALCULATE ATTENDEE METRICS FOR RANKINGS ---
+  const allAttendeeMetrics = FIXED_FAMILY_MEMBERS.map(person => {
+    const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
+    const pDays = personVisits.length;
+
+    const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
+
+    const pWaitMinutes = personVisits.reduce((sum, v) => {
+      return sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
+    }, 0);
+
+    const pParkMinutes = personVisits.reduce((sum, v) => {
+      const pEndTime = getPersonEndTime(v, person);
+      if (v.startTime && pEndTime) {
+        const start = parseTimeToMinutes(v.startTime);
+        const end = parseTimeToMinutes(pEndTime);
+        return sum + (end >= start ? (end - start) : ((1440 - start) + end));
+      }
+      return sum;
+    }, 0);
+
+    const pAvgActs = pDays > 0 ? pActivities / pDays : 0;
+    const pAvgPark = pDays > 0 ? pParkMinutes / pDays : 0;
+    const pAvgWait = pActivities > 0 ? pWaitMinutes / pActivities : 0;
+
+    return { person, pActivities, pParkMinutes, pWaitMinutes, pAvgActs, pAvgPark, pAvgWait };
+  });
+
+  const attActivitiesArr = allAttendeeMetrics.map(a => a.pActivities);
+  const attParkMinutesArr = allAttendeeMetrics.map(a => a.pParkMinutes);
+  const attWaitMinutesArr = allAttendeeMetrics.map(a => a.pWaitMinutes);
+  const attAvgActsArr = allAttendeeMetrics.map(a => a.pAvgActs);
+  const attAvgParkArr = allAttendeeMetrics.map(a => a.pAvgPark);
+  const attAvgWaitArr = allAttendeeMetrics.map(a => a.pAvgWait);
+
+  // --- RIDE BREAKDOWN DATA ---
   const rideStatsMap: Record<string, {
     name: string;
     park: string;
@@ -74,15 +142,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   }> = {};
 
   visits.forEach(v => {
-    // Filter by Selected Park
     if (selectedPark && v.parkName !== selectedPark) return;
 
-    // Filter by Selected Attendee
     const party = parseAttendees(v.attendees);
     if (selectedAttendee !== 'ALL' && !party.includes(selectedAttendee)) return;
 
     v.activities.forEach(act => {
-      // Check rider filter if person is selected
       if (selectedAttendee !== 'ALL' && !isPersonRider(act, v, selectedAttendee)) return;
 
       const rideKey = `${v.parkName}___${act.rideName}`;
@@ -126,7 +191,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     };
   });
 
-  // Sort Ride Data
   const sortedRides = [...rideList].sort((a, b) => {
     const valA = a[sortField];
     const valB = b[sortField];
@@ -148,9 +212,21 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {PARK_NAMES.map((park) => {
             const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
-            const avgActivities = stats.visits > 0 ? (stats.activities / stats.visits).toFixed(1) : '0';
-            const avgVisit = stats.visits > 0 ? stats.timeInPark / stats.visits : 0;
-            const avgWait = stats.activities > 0 ? Math.round(stats.waitTime / stats.activities) : 0;
+            const avgActivitiesVal = stats.visits > 0 ? stats.activities / stats.visits : 0;
+            const avgVisitVal = stats.visits > 0 ? stats.timeInPark / stats.visits : 0;
+            const avgWaitVal = stats.activities > 0 ? stats.waitTime / stats.activities : 0;
+
+            const avgActivities = avgActivitiesVal.toFixed(1);
+            const avgVisit = avgVisitVal;
+            const avgWait = Math.round(avgWaitVal);
+
+            // Park Rankings (comparing 1-4 parks)
+            const rActs = getRank(parkActivitiesArr, stats.activities, false);
+            const rTimeInPark = getRank(parkTimeInParkArr, stats.timeInPark, false);
+            const rWaitTime = getRank(parkWaitTimeArr, stats.waitTime, false);
+            const rAvgActs = getRank(parkAvgActivitiesArr, avgActivitiesVal, false);
+            const rAvgVisit = getRank(parkAvgVisitArr, avgVisitVal, false);
+            const rAvgWait = getRank(parkAvgWaitArr, avgWaitVal, true); // Lowest wait = #1
 
             // Pie Chart calculations
             const totalTime = Math.max(1, stats.timeInPark);
@@ -193,7 +269,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               .filter(item => item.visits > 0)
               .sort((a, b) => b.visits - a.visits);
 
-            // Days of the Week Group Visits Calculation for Park
+            // Days of the Week Group Visits Calculation
             const parkDayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             parkVisits.forEach(v => {
               if (v.visitDate) {
@@ -222,32 +298,38 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </span>
                   </div>
 
-                  {/* 2x3 Grid Stats */}
+                  {/* 2x3 Grid Stats with Rankings */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{stats.activities}</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rActs, 4), marginTop: '3px' }}>#{rActs}</div>
                     </div>
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(stats.timeInPark)}</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rTimeInPark, 4), marginTop: '3px' }}>#{rTimeInPark}</div>
                     </div>
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(stats.waitTime)}</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rWaitTime, 4), marginTop: '3px' }}>#{rWaitTime}</div>
                     </div>
 
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{avgActivities}</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAvgActs, 4), marginTop: '3px' }}>#{rAvgActs}</div>
                     </div>
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(avgVisit)}</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAvgVisit, 4), marginTop: '3px' }}>#{rAvgVisit}</div>
                     </div>
-                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                    <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{avgWait}m</div>
                       <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAvgWait, 4), marginTop: '3px' }}>#{rAvgWait}</div>
                     </div>
                   </div>
 
@@ -383,17 +465,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Attendees */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '900', color: '#003366', margin: '0 0 4px 4px' }}>
-            <span style={{ fontSize: '24px' }}>👥</span> Attendee Cards
-          </h2>
-          
           {FIXED_FAMILY_MEMBERS.map(person => {
             const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
             const pDays = personVisits.length;
 
-            const pActivities = personVisits.reduce((sum, v) => {
-              return sum + v.activities.filter(a => isPersonRider(a, v, person)).length;
-            }, 0);
+            const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
 
             const pWaitMinutes = personVisits.reduce((sum, v) => {
               return sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
@@ -409,9 +485,22 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               return sum;
             }, 0);
 
-            const pAvgActs = pDays > 0 ? (pActivities / pDays).toFixed(1) : '0';
-            const pAvgPark = pDays > 0 ? pParkMinutes / pDays : 0;
-            const pAvgWait = pActivities > 0 ? Math.round(pWaitMinutes / pActivities) : 0;
+            const pAvgActsVal = pDays > 0 ? pActivities / pDays : 0;
+            const pAvgParkVal = pDays > 0 ? pParkMinutes / pDays : 0;
+            const pAvgWaitVal = pActivities > 0 ? pWaitMinutes / pActivities : 0;
+
+            const pAvgActs = pAvgActsVal.toFixed(1);
+            const pAvgPark = pAvgParkVal;
+            const pAvgWait = Math.round(pAvgWaitVal);
+
+            // Attendee Rankings (comparing 1-6 attendees)
+            const totalAtt = FIXED_FAMILY_MEMBERS.length;
+            const rAttActs = getRank(attActivitiesArr, pActivities, false);
+            const rAttParkMin = getRank(attParkMinutesArr, pParkMinutes, false);
+            const rAttWaitMin = getRank(attWaitMinutesArr, pWaitMinutes, false);
+            const rAttAvgActs = getRank(attAvgActsArr, pAvgActsVal, false);
+            const rAttAvgPark = getRank(attAvgParkArr, pAvgParkVal, false);
+            const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true); // Lowest wait = #1
 
             // Personal Pie Chart Calculations
             const pTotalTime = Math.max(1, pParkMinutes);
@@ -436,43 +525,46 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             return (
               <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
                 
-                {/* Header: Name and Visit Count Pill */}
+                {/* Header: Name and Visit Count Pill (Emoji Removed) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '24px', color: '#2B6CB0' }}>👤</span>
-                    <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
-                  </div>
+                  <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
                     {pDays} {pDays === 1 ? 'Park Visit' : 'Park Visits'}
                   </div>
                 </div>
 
-                {/* 2x3 Grid Stats */}
+                {/* 2x3 Grid Stats with Rankings (#1 Gold, #6 Red) */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttActs, totalAtt), marginTop: '3px' }}>#{rAttActs}</div>
                   </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttParkMin, totalAtt), marginTop: '3px' }}>#{rAttParkMin}</div>
                   </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttWaitMin, totalAtt), marginTop: '3px' }}>#{rAttWaitMin}</div>
                   </div>
 
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgActs}</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgActs, totalAtt), marginTop: '3px' }}>#{rAttAvgActs}</div>
                   </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(pAvgPark)}</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgPark, totalAtt), marginTop: '3px' }}>#{rAttAvgPark}</div>
                   </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgWait}m</div>
                     <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgWait, totalAtt), marginTop: '3px' }}>#{rAttAvgWait}</div>
                   </div>
                 </div>
 
@@ -508,7 +600,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Activities Logged Bar Charts Per Park */}
+                {/* Activities Logged Bar Charts Per Park (Clickable -> Navigates to Checklist) */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
                     ACTIVITIES LOGGED
@@ -522,7 +614,22 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                       const percentComplete = Math.round((riddenInPark / totalParkRides) * 100);
 
                       return (
-                        <div key={park} style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EDF2F7' }}>
+                        <div
+                          key={park}
+                          onClick={() => {
+                            if (setSelectedAttendee) setSelectedAttendee(person);
+                            if (setMainTab) setMainTab('checklist');
+                          }}
+                          style={{
+                            background: '#F8FAFC',
+                            padding: '12px 14px',
+                            borderRadius: '14px',
+                            border: '1px solid #EDF2F7',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={`Click to view ${person}'s checklist`}
+                        >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {PARK_EMOJIS[park]} {park}
@@ -587,43 +694,43 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-     {/* Park Filter Bar (Single Line Enforced) */}
-<div style={{ marginBottom: '16px' }}>
-  <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
-    PARK
-  </div>
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-    {PARK_NAMES.map(park => {
-      const isSelected = selectedPark === park;
-      return (
-        <button
-          key={park}
-          onClick={() => setSelectedPark(isSelected ? null : park)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '10px 6px',
-            borderRadius: '14px',
-            border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: isSelected ? '#EBF8FF' : '#FFF',
-            color: isSelected ? '#004487' : '#2D3748',
-            fontSize: '11px',
-            fontWeight: '800',
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-            overflow: 'hidden'
-          }}
-        >
-          <span style={{ fontSize: '14px', flexShrink: 0 }}>{PARK_EMOJIS[park]}</span>
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
-        </button>
-      );
-    })}
-  </div>
-</div>
+          {/* Park Filter Bar (2x2 Grid Style) */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+              PARK
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {PARK_NAMES.map(park => {
+                const isSelected = selectedPark === park;
+                return (
+                  <button
+                    key={park}
+                    onClick={() => setSelectedPark(isSelected ? null : park)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px 6px',
+                      borderRadius: '14px',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#EBF8FF' : '#FFF',
+                      color: isSelected ? '#004487' : '#2D3748',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', flexShrink: 0 }}>{PARK_EMOJIS[park]}</span>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Rides Sortable Table Container */}
           {sortedRides.length === 0 ? (
@@ -633,13 +740,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
           ) : (
             <div style={{ background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
               
-              {/* Scrollable Container with Sticky First Column */}
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#4A5568', fontSize: '11px', fontWeight: '900' }}>
                       
-                      {/* Park Emoji Header */}
                       <th
                         onClick={() => handleSort('park')}
                         style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}
@@ -647,7 +752,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         Park {sortField === 'park' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Ride Name Header (Sticky Left) */}
                       <th
                         onClick={() => handleSort('name')}
                         style={{
@@ -664,32 +768,26 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         Ride {sortField === 'name' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Ridden */}
                       <th onClick={() => handleSort('ridden')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Ridden {sortField === 'ridden' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Avg Wait */}
                       <th onClick={() => handleSort('avgWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Avg Wait {sortField === 'avgWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Total Wait */}
                       <th onClick={() => handleSort('totalWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Tot Wait {sortField === 'totalWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Max Wait */}
                       <th onClick={() => handleSort('maxWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Max {sortField === 'maxWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Min Wait */}
                       <th onClick={() => handleSort('minWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Min {sortField === 'minWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
 
-                      {/* Walk-Ons */}
                       <th onClick={() => handleSort('walkOns')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Walk-Ons {sortField === 'walkOns' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
@@ -703,12 +801,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
                       return (
                         <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
-                          {/* Park Emoji Cell */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', borderRight: '1px solid #EDF2F7', background: rowBg }}>
                             {PARK_EMOJIS[r.park] || '🏰'}
                           </td>
 
-                          {/* Ride Name Sticky Cell */}
                           <td
                             style={{
                               padding: '10px 12px',
@@ -728,32 +824,26 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                             {r.name}
                           </td>
 
-                          {/* Ridden (Clean Count without 'x') */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
                             {r.ridden}
                           </td>
 
-                          {/* Avg Wait */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#2D3748', background: rowBg }}>
                             {r.avgWait}m
                           </td>
 
-                          {/* Tot Wait */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#ED8936', background: rowBg }}>
                             {r.totalWait}m
                           </td>
 
-                          {/* Max Wait */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#C53030', background: rowBg }}>
                             {r.maxWait}m
                           </td>
 
-                          {/* Min Wait */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#276749', background: rowBg }}>
                             {r.minWait}m
                           </td>
 
-                          {/* Walk-Ons */}
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#D69E2E', background: rowBg }}>
                             {r.walkOns}
                           </td>
