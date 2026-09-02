@@ -530,25 +530,67 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               GROUP STATS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
             </h3>
 
-            {/* Group Visits Box + Park Breakdown Grid */}
-            <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '24px', fontWeight: '900', color: '#004487' }}>{totalDays}</div>
-                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>GROUP VISITS</div>
-              </div>
+        {/* Group Visits Box + Side-by-Side Park Breakdown Grid */}
+<div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+  
+  {/* Left: Total Count + Stacked Label */}
+  <div style={{ flexShrink: 0 }}>
+    <div style={{ fontSize: '28px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+      {totalDays}
+    </div>
+    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '6px', lineHeight: '1.2' }}>
+      GROUP<br />VISITS
+    </div>
+  </div>
 
-              {/* Connected Park Visit Counts Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', paddingTop: '10px', borderTop: '1px dashed #E2E8F0' }}>
-                {Object.entries(PARK_EMOJIS).map(([pName, emoji]) => (
-                  <div key={pName} style={{ textAlign: 'center', background: '#FFF', padding: '6px 4px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '14px' }}>{emoji}</div>
-                    <div style={{ fontSize: '12px', fontWeight: '900', color: '#004487', marginTop: '2px' }}>
-                      {parkVisitsMap[pName] || 0}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+  {/* Vertical Dotted Divider Line */}
+  <div style={{ width: '1px', alignSelf: 'stretch', borderLeft: '2px dotted #CBD5E0' }} />
+
+  {/* Right: 2x2 Park Breakdown Grid (Numbers above Names, No Emojis) */}
+  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
+    
+    {/* Magic Kingdom */}
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+        {parkVisitsMap['Magic Kingdom'] || 0}
+      </div>
+      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
+        Magic Kingdom
+      </div>
+    </div>
+
+    {/* Epcot */}
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+        {parkVisitsMap['Epcot'] || 0}
+      </div>
+      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
+        Epcot
+      </div>
+    </div>
+
+    {/* Hollywood Studios */}
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+        {parkVisitsMap['Hollywood Studios'] || 0}
+      </div>
+      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
+        Hollywood Studios
+      </div>
+    </div>
+
+    {/* Animal Kingdom */}
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+        {parkVisitsMap['Animal Kingdom'] || 0}
+      </div>
+      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
+        Animal Kingdom
+      </div>
+    </div>
+
+  </div>
+</div>
 
             {/* 2x3 Grid Stats (No Rankings) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
