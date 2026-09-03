@@ -9,8 +9,12 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
   return (
     <>
-      <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#004487', letterSpacing: '-0.5px', margin: '0' }}>🏰 Disney Pass Tracker</h1>
+      <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <img
+          src="/Logo-WDW.webp"
+          alt="Disney Pass Tracker"
+          style={{ height: '38px', width: 'auto', objectFit: 'contain' }}
+        />
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '6px', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
