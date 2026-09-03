@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
-import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
+import { PARK_NAMES, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate, format12Hour } from '../../lib/helpers';
+import { ParkIcon } from '../Shared/ParkIcon';
 
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
@@ -50,7 +51,6 @@ const getRank = (values: number[], targetValue: number, ascending: boolean = fal
   return sorted.indexOf(targetValue) + 1;
 };
 
-// Calculate visit duration in minutes
 const getVisitDuration = (v: Visit, personFilter: string): number => {
   const pEndTime = personFilter === 'ALL' ? v.endTime : getPersonEndTime(v, personFilter);
   if (v.startTime && pEndTime) {
@@ -189,7 +189,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     const party = parseAttendees(v.attendees);
     const validActs = selectedAttendee === 'ALL' ? v.activities : v.activities.filter(a => isPersonRider(a, v, selectedAttendee));
     
-    // Split day calculation
     const endTimes = v.memberEndTimes || {};
     const fullDayMembers: string[] = [];
     const earlyMembers: string[] = [];
@@ -297,8 +296,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
                 <div style={{ padding: '18px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #EDF2F7', paddingBottom: '10px' }}>
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>
-                      {PARK_EMOJIS[park]} {park}
+                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ParkIcon parkName={park} size={22} />
+                      <span>{park}</span>
                     </h3>
                     <span style={{ fontSize: '12px', fontWeight: '800', color: '#718096', background: '#F8FAFC', padding: '4px 10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
                       {stats.visits} {stats.visits === 1 ? 'Group Visit' : 'Group Visits'}
@@ -579,7 +579,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              {PARK_EMOJIS[park]} {park}
+                              <ParkIcon parkName={park} size={16} />
+                              <span>{park}</span>
                             </span>
                             <span style={{ color: '#004487', fontWeight: '900' }}>
                               {riddenInPark} / {totalParkRides} ({percentComplete}%)
@@ -661,7 +662,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                       overflow: 'hidden'
                     }}
                   >
-                    <span style={{ fontSize: '14px', flexShrink: 0 }}>{PARK_EMOJIS[park]}</span>
+                    <ParkIcon parkName={park} size={16} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
                   </button>
                 );
@@ -710,8 +711,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                       const rowBg = idx % 2 === 0 ? '#FFF' : '#F8FAFC';
                       return (
                         <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', borderRight: '1px solid #EDF2F7', background: rowBg }}>
-                            {PARK_EMOJIS[r.park] || '🏰'}
+                          <td style={{ padding: '10px 8px', textAlign: 'center', borderRight: '1px solid #EDF2F7', background: rowBg }}>
+                            <ParkIcon parkName={r.park} size={20} />
                           </td>
                           <td style={{ padding: '10px 12px', fontWeight: '800', color: '#1A202C', position: 'sticky', left: 0, background: rowBg, zIndex: 1, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
                             {r.name}
@@ -772,7 +773,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Top Header Banner */}
                       <div
                         style={{
                           background: isTop ? '#FEFCBF' : '#EBF8FF',
@@ -787,25 +787,21 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         {formatMinutes(v.duration)}
                       </div>
 
-                      {/* Card Content Area */}
                       <div style={{ padding: '12px 14px' }}>
-                        {/* Line 1: Attendees */}
                         <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
                           {v.party.join(', ')}
                         </div>
 
-                        {/* Line 2: Park */}
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ParkIcon parkName={v.parkName} size={16} />
+                          <span>{v.parkName}</span>
                         </div>
 
-                        {/* Line 3: Date & Time Side-by-Side */}
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           <span>📅 {formatDisplayDate(v.visitDate)}</span>
                           <span>⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}</span>
                         </div>
 
-                        {/* Line 4: Split Day Line */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
                           <div style={{ fontSize: '11px', color: '#DD6B20', fontWeight: '700', marginTop: '6px' }}>
                             ⚡ Split Day: {v.fullDayMembers.join(', ')} stayed full day
@@ -842,7 +838,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Top Header Banner */}
                       <div
                         style={{
                           background: isTop ? '#FEFCBF' : '#F0FFF4',
@@ -857,25 +852,21 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         {formatMinutes(v.duration)}
                       </div>
 
-                      {/* Card Content Area */}
                       <div style={{ padding: '12px 14px' }}>
-                        {/* Line 1: Attendees */}
                         <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
                           {v.party.join(', ')}
                         </div>
 
-                        {/* Line 2: Park */}
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ParkIcon parkName={v.parkName} size={16} />
+                          <span>{v.parkName}</span>
                         </div>
 
-                        {/* Line 3: Date & Time Side-by-Side */}
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           <span>📅 {formatDisplayDate(v.visitDate)}</span>
                           <span>⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}</span>
                         </div>
 
-                        {/* Line 4: Split Day Line */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
                           <div style={{ fontSize: '11px', color: '#DD6B20', fontWeight: '700', marginTop: '6px' }}>
                             ⚡ Split Day: {v.fullDayMembers.join(', ')} stayed full day
@@ -912,7 +903,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Top Header Banner */}
                       <div
                         style={{
                           background: isTop ? '#FEFCBF' : '#EBF8FF',
@@ -927,32 +917,27 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         {v.rideCount} {v.rideCount === 1 ? 'ride' : 'rides'}
                       </div>
 
-                      {/* Card Content Area */}
                       <div style={{ padding: '12px 14px' }}>
-                        {/* Line 1: Attendees */}
                         <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
                           {v.party.join(', ')}
                         </div>
 
-                        {/* Line 2: Park */}
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#004487', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ParkIcon parkName={v.parkName} size={16} />
+                          <span>{v.parkName}</span>
                         </div>
 
-                        {/* Line 3: Date & Time Side-by-Side */}
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                           <span>📅 {formatDisplayDate(v.visitDate)}</span>
                           <span>⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}</span>
                         </div>
 
-                        {/* Line 4: Split Day Line */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
                           <div style={{ fontSize: '11px', color: '#DD6B20', fontWeight: '700', marginTop: '6px' }}>
                             ⚡ Split Day: {v.fullDayMembers.join(', ')} stayed full day
                           </div>
                         )}
 
-                        {/* Clean Rides List (No Carousel Horse Emoji) */}
                         {v.ridesListStr && (
                           <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #E2E8F0', fontSize: '11px', color: '#4A5568', fontWeight: '600', lineHeight: '1.5' }}>
                             {v.ridesListStr}
