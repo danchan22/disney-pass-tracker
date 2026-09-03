@@ -78,56 +78,39 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ rideCountsMap, visit
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* PARK FILTER BUTTONS */}
-      <div style={{ background: '#FFF', borderRadius: '18px', padding: '12px', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-        <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginBottom: '8px', letterSpacing: '0.5px' }}>
-          PARK FILTER
+      {/* 2x2 PARK FILTER GRID */}
+      <div style={{ marginBottom: '4px' }}>
+        <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+          PARK
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
-          <button
-            type="button"
-            onClick={() => setSelectedPark('ALL')}
-            style={{
-              padding: '8px 2px',
-              borderRadius: '10px',
-              border: selectedPark === 'ALL' ? '2px solid #004487' : '1px solid #E2E8F0',
-              background: selectedPark === 'ALL' ? '#004487' : '#F8FAFC',
-              color: selectedPark === 'ALL' ? '#FFF' : '#4A5568',
-              fontSize: '11px',
-              fontWeight: '800',
-              cursor: 'pointer',
-              textAlign: 'center'
-            }}
-          >
-            All
-          </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           {PARK_NAMES.map(park => {
             const isSel = selectedPark === park;
             return (
               <button
                 key={park}
                 type="button"
-                onClick={() => setSelectedPark(park)}
+                onClick={() => setSelectedPark(prev => prev === park ? 'ALL' : park)}
                 style={{
-                  padding: '6px 2px',
-                  borderRadius: '10px',
-                  border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
-                  background: isSel ? '#EBF8FF' : '#FFF',
-                  color: isSel ? '#004487' : '#4A5568',
-                  fontSize: '10px',
-                  fontWeight: '800',
-                  cursor: 'pointer',
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '2px'
+                  gap: '8px',
+                  padding: '10px 8px',
+                  borderRadius: '14px',
+                  border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
+                  background: isSel ? '#EBF8FF' : '#FFF',
+                  color: isSel ? '#004487' : '#2D3748',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                  overflow: 'hidden',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <ParkIcon parkName={park} size={14} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-                  {park.replace('Kingdom', 'Kgdm').replace('Hollywood', 'HW')}
-                </span>
+                <ParkIcon parkName={park} size={18} />
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
               </button>
             );
           })}
