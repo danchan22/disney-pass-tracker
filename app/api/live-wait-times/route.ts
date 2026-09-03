@@ -22,6 +22,16 @@ const EXCLUDED_SHOW_PATTERNS = [
   'trick-or-treat',
 ];
 
+// Helper to normalize strings (strips curly quotes, trademarks, and non-alphanumeric chars)
+function cleanString(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[’'"]/g, '') // Remove all types of apostrophes
+    .replace(/&/g, 'and')  // Normalize & to and
+    .replace(/[^a-z0-9\s]/g, '') // Remove ™, ®, hyphen, punctuation
+    .trim();
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parkName = searchParams.get('park') || '';
@@ -44,16 +54,22 @@ export async function GET(request: Request) {
     const data = await res.json();
     const liveData = data.liveData || [];
 
-    // Valid attraction list for current park
-    const knownAttractions = (PARK_ATTRACTIONS[parkName] || []).map(a => a.toLowerCase().trim());
+    // Valid attraction list for current park (Normalized)
+    const rawKnownAttractions = PARK_ATTRACTIONS[parkName] || [];
+    const cleanedKnownAttractions = rawKnownAttractions.map(a => cleanString(a));
 
-    // 1. Process Rides (Filtered against PARK_ATTRACTIONS)
+    // 1. Process Rides (Filtered with normalized cleanString)
     const rides = liveData
       .filter((item: any) => {
-        const isAttraction = item.entityType === 'ATTRACTION' || item.type === 'ATTRACTION';
+        const isAttraction = item.entityType === 'ATTRACTION' || item.type === 'ATTRACTION' || item.queue?.STANDBY !== undefined;
         if (!isAttraction) return false;
-        const nameLower = (item.name || '').toLowerCase().trim();
-        return knownAttractions.some(known => nameLower.includes(known) || known.includes(nameLower));
+
+        const cleanedName = cleanString(item.name || '');
+
+        // Match normalized string
+        return cleanedKnownAttractions.some(known => 
+          cleanedName.includes(known) || known.includes(cleanedName)
+        );
       })
       .map((item: any) => ({
         id: item.id,
@@ -63,7 +79,7 @@ export async function GET(request: Request) {
       }))
       .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-    // 2. Process Shows & Parades (Excluding Meet & Greets + Not-So-Scary Events)
+    // 2. Process Shows & Parades
     const shows = liveData
       .filter((item: any) => {
         const isShow = item.entityType === 'SHOW' || item.entityType === 'EVENT' || item.type === 'SHOW' || item.type === 'EVENT';
