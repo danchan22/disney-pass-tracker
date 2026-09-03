@@ -242,7 +242,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   });
   const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
-const monthVisitsMap: Record<number, number> = {};
+  const monthVisitsMap: Record<number, number> = {};
   filteredVisits.forEach(v => {
     if (v.visitDate) {
       const [y, m] = v.visitDate.split('-').map(Number);
