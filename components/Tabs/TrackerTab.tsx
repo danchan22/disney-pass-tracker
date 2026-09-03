@@ -73,6 +73,35 @@ interface TrackerTabProps {
   deleteVisit: (id: string) => void;
 }
 
+// Coaster Song Playlists
+const COASTER_SONGS: Record<string, string[]> = {
+  'Guardians of the Galaxy: Cosmic Rewind': [
+    '"September" by Earth, Wind & Fire',
+    '"Disco Inferno" by The Trammps',
+    '"Everybody Wants to Rule the World" by Tears for Fears',
+    '"I Ran (So Far Away)" by A Flock of Seagulls',
+    '"One Way or Another" by Blondie',
+    '"Conga" by Gloria Estefan',
+  ],
+  'Rock \'n\' Roller Coaster Starring Aerosmith': [
+    '"Song 2"',
+    '"Born To Be Wild"',
+    '"Love Rollercoaster"',
+    '"Rock! Rock! (Till You Drop)"',
+    '"Walking on Sunshine"',
+  ],
+};
+
+const getCoasterSongs = (ride: string): string[] | null => {
+  if (!ride) return null;
+  for (const [key, songs] of Object.entries(COASTER_SONGS)) {
+    if (ride.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(ride.toLowerCase())) {
+      return songs;
+    }
+  }
+  return null;
+};
+
 const WEEKDAYS = [
   { label: 'M', dayIndex: 1 },
   { label: 'T', dayIndex: 2 },
@@ -159,7 +188,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
 }) => {
   const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
 
-  // Group Visits Breakdown Per Park
+  const activeCoasterSongs = getCoasterSongs(rideName);
+
   const parkVisitsMap: Record<string, number> = {
     'Magic Kingdom': 0,
     'Epcot': 0,
@@ -172,7 +202,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
     }
   });
 
-  // Unique Activities Logged Across All Parks
   const allPossibleAttractionsCount = Object.values(PARK_ATTRACTIONS).reduce((sum, list) => sum + list.length, 0);
   const uniqueRidesRidden = new Set<string>();
   filteredVisits.forEach(v => {
@@ -185,12 +214,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   const riddenUniqueCount = uniqueRidesRidden.size;
   const totalUniquePercent = Math.round((riddenUniqueCount / Math.max(1, allPossibleAttractionsCount)) * 100);
 
-  // Conic Pie Chart Calculation
   const totalParkTime = Math.max(1, totalParkMinutes);
   const lineTime = Math.min(totalWaitMinutes, totalParkTime);
   const linePercent = Math.round((lineTime / totalParkTime) * 100);
 
-  // Days of the Week Calculation
   const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   filteredVisits.forEach(v => {
     if (v.visitDate) {
@@ -201,7 +228,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   });
   const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
-  // Months Calculation
   const monthVisitsMap: Record<number, number> = {};
   filteredVisits.forEach(v => {
     if (v.visitDate) {
@@ -236,7 +262,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
                 </div>
 
-                {/* ACTIVE PARTY & ADD SOMEONE BUTTON */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div style={{ fontSize: '14px', color: '#F7FAFC' }}>
                     👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
@@ -244,17 +269,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddPersonModal(true)}
-                    style={{
-                      background: '#D4AF37',
-                      color: '#003366',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      fontSize: '12px',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      flexShrink: 0
-                    }}
+                    style={{ background: '#D4AF37', color: '#003366', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
                   >
                     Add Someone
                   </button>
@@ -349,7 +364,21 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                           )}
                         </div>
 
-                        {/* TIMER BUTTONS INCLUDING WALK ON */}
+                        {/* POSSIBLE SONGS CARD (Guardians & Rock 'n' Roller Coaster) */}
+                        {activeCoasterSongs && (
+                          <div style={{ background: '#F3E8FF', border: '1px solid #E9D5FF', padding: '10px 12px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
+                            <div style={{ fontWeight: '800', color: '#6B21A8', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              🎵 Possible Songs:
+                            </div>
+                            <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', lineHeight: '1.5' }}>
+                              {activeCoasterSongs.map(song => (
+                                <li key={song}>{song}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* TIMER BUTTONS */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 2fr', gap: '6px', marginTop: '12px' }}>
                           <button type="button" onClick={handleCancelQueueTimer} style={{ padding: '10px 4px', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>
                             Cancel
@@ -388,6 +417,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                     )}
                   </div>
 
+                  {/* TODAY'S LOG LIST */}
                   {activeVisit.activities.length > 0 && (
                     <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                       <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
@@ -395,6 +425,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                         {activeVisit.activities.map((act) => {
                           const isEditingThis = editingActivityId === act.id && editingVisitId === null;
                           const actRidersList = parseAttendees(act.riders);
+                          const editCoasterSongs = getCoasterSongs(editRideName);
 
                           return isEditingThis ? (
                             <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
@@ -412,6 +443,35 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </optgroup>
                               </select>
 
+                              {/* SONG SELECTOR FOR COASTERS */}
+                              {editCoasterSongs && (
+                                <div style={{ marginBottom: '8px', background: '#F3E8FF', padding: '8px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#6B21A8', display: 'block', marginBottom: '4px' }}>
+                                    🎵 WHICH SONG DID YOU GET?
+                                  </label>
+                                  <select
+                                    value={editCoasterSongs.find(s => editNotes.includes(s)) || ''}
+                                    onChange={(e) => {
+                                      const chosen = e.target.value;
+                                      let cleanNotes = editNotes;
+                                      editCoasterSongs.forEach(s => {
+                                        cleanNotes = cleanNotes.replace(`🎵 Song: ${s}`, '').replace(`🎵 ${s}`, '').replace(s, '').trim();
+                                      });
+                                      if (chosen) {
+                                        cleanNotes = cleanNotes ? `${cleanNotes} • 🎵 ${chosen}` : `🎵 ${chosen}`;
+                                      }
+                                      setEditNotes(cleanNotes);
+                                    }}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #D8B4FE', fontSize: '12px', background: '#FFF', color: '#581C87', fontWeight: '700' }}
+                                  >
+                                    <option value="">-- Select Song --</option>
+                                    {editCoasterSongs.map(song => (
+                                      <option key={song} value={song}>{song}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
                               <div style={{ marginBottom: '6px' }}>
                                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -426,9 +486,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               </div>
                               
+                              {/* FIX FOR WALK ON BUTTON OVERFLOW */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -437,7 +498,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                         setEditNotes(`${editNotes} [Walk On]`.trim());
                                       }
                                     }}
-                                    style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
+                                    style={{ padding: '8px 10px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
                                   >
                                     ⚡ Walk On
                                   </button>
@@ -478,13 +539,11 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   )}
                 </div>
 
-                {/* LEAVE THE PARK BUTTON */}
                 <button onClick={() => { setDepartingMembers(activePartyList); setShowCheckoutModal(true); }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(to right, #E53E3E, #C53030)', color: '#FFF', border: 'none', borderRadius: '14px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
                   Leave the Park & Save Day
                 </button>
               </div>
 
-              {/* STANDALONE LIVE WAIT TIMES WIDGET BETWEEN CURRENTLY AT AND GROUP STATS */}
               <LiveWaitTimesWidget parkName={activeVisit.parkName} />
             </>
           ) : (
@@ -537,7 +596,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
             {/* Group Visits Box + Side-by-Side Park Breakdown Grid */}
             <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
               
-              {/* Left: Total Count + Stacked Label */}
               <div style={{ flexShrink: 0 }}>
                 <div style={{ fontSize: '28px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
                   {totalDays}
@@ -547,10 +605,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                 </div>
               </div>
 
-              {/* Vertical Dotted Divider Line */}
               <div style={{ width: '1px', alignSelf: 'stretch', borderLeft: '2px dotted #CBD5E0' }} />
 
-              {/* Right: 2x2 Park Breakdown Grid (Numbers above Names with Icons) */}
               <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
                 {['Magic Kingdom', 'Epcot', 'Hollywood Studios', 'Animal Kingdom'].map((p) => (
                   <div key={p}>
@@ -566,7 +622,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               </div>
             </div>
 
-            {/* 2x3 Grid Stats (No Rankings) */}
+            {/* 2x3 Grid Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
               <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                 <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{totalActivities}</div>
@@ -595,7 +651,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               </div>
             </div>
 
-            {/* Time Spent in Line vs Park Pie Chart */}
+            {/* Time Spent Pie Chart */}
             <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div
                 style={{
@@ -616,7 +672,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               </div>
             </div>
 
-            {/* Activities Logged Progress Bar Across All Parks */}
+            {/* Activities Logged Progress Bar */}
             <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '6px' }}>
                 <span>ACTIVITIES LOGGED</span>
@@ -743,6 +799,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                         {v.activities.map((a) => {
                           const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
                           const actRidersList = parseAttendees(a.riders);
+                          const editCoasterSongsHistory = getCoasterSongs(editRideName);
 
                           return isEditingThis ? (
                             <div key={a.id} style={{ background: '#FFF', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
@@ -760,6 +817,35 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </optgroup>
                               </select>
 
+                              {/* SONG SELECTOR FOR COASTERS (HISTORY) */}
+                              {editCoasterSongsHistory && (
+                                <div style={{ marginBottom: '8px', background: '#F3E8FF', padding: '8px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#6B21A8', display: 'block', marginBottom: '4px' }}>
+                                    🎵 WHICH SONG DID YOU GET?
+                                  </label>
+                                  <select
+                                    value={editCoasterSongsHistory.find(s => editNotes.includes(s)) || ''}
+                                    onChange={(e) => {
+                                      const chosen = e.target.value;
+                                      let cleanNotes = editNotes;
+                                      editCoasterSongsHistory.forEach(s => {
+                                        cleanNotes = cleanNotes.replace(`🎵 Song: ${s}`, '').replace(`🎵 ${s}`, '').replace(s, '').trim();
+                                      });
+                                      if (chosen) {
+                                        cleanNotes = cleanNotes ? `${cleanNotes} • 🎵 ${chosen}` : `🎵 ${chosen}`;
+                                      }
+                                      setEditNotes(cleanNotes);
+                                    }}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #D8B4FE', fontSize: '12px', background: '#FFF', color: '#581C87', fontWeight: '700' }}
+                                  >
+                                    <option value="">-- Select Song --</option>
+                                    {editCoasterSongsHistory.map(song => (
+                                      <option key={song} value={song}>{song}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
                               <div style={{ marginBottom: '6px' }}>
                                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -774,9 +860,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               </div>
                               
+                              {/* FIX FOR WALK ON BUTTON OVERFLOW (HISTORY) */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -785,7 +872,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                         setEditNotes(`${editNotes} [Walk On]`.trim());
                                       }
                                     }}
-                                    style={{ padding: '8px 12px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
+                                    style={{ padding: '8px 10px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
                                   >
                                     ⚡ Walk On
                                   </button>
