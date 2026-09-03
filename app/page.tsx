@@ -106,18 +106,6 @@ export default function DisneyTracker() {
   }, [activeVisit?.id, activeVisit?.parkName]);
 
   useEffect(() => {
-    const savedStart = localStorage.getItem('disney_queue_start_ts');
-    const savedStr = localStorage.getItem('disney_queue_start_str');
-    const savedRide = localStorage.getItem('disney_queue_ride_name');
-
-    if (savedStart && savedStr) {
-      setQueueStartTimestamp(Number(savedStart));
-      setQueueStartTimeStr(savedStr);
-      if (savedRide) setRideName(savedRide);
-    }
-  }, []);
-
-  useEffect(() => {
     if (queueStartTimestamp && activeVisit && rideName && !rideTrivia) {
       fetchRideTrivia(rideName, activeVisit.parkName);
       fetchHiddenMickey(rideName, activeVisit.parkName);
@@ -136,6 +124,34 @@ export default function DisneyTracker() {
     fetchCloudVisits();
     fetchPhotoGrids();
   }, []);
+
+  // Network Recovery Sync Listener: Pushes pending local timer to cloud when cell service returns
+  useEffect(() => {
+    const syncPendingLocalTimerToCloud = async () => {
+      const savedTs = localStorage.getItem('disney_queue_start_ts');
+      const savedStr = localStorage.getItem('disney_queue_start_str');
+      const savedRide = localStorage.getItem('disney_queue_ride_name');
+
+      if (savedTs && activeVisit) {
+        try {
+          const supabase = await getSupabase();
+          await supabase
+            .from('visits')
+            .update({
+              queue_start_ts: Number(savedTs),
+              queue_start_str: savedStr,
+              queue_ride_name: savedRide,
+            })
+            .eq('id', activeVisit.id);
+        } catch (err) {
+          console.warn("Cloud sync retry failed:", err);
+        }
+      }
+    };
+
+    window.addEventListener('online', syncPendingLocalTimerToCloud);
+    return () => window.removeEventListener('online', syncPendingLocalTimerToCloud);
+  }, [activeVisit?.id]);
 
   const clearQueueTimerStorage = () => {
     localStorage.removeItem('disney_queue_start_ts');
@@ -164,6 +180,9 @@ export default function DisneyTracker() {
           memberEndTimes: parseMemberEndTimes(v.memberEndTimes || v.member_end_times || v.attendees, v.notes),
           memberStartTimes: parseMemberStartTimes(v.memberStartTimes || v.member_start_times || v.attendees, v.notes),
           notes: v.notes,
+          queue_start_ts: v.queue_start_ts,
+          queue_start_str: v.queue_start_str,
+          queue_ride_name: v.queue_ride_name,
           activities: (v.activities || []).map((a: any) => ({
             id: a.id,
             visit_id: a.visit_id,
@@ -180,8 +199,26 @@ export default function DisneyTracker() {
           return tsB - tsA;
         });
 
-        setActiveVisit(formattedVisits.find(v => !v.endTime) || null);
+        const active = formattedVisits.find(v => !v.endTime) || null;
+        setActiveVisit(active);
         setVisits(formattedVisits.filter(v => v.endTime));
+
+        // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud
+        const localStart = localStorage.getItem('disney_queue_start_ts');
+        const localStr = localStorage.getItem('disney_queue_start_str');
+        const localRide = localStorage.getItem('disney_queue_ride_name');
+
+        if (localStart && localStr) {
+          setQueueStartTimestamp(Number(localStart));
+          setQueueStartTimeStr(localStr);
+          if (localRide) setRideName(localRide);
+        } else if (active && (active as any).queue_start_ts) {
+          setQueueStartTimestamp(Number((active as any).queue_start_ts));
+          setQueueStartTimeStr((active as any).queue_start_str || null);
+          if ((active as any).queue_ride_name) {
+            setRideName((active as any).queue_ride_name);
+          }
+        }
       }
     } catch (err: any) {
       setErrorMessage("Could not load cloud visits. " + (err.message || ''));
@@ -442,30 +479,58 @@ export default function DisneyTracker() {
     setMickeyLoading(false);
   };
 
-  const handleStartQueueTimer = () => {
+  const handleStartQueueTimer = async () => {
+    if (!activeVisit) return;
+
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
     const ts = now.getTime();
 
-    setQueueStartTimestamp(ts);
-    setQueueStartTimeStr(timeString);
-
+    // Local Write (100% offline safe)
     localStorage.setItem('disney_queue_start_ts', ts.toString());
     localStorage.setItem('disney_queue_start_str', timeString);
     localStorage.setItem('disney_queue_ride_name', rideName);
 
-    if (activeVisit) {
-      fetchRideTrivia(rideName, activeVisit.parkName);
-      fetchHiddenMickey(rideName, activeVisit.parkName);
+    setQueueStartTimestamp(ts);
+    setQueueStartTimeStr(timeString);
+
+    // Best-effort Background Push to Cloud
+    try {
+      const supabase = await getSupabase();
+      await supabase
+        .from('visits')
+        .update({
+          queue_start_ts: ts,
+          queue_start_str: timeString,
+          queue_ride_name: rideName,
+        })
+        .eq('id', activeVisit.id);
+    } catch (err) {
+      console.warn("Dead zone detected: Timer saved locally, will sync when online.", err);
     }
+
+    fetchRideTrivia(rideName, activeVisit.parkName);
+    fetchHiddenMickey(rideName, activeVisit.parkName);
   };
 
-  const handleCancelQueueTimer = () => {
+  const handleCancelQueueTimer = async () => {
     clearQueueTimerStorage();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setRideTrivia(null);
     setHiddenMickey(null);
+
+    if (activeVisit) {
+      try {
+        const supabase = await getSupabase();
+        await supabase
+          .from('visits')
+          .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
+          .eq('id', activeVisit.id);
+      } catch (err) {
+        console.warn("Could not clear cloud timer:", err);
+      }
+    }
   };
 
   const handleEndQueueTimer = async (isWalkOn = false) => {
@@ -494,6 +559,13 @@ export default function DisneyTracker() {
       setWaitTime('');
       setRideTrivia(null);
       setHiddenMickey(null);
+
+      // Clear Cloud Timer
+      await supabase
+        .from('visits')
+        .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
+        .eq('id', activeVisit.id);
+
     } catch (err: any) {
       alert("Error logging timer activity: " + (err.message || err));
     } finally {
@@ -745,7 +817,7 @@ export default function DisneyTracker() {
       )}
 
       {mainTab === 'analytics' && (
-<AnalyticsTab
+        <AnalyticsTab
           analyticsSubTab={analyticsSubTab}
           parkStats={parkStats}
           mostTimesRidden={mostTimesRidden}
