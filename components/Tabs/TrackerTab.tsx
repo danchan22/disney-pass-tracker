@@ -1,10 +1,13 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
-import { FIXED_FAMILY_MEMBERS, PARK_EMOJIS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
+import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
 import { ParkingSubtab } from './ParkingSubtab';
 import { AddPersonModal } from '../Modals/AddPersonModal';
 import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimesWidget';
+import { ParkIcon } from '../Shared/ParkIcon';
 
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
@@ -224,8 +227,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   </span>
                 </div>
 
-                <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%' }}>
-                  {PARK_EMOJIS[activeVisit.parkName] || ''} {activeVisit.parkName}
+                <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ParkIcon parkName={activeVisit.parkName} size={28} />
+                  <span>{activeVisit.parkName}</span>
                 </h2>
 
                 <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '12px', fontWeight: '600' }}>
@@ -490,10 +494,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>SELECT PARK</label>
                 <select value={parkName} onChange={(e) => setParkName(e.target.value as any)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E0', background: '#F8FAFC', fontSize: '16px', fontWeight: '700', color: '#004487' }}>
-                  <option value="Magic Kingdom">🏰 Magic Kingdom</option>
-                  <option value="Epcot">🪩 Epcot</option>
-                  <option value="Hollywood Studios">🎥 Hollywood Studios</option>
-                  <option value="Animal Kingdom">🌳 Animal Kingdom</option>
+                  <option value="Magic Kingdom">Magic Kingdom</option>
+                  <option value="Epcot">Epcot</option>
+                  <option value="Hollywood Studios">Hollywood Studios</option>
+                  <option value="Animal Kingdom">Animal Kingdom</option>
                 </select>
               </div>
 
@@ -530,67 +534,37 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               GROUP STATS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
             </h3>
 
-        {/* Group Visits Box + Side-by-Side Park Breakdown Grid */}
-<div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-  
-  {/* Left: Total Count + Stacked Label */}
-  <div style={{ flexShrink: 0 }}>
-    <div style={{ fontSize: '28px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
-      {totalDays}
-    </div>
-    <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '6px', lineHeight: '1.2' }}>
-      GROUP<br />VISITS
-    </div>
-  </div>
+            {/* Group Visits Box + Side-by-Side Park Breakdown Grid */}
+            <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              
+              {/* Left: Total Count + Stacked Label */}
+              <div style={{ flexShrink: 0 }}>
+                <div style={{ fontSize: '28px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
+                  {totalDays}
+                </div>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: '#718096', marginTop: '6px', lineHeight: '1.2' }}>
+                  GROUP<br />VISITS
+                </div>
+              </div>
 
-  {/* Vertical Dotted Divider Line */}
-  <div style={{ width: '1px', alignSelf: 'stretch', borderLeft: '2px dotted #CBD5E0' }} />
+              {/* Vertical Dotted Divider Line */}
+              <div style={{ width: '1px', alignSelf: 'stretch', borderLeft: '2px dotted #CBD5E0' }} />
 
-  {/* Right: 2x2 Park Breakdown Grid (Numbers above Names, No Emojis) */}
-  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
-    
-    {/* Magic Kingdom */}
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
-        {parkVisitsMap['Magic Kingdom'] || 0}
-      </div>
-      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
-        Magic Kingdom
-      </div>
-    </div>
-
-    {/* Epcot */}
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
-        {parkVisitsMap['Epcot'] || 0}
-      </div>
-      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
-        Epcot
-      </div>
-    </div>
-
-    {/* Hollywood Studios */}
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
-        {parkVisitsMap['Hollywood Studios'] || 0}
-      </div>
-      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
-        Hollywood Studios
-      </div>
-    </div>
-
-    {/* Animal Kingdom */}
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1' }}>
-        {parkVisitsMap['Animal Kingdom'] || 0}
-      </div>
-      <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
-        Animal Kingdom
-      </div>
-    </div>
-
-  </div>
-</div>
+              {/* Right: 2x2 Park Breakdown Grid (Numbers above Names with Icons) */}
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
+                {['Magic Kingdom', 'Epcot', 'Hollywood Studios', 'Animal Kingdom'].map((p) => (
+                  <div key={p}>
+                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#004487', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <ParkIcon parkName={p} size={14} />
+                      <span>{parkVisitsMap[p] || 0}</span>
+                    </div>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '3px', lineHeight: '1.1' }}>
+                      {p}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* 2x3 Grid Stats (No Rankings) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
@@ -751,8 +725,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
               return (
                 <div key={v.id} style={{ border: '1px solid #E2E8F0', borderRadius: '20px', padding: '16px', marginBottom: '12px', background: '#FFF' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EDF2F7', paddingBottom: '8px', marginBottom: '10px' }}>
-                    <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800' }}>
-                      {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                    <strong style={{ color: '#004487', fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ParkIcon parkName={v.parkName} size={18} />
+                      <span>{v.parkName}</span>
                     </strong>
                     <span style={{ fontSize: '13px', color: '#718096', fontWeight: '600' }}>📅 {formatDisplayDate(v.visitDate)}</span>
                   </div>
