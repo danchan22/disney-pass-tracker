@@ -43,5 +43,5 @@ export interface ParkingLog {
 
 export type MainTab = 'tracker' | 'analytics' | 'checklist' | 'rainbow';
 export type TrackerSubTab = 'Today' | 'History' | 'Parking';
-export type AnalyticsSubTab = 'averages' | 'top10' | 'cards';
+export type AnalyticsSubTab = 'averages' | 'cards' | 'top10' | 'visits';
 export type RainbowSubTab = 'stream' | 'badges';
