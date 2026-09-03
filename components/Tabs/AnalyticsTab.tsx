@@ -188,7 +188,28 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     const duration = getVisitDuration(v, selectedAttendee);
     const party = parseAttendees(v.attendees);
     const validActs = selectedAttendee === 'ALL' ? v.activities : v.activities.filter(a => isPersonRider(a, v, selectedAttendee));
-    return { ...v, duration, party, rideCount: validActs.length };
+    
+    // Split day calculation
+    const endTimes = v.memberEndTimes || {};
+    const fullDayMembers: string[] = [];
+    const earlyMembers: string[] = [];
+    party.forEach(m => {
+      const mEnd = endTimes[m] || v.endTime;
+      if (mEnd === v.endTime) fullDayMembers.push(m);
+      else earlyMembers.push(m);
+    });
+
+    const hasEarlyDepartures = earlyMembers.length > 0 && fullDayMembers.length > 0;
+
+    return { 
+      ...v, 
+      duration, 
+      party, 
+      rideCount: validActs.length,
+      hasEarlyDepartures,
+      fullDayMembers,
+      earlyMembers
+    };
   });
 
   const longestDays = [...mappedVisits].sort((a, b) => b.duration - a.duration).slice(0, 10);
@@ -728,38 +749,83 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
           
           {/* LONGEST DAYS */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
-              ⏱️ LONGEST DAYS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
-            </div>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⏱️</span> Longest Days {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </h3>
             {longestDays.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {longestDays.map((v, idx) => {
-                  const isTop = idx === 0;
+                  const rank = idx + 1;
+                  const isTop = rank === 1;
+
                   return (
                     <div
                       key={v.id}
                       style={{
                         background: isTop ? '#FFFDF5' : '#F8FAFC',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        padding: '12px 14px',
+                        borderRadius: '16px',
+                        border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '12px'
+                        gap: '12px',
+                        boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
-                          👥 {v.party.join(', ')}
-                        </div>
+                      {/* Rank Circle */}
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: isTop ? '#D4AF37' : '#CBD5E0',
+                          color: '#FFF',
+                          fontWeight: '900',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        {rank}
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#9F7AEA', flexShrink: 0 }}>
+
+                      {/* Content */}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        {/* Line 1: Attendees */}
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {v.party.join(', ')}
+                        </div>
+
+                        {/* Line 2: Park & Date */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        </div>
+
+                        {/* Split Day Note */}
+                        {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
+                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
+                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right Callout Badge */}
+                      <div
+                        style={{
+                          background: isTop ? '#FEFCBF' : '#EBF8FF',
+                          color: isTop ? '#744210' : '#2B6CB0',
+                          border: isTop ? '1px solid #F6E05E' : '1px solid #BEE3F8',
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          flexShrink: 0
+                        }}
+                      >
                         {formatMinutes(v.duration)}
                       </div>
                     </div>
@@ -771,38 +837,83 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
           {/* SHORTEST DAYS */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
-              ⚡ SHORTEST DAYS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
-            </div>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⚡</span> Shortest Days {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </h3>
             {shortestDays.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {shortestDays.map((v, idx) => {
-                  const isTop = idx === 0;
+                  const rank = idx + 1;
+                  const isTop = rank === 1;
+
                   return (
                     <div
                       key={v.id}
                       style={{
                         background: isTop ? '#FFFDF5' : '#F8FAFC',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        padding: '12px 14px',
+                        borderRadius: '16px',
+                        border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '12px'
+                        gap: '12px',
+                        boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
-                          👥 {v.party.join(', ')}
-                        </div>
+                      {/* Rank Circle */}
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: isTop ? '#D4AF37' : '#CBD5E0',
+                          color: '#FFF',
+                          fontWeight: '900',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        {rank}
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169', flexShrink: 0 }}>
+
+                      {/* Content */}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        {/* Line 1: Attendees */}
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {v.party.join(', ')}
+                        </div>
+
+                        {/* Line 2: Park & Date */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        </div>
+
+                        {/* Split Day Note */}
+                        {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
+                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
+                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right Callout Badge */}
+                      <div
+                        style={{
+                          background: isTop ? '#FEFCBF' : '#F0FFF4',
+                          color: isTop ? '#744210' : '#276749',
+                          border: isTop ? '1px solid #F6E05E' : '1px solid #C6F6D5',
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          flexShrink: 0
+                        }}
+                      >
                         {formatMinutes(v.duration)}
                       </div>
                     </div>
@@ -814,38 +925,76 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
           {/* BUSIEST DAYS */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
-              🎢 BUSIEST DAYS (MOST RIDES LOGGED) {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
-            </div>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🎢</span> Busiest Days (Most Rides Logged) {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </h3>
             {busiestDays.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {busiestDays.map((v, idx) => {
-                  const isTop = idx === 0;
+                  const rank = idx + 1;
+                  const isTop = rank === 1;
+
                   return (
                     <div
                       key={v.id}
                       style={{
                         background: isTop ? '#FFFDF5' : '#F8FAFC',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        padding: '12px 14px',
+                        borderRadius: '16px',
+                        border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '12px'
+                        gap: '12px',
+                        boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
+                      {/* Rank Circle */}
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: isTop ? '#D4AF37' : '#CBD5E0',
+                          color: '#FFF',
+                          fontWeight: '900',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        {rank}
+                      </div>
+
+                      {/* Content */}
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
+                        {/* Line 1: Attendees */}
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {v.party.join(', ')}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
-                          👥 {v.party.join(', ')}
+
+                        {/* Line 2: Park & Date */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
                         </div>
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#004487', flexShrink: 0 }}>
+
+                      {/* Right Callout Badge */}
+                      <div
+                        style={{
+                          background: isTop ? '#FEFCBF' : '#EBF8FF',
+                          color: isTop ? '#744210' : '#2B6CB0',
+                          border: isTop ? '1px solid #F6E05E' : '1px solid #BEE3F8',
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          flexShrink: 0
+                        }}
+                      >
                         {v.rideCount} {v.rideCount === 1 ? 'ride' : 'rides'}
                       </div>
                     </div>
