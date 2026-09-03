@@ -252,8 +252,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   });
   const maxMonthVisits = Math.max(1, ...Object.values(monthVisitsMap));
 return(
-<div>
-{trackerSubTab === 'Today' && (
+return (
+    <>
+      {/* Subtab: Today */}
+      {trackerSubTab === 'Today' && (
         <div>
           {activeVisit ? (
             <>
