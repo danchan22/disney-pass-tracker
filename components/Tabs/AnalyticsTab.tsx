@@ -759,8 +759,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {longestDays.map((v, idx) => {
-                  const rank = idx + 1;
-                  const isTop = rank === 1;
+                  const isTop = idx === 0;
 
                   return (
                     <div
@@ -771,51 +770,38 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         borderRadius: '16px',
                         border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
                         gap: '12px',
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Rank Circle */}
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: isTop ? '#D4AF37' : '#CBD5E0',
-                          color: '#FFF',
-                          fontWeight: '900',
-                          fontSize: '13px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        {rank}
-                      </div>
-
-                      {/* Content */}
+                      {/* Content Area */}
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        {/* Line 1: Attendees */}
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {/* Line 1: Attendees (Spills naturally without ellipsis) */}
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
                           {v.party.join(', ')}
                         </div>
 
-                        {/* Line 2: Park & Date */}
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        {/* Line 2: Park */}
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#004487', marginTop: '4px' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
                         </div>
 
-                        {/* Line 3: Start & End Time */}
+                        {/* Line 3: Date */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                          📅 {formatDisplayDate(v.visitDate)}
+                        </div>
+
+                        {/* Line 4: Start & End Time */}
                         <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '2px' }}>
                           ⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}
                         </div>
 
-                        {/* Split Day Note */}
+                        {/* Simplified Split Day Note */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
-                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
-                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
+                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '3px' }}>
+                            ⚡ {v.fullDayMembers.join(', ')} stayed full day
                           </div>
                         )}
                       </div>
@@ -852,8 +838,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {shortestDays.map((v, idx) => {
-                  const rank = idx + 1;
-                  const isTop = rank === 1;
+                  const isTop = idx === 0;
 
                   return (
                     <div
@@ -864,51 +849,38 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         borderRadius: '16px',
                         border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
                         gap: '12px',
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Rank Circle */}
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: isTop ? '#D4AF37' : '#CBD5E0',
-                          color: '#FFF',
-                          fontWeight: '900',
-                          fontSize: '13px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        {rank}
-                      </div>
-
-                      {/* Content */}
+                      {/* Content Area */}
                       <div style={{ minWidth: 0, flex: 1 }}>
                         {/* Line 1: Attendees */}
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
                           {v.party.join(', ')}
                         </div>
 
-                        {/* Line 2: Park & Date */}
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        {/* Line 2: Park */}
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#004487', marginTop: '4px' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
                         </div>
 
-                        {/* Line 3: Start & End Time */}
+                        {/* Line 3: Date */}
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                          📅 {formatDisplayDate(v.visitDate)}
+                        </div>
+
+                        {/* Line 4: Start & End Time */}
                         <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '2px' }}>
                           ⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}
                         </div>
 
-                        {/* Split Day Note */}
+                        {/* Simplified Split Day Note */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
-                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
-                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
+                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '3px' }}>
+                            ⚡ {v.fullDayMembers.join(', ')} stayed full day
                           </div>
                         )}
                       </div>
@@ -945,8 +917,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {busiestDays.map((v, idx) => {
-                  const rank = idx + 1;
-                  const isTop = rank === 1;
+                  const isTop = idx === 0;
 
                   return (
                     <div
@@ -956,73 +927,58 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         padding: '12px 14px',
                         borderRadius: '16px',
                         border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
                         boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
                       }}
                     >
-                      {/* Rank Circle */}
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: isTop ? '#D4AF37' : '#CBD5E0',
-                          color: '#FFF',
-                          fontWeight: '900',
-                          fontSize: '13px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        {rank}
-                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                        {/* Header Content Area */}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          {/* Line 1: Attendees */}
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', lineHeight: '1.4' }}>
+                            {v.party.join(', ')}
+                          </div>
 
-                      {/* Content */}
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        {/* Line 1: Attendees */}
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {v.party.join(', ')}
+                          {/* Line 2: Park */}
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#004487', marginTop: '4px' }}>
+                            {PARK_EMOJIS[v.parkName] || ''} {v.parkName}
+                          </div>
+
+                          {/* Line 3: Date */}
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
+                            📅 {formatDisplayDate(v.visitDate)}
+                          </div>
+
+                          {/* Simplified Split Day Note */}
+                          {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
+                            <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '3px' }}>
+                              ⚡ {v.fullDayMembers.join(', ')} stayed full day
+                            </div>
+                          )}
                         </div>
 
-                        {/* Line 2: Park & Date */}
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
-                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        {/* Right Callout Badge */}
+                        <div
+                          style={{
+                            background: isTop ? '#FEFCBF' : '#EBF8FF',
+                            color: isTop ? '#744210' : '#2B6CB0',
+                            border: isTop ? '1px solid #F6E05E' : '1px solid #BEE3F8',
+                            padding: '6px 10px',
+                            borderRadius: '10px',
+                            fontSize: '12px',
+                            fontWeight: '900',
+                            flexShrink: 0
+                          }}
+                        >
+                          {v.rideCount} {v.rideCount === 1 ? 'ride' : 'rides'}
                         </div>
-
-                        {/* Line 3: Rides List Separated by Bullets */}
-                        {v.ridesListStr && (
-                          <div style={{ fontSize: '10px', color: '#4A5568', fontWeight: '600', marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            🎠 {v.ridesListStr}
-                          </div>
-                        )}
-
-                        {/* Split Day Note */}
-                        {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
-                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
-                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
-                          </div>
-                        )}
                       </div>
 
-                      {/* Right Callout Badge */}
-                      <div
-                        style={{
-                          background: isTop ? '#FEFCBF' : '#EBF8FF',
-                          color: isTop ? '#744210' : '#2B6CB0',
-                          border: isTop ? '1px solid #F6E05E' : '1px solid #BEE3F8',
-                          padding: '6px 10px',
-                          borderRadius: '10px',
-                          fontSize: '12px',
-                          fontWeight: '900',
-                          flexShrink: 0
-                        }}
-                      >
-                        {v.rideCount} {v.rideCount === 1 ? 'ride' : 'rides'}
-                      </div>
+                      {/* Expanded Rides List Below Card Header (Wraps Naturally) */}
+                      {v.ridesListStr && (
+                        <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #E2E8F0', fontSize: '11px', color: '#4A5568', fontWeight: '600', lineHeight: '1.5' }}>
+                          🎠 {v.ridesListStr}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
