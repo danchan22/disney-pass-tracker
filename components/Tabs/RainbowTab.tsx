@@ -1,10 +1,13 @@
+'use client';
+
 import React, { useState, useMemo } from 'react';
 import { PhotoGridRecord, RainbowSubTab } from '../../lib/types';
-import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARK_EMOJIS, RAINBOW_COLORS } from '../../lib/constants';
+import { FIXED_FAMILY_MEMBERS, PARK_NAMES, RAINBOW_COLORS } from '../../lib/constants';
 import { getSupabase } from '../../lib/supabase';
 import { compressImageToWebP } from '../../lib/helpers';
 import { UploadPhotoModal } from '../Modals/UploadPhotoModal';
 import { LightboxModal } from '../Modals/LightboxModal';
+import { ParkIcon } from '../Shared/ParkIcon';
 
 interface RainbowTabProps {
   rainbowSubTab: RainbowSubTab;
@@ -190,10 +193,15 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
                         border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
                         background: isSel ? '#004487' : '#FFF',
                         color: isSel ? '#FFF' : '#4A5568',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
                       }}
                     >
-                      {PARK_EMOJIS[p]} {p}
+                      <ParkIcon parkName={p} size={16} />
+                      <span>{p}</span>
                     </button>
                   );
                 })}
@@ -249,8 +257,9 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
                   <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7' }}>
                     <div>
                       <div style={{ fontWeight: '900', fontSize: '15px', color: '#1A202C' }}>{photo.user_name}</div>
-                      <div style={{ fontSize: '12px', color: '#718096', marginTop: '2px' }}>
-                        {PARK_EMOJIS[photo.park_name]} {photo.park_name}
+                      <div style={{ fontSize: '12px', color: '#718096', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <ParkIcon parkName={photo.park_name} size={14} />
+                        <span>{photo.park_name}</span>
                       </div>
                     </div>
                     <span style={{ padding: '4px 12px', borderRadius: '12px', fontWeight: '800', fontSize: '12px', background: colorConfig.hex, color: photo.color === 'White' ? '#1A202C' : '#FFF', border: photo.color === 'White' ? '1px solid #CBD5E0' : 'none' }}>
@@ -295,7 +304,10 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
             return (
               <div key={pName} style={{ background: '#FFF', borderRadius: '20px', padding: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontWeight: '900', fontSize: '16px', color: '#004487' }}>{PARK_EMOJIS[pName]} {pName}</span>
+                  <span style={{ fontWeight: '900', fontSize: '16px', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ParkIcon parkName={pName} size={20} />
+                    <span>{pName}</span>
+                  </span>
                   <span style={{ fontSize: '12px', fontWeight: '800', color: '#D4AF37', background: '#FFFDF5', padding: '3px 10px', borderRadius: '10px', border: '1px solid #FEEBC8' }}>
                     {completedCount}/{RAINBOW_COLORS.length} completed
                   </span>
