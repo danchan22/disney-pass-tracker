@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
@@ -71,6 +71,7 @@ interface TrackerTabProps {
   loading: boolean;
   openEditVisit: (v: Visit) => void;
   deleteVisit: (id: string) => void;
+  handleReorderActivity: (visitId: string | null, activityId: string, direction: 'up' | 'down') => void;
 }
 
 // Coaster Song Playlists
@@ -92,10 +93,16 @@ const COASTER_SONGS: Record<string, string[]> = {
   ],
 };
 
+const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const getCoasterSongs = (ride: string): string[] | null => {
   if (!ride) return null;
+  const cleanedRide = cleanStr(ride);
+  if (!cleanedRide) return null;
+
   for (const [key, songs] of Object.entries(COASTER_SONGS)) {
-    if (ride.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(ride.toLowerCase())) {
+    const cleanedKey = cleanStr(key);
+    if (cleanedRide.includes(cleanedKey) || cleanedKey.includes(cleanedRide)) {
       return songs;
     }
   }
@@ -185,8 +192,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   loading,
   openEditVisit,
   deleteVisit,
+  handleReorderActivity,
 }) => {
-  const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
+  const [showAddPersonModal, setShowAddPersonModal] = React.useState<boolean>(false);
 
   const activeCoasterSongs = getCoasterSongs(rideName);
 
@@ -422,7 +430,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                     <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
                       <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {activeVisit.activities.map((act) => {
+                        {activeVisit.activities.map((act, idx) => {
                           const isEditingThis = editingActivityId === act.id && editingVisitId === null;
                           const actRidersList = parseAttendees(act.riders);
                           const editCoasterSongs = getCoasterSongs(editRideName);
@@ -486,7 +494,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               </div>
                               
-                              {/* FIX FOR WALK ON BUTTON OVERFLOW */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
                                   <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
@@ -513,7 +520,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
+                            <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                                 <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{act.rideName}</div>
                                 <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
@@ -528,9 +535,25 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                   👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
                                 </div>
                               </div>
-                              <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
-                                Edit
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => handleReorderActivity(null, act.id, 'up')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Up"
+                                  >▲</button>
+                                  <button
+                                    disabled={idx === activeVisit.activities.length - 1}
+                                    onClick={() => handleReorderActivity(null, act.id, 'down')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === activeVisit.activities.length - 1 ? 'default' : 'pointer', opacity: idx === activeVisit.activities.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Down"
+                                  >▼</button>
+                                </div>
+                                <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
+                                  Edit
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -796,7 +819,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   {v.activities.length > 0 && (
                     <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px', border: '1px solid #EDF2F7' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {v.activities.map((a) => {
+                        {v.activities.map((a, idx) => {
                           const isEditingThis = editingActivityId === a.id && editingVisitId === v.id;
                           const actRidersList = parseAttendees(a.riders);
                           const editCoasterSongsHistory = getCoasterSongs(editRideName);
@@ -860,7 +883,6 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               </div>
                               
-                              {/* FIX FOR WALK ON BUTTON OVERFLOW (HISTORY) */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
                                   <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
@@ -887,7 +909,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
                               <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                                 <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{a.rideName}</div>
                                 <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
@@ -902,9 +924,25 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                   👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
                                 </div>
                               </div>
-                              <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px', flexShrink: 0 }}>
-                                Edit
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => handleReorderActivity(v.id, a.id, 'up')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Up"
+                                  >▲</button>
+                                  <button
+                                    disabled={idx === v.activities.length - 1}
+                                    onClick={() => handleReorderActivity(v.id, a.id, 'down')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === v.activities.length - 1 ? 'default' : 'pointer', opacity: idx === v.activities.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Down"
+                                  >▼</button>
+                                </div>
+                                <button onClick={() => startEditing(a, v.id)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
+                                  Edit
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
