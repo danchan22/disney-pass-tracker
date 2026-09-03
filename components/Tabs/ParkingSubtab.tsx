@@ -1,8 +1,11 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { ParkingLog } from '../../lib/types';
-import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARK_EMOJIS, PARKING_OPTIONS, ParkingSpotDetail } from '../../lib/constants';
+import { FIXED_FAMILY_MEMBERS, PARK_NAMES, PARKING_OPTIONS, ParkingSpotDetail } from '../../lib/constants';
 import { getSupabase } from '../../lib/supabase';
 import { get6AMCutoffISO } from '../../lib/helpers';
+import { ParkIcon } from '../Shared/ParkIcon';
 
 export const ParkingSubtab: React.FC = () => {
   const [parkingAttendees, setParkingAttendees] = useState<string[]>([]);
@@ -154,7 +157,7 @@ export const ParkingSubtab: React.FC = () => {
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setSelectedPark(p)}
+                  onClick={() => setSelectedPark(p as any)}
                   style={{
                     padding: '8px',
                     borderRadius: '10px',
@@ -164,9 +167,14 @@ export const ParkingSubtab: React.FC = () => {
                     fontSize: '12px',
                     fontWeight: '800',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}
                 >
-                  {PARK_EMOJIS[p]} {p}
+                  <ParkIcon parkName={p} size={16} variant={isSelected ? 'line' : 'color'} />
+                  <span>{p}</span>
                 </button>
               );
             })}
