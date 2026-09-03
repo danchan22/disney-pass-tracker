@@ -183,7 +183,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     return sortOrder === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
   });
 
-  // --- VISITS TAB CALCULATIONS ---
+  // VISITS TAB CALCULATIONS
   const mappedVisits = filteredVisits.map(v => {
     const duration = getVisitDuration(v, selectedAttendee);
     const party = parseAttendees(v.attendees);
@@ -257,7 +257,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               .filter(item => item.visits > 0)
               .sort((a, b) => b.visits - a.visits);
 
-            // Days of the Week Visits Calculation (Filtered by Attendee)
             const parkDayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             parkVisits.forEach(v => {
               if (v.visitDate) {
@@ -382,7 +381,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   )}
 
-                  {/* Days of Week Vertical Chart (Attendee-Filtered) */}
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
                       DAYS OF THE WEEK {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
@@ -419,7 +417,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: People (formerly Attendees) */}
+      {/* Subtab: People */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {FIXED_FAMILY_MEMBERS.map(person => {
@@ -724,7 +722,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Visits (New Subtab with Leaderboards) */}
+      {/* Subtab: Visits */}
       {analyticsSubTab === ('visits' as AnalyticsSubTab) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
@@ -748,7 +746,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         borderRadius: '12px',
                         border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         gap: '12px'
                       }}
@@ -791,7 +789,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         borderRadius: '12px',
                         border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         gap: '12px'
                       }}
@@ -834,7 +832,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         borderRadius: '12px',
                         border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         gap: '12px'
                       }}
