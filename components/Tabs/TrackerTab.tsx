@@ -260,7 +260,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
         <div>
           {activeVisit ? (
             <>
-              {/* CURRENTLY AT CARD CONTAINER */}
+{/* CURRENTLY AT CARD CONTAINER */}
 <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
   
   {/* PARK BANNER HEADER (Edge-to-Edge) */}
