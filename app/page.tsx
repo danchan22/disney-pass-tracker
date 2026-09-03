@@ -183,14 +183,20 @@ export default function DisneyTracker() {
           queue_start_ts: v.queue_start_ts,
           queue_start_str: v.queue_start_str,
           queue_ride_name: v.queue_ride_name,
-          activities: (v.activities || []).map((a: any) => ({
-            id: a.id,
-            visit_id: a.visit_id,
-            rideName: a.rideName || a.ridename,
-            waitTimeMinutes: Number(a.waitTimeMinutes || a.waittimeminutes || 0),
-            notes: a.notes,
-            riders: a.riders ? parseAttendees(a.riders) : parseAttendees(v.attendees)
-          }))
+          activities: (v.activities || [])
+            .sort((a: any, b: any) => {
+              const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return timeA - timeB;
+            })
+            .map((a: any) => ({
+              id: a.id,
+              visit_id: a.visit_id,
+              rideName: a.rideName || a.ridename,
+              waitTimeMinutes: Number(a.waitTimeMinutes || a.waittimeminutes || 0),
+              notes: a.notes,
+              riders: a.riders ? parseAttendees(a.riders) : parseAttendees(v.attendees)
+            }))
         }));
 
         formattedVisits.sort((a, b) => {
@@ -713,6 +719,45 @@ export default function DisneyTracker() {
     setEditingVisitId(null);
   };
 
+  const handleReorderActivity = async (visitId: string | null, activityId: string, direction: 'up' | 'down') => {
+    const targetVisit = visitId === null ? activeVisit : visits.find(v => v.id === visitId);
+    if (!targetVisit) return;
+
+    const acts = [...targetVisit.activities];
+    const idx = acts.findIndex(a => a.id === activityId);
+    if (idx === -1) return;
+
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= acts.length) return;
+
+    // Swap in array
+    const temp = acts[idx];
+    acts[idx] = acts[swapIdx];
+    acts[swapIdx] = temp;
+
+    // Update local state immediately
+    if (visitId === null && activeVisit) {
+      setActiveVisit({ ...activeVisit, activities: acts });
+    } else {
+      setVisits(prev => prev.map(v => v.id === visitId ? { ...v, activities: acts } : v));
+    }
+
+    // Persist ordered timestamps to Supabase
+    try {
+      const supabase = await getSupabase();
+      const baseTime = new Date((targetVisit.visitDate || '2026-01-01') + 'T12:00:00Z').getTime();
+      for (let i = 0; i < acts.length; i++) {
+        const newCreatedAt = new Date(baseTime + i * 1000).toISOString();
+        await supabase
+          .from('activities')
+          .update({ created_at: newCreatedAt })
+          .eq('id', acts[i].id);
+      }
+    } catch (err) {
+      console.warn("Could not save activity reorder to cloud:", err);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '520px', margin: '0 auto', padding: '15px 15px 30px 15px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1A202C', background: '#FAFAFA', minHeight: '100vh' }}>
 
@@ -813,6 +858,7 @@ export default function DisneyTracker() {
           loading={loading}
           openEditVisit={openEditVisit}
           deleteVisit={deleteVisit}
+          handleReorderActivity={handleReorderActivity}
         />
       )}
 
