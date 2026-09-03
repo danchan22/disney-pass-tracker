@@ -47,7 +47,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
     );
   }
 
-  if (mainTab === 'analytics') {
+if (mainTab === 'analytics') {
     return (
       <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '10px' }}>
         <button onClick={() => setAnalyticsSubTab('averages')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'averages' ? '#004487' : 'transparent', color: analyticsSubTab === 'averages' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
@@ -58,6 +58,9 @@ export const Subheader: React.FC<SubheaderProps> = ({
         </button>
         <button onClick={() => setAnalyticsSubTab('top10')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'top10' ? '#004487' : 'transparent', color: analyticsSubTab === 'top10' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
           Rides
+        </button>
+        <button onClick={() => setAnalyticsSubTab('visits' as any)} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === ('visits' as any) ? '#004487' : 'transparent', color: analyticsSubTab === ('visits' as any) ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
+          Visits
         </button>
       </div>
     );
