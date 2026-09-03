@@ -879,7 +879,7 @@ export default function DisneyTracker() {
         />
       )}
 
-      {mainTab === 'checklist' && <ChecklistTab rideCountsMap={rideCountsMap} />}
+      {mainTab === 'checklist' && <ChecklistTab rideCountsMap={rideCountsMap} visits={visits} />}
 
       {mainTab === 'rainbow' && (
         <RainbowTab
