@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Visit, Activity, TrackerSubTab } from '../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES } from '../../lib/constants';
 import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '../../lib/helpers';
@@ -81,7 +81,6 @@ const PARK_BANNERS: Record<string, string> = {
   'Animal Kingdom': '/park-animal-kingdom.png'
 };
 
-// Coaster Song Playlists
 const COASTER_SONGS: Record<string, string[]> = {
   'Guardians of the Galaxy: Cosmic Rewind': [
     '"September" by Earth, Wind & Fire',
@@ -201,7 +200,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   deleteVisit,
   handleReorderActivity,
 }) => {
-  const [showAddPersonModal, setShowAddPersonModal] = React.useState<boolean>(false);
+  const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
 
   const activeCoasterSongs = getCoasterSongs(rideName);
 
