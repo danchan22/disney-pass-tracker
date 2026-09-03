@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
-import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider } from '../../lib/helpers';
+import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate } from '../../lib/helpers';
 
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
@@ -39,17 +39,26 @@ const WEEKDAYS = [
 
 type SortField = 'park' | 'name' | 'ridden' | 'avgWait' | 'totalWait' | 'maxWait' | 'minWait' | 'walkOns';
 
-// Helper to determine rank badge color
 const getRankColor = (rank: number, total: number) => {
-  if (rank === 1) return '#D4AF37'; // Gold
-  if (rank === total) return '#E53E3E'; // Red
-  return '#A0AEC0'; // Grey
+  if (rank === 1) return '#D4AF37';
+  if (rank === total) return '#E53E3E';
+  return '#A0AEC0';
 };
 
-// Helper to calculate rank (1-indexed) in an array of numbers
 const getRank = (values: number[], targetValue: number, ascending: boolean = false): number => {
   const sorted = [...values].sort((a, b) => (ascending ? a - b : b - a));
   return sorted.indexOf(targetValue) + 1;
+};
+
+// Calculate visit duration in minutes
+const getVisitDuration = (v: Visit, personFilter: string): number => {
+  const pEndTime = personFilter === 'ALL' ? v.endTime : getPersonEndTime(v, personFilter);
+  if (v.startTime && pEndTime) {
+    const start = parseTimeToMinutes(v.startTime);
+    const end = parseTimeToMinutes(pEndTime);
+    return end >= start ? (end - start) : ((1440 - start) + end);
+  }
+  return 0;
 };
 
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
@@ -66,14 +75,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   setSelectedAttendee,
   setMainTab,
 }) => {
-  // State for Park Filter in Rides Tab (null = ALL)
   const [selectedPark, setSelectedPark] = useState<string | null>(null);
-
-  // State for Table Sorting (Default: Ridden Descending)
   const [sortField, setSortField] = useState<SortField>('ridden');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Handle Park Filter Toggle with Top Scroll Fix
   const handleParkSelect = (park: string) => {
     setSelectedPark(prev => (prev === park ? null : park));
     if (typeof window !== 'undefined') {
@@ -90,7 +95,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     }
   };
 
-  // --- PRE-CALCULATE PARK METRICS FOR RANKINGS ---
+  // Pre-calculate Park Metrics
   const allParkMetrics = PARK_NAMES.map(park => {
     const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
     const avgActivities = stats.visits > 0 ? stats.activities / stats.visits : 0;
@@ -106,17 +111,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const parkAvgVisitArr = allParkMetrics.map(p => p.avgVisit);
   const parkAvgWaitArr = allParkMetrics.map(p => p.avgWait);
 
-  // --- PRE-CALCULATE ATTENDEE METRICS FOR RANKINGS ---
+  // Pre-calculate Attendee Metrics
   const allAttendeeMetrics = FIXED_FAMILY_MEMBERS.map(person => {
     const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
     const pDays = personVisits.length;
-
     const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
-
-    const pWaitMinutes = personVisits.reduce((sum, v) => {
-      return sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
-    }, 0);
-
+    const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
     const pParkMinutes = personVisits.reduce((sum, v) => {
       const pEndTime = getPersonEndTime(v, person);
       if (v.startTime && pEndTime) {
@@ -141,79 +141,59 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const attAvgParkArr = allAttendeeMetrics.map(a => a.pAvgPark);
   const attAvgWaitArr = allAttendeeMetrics.map(a => a.pAvgWait);
 
-  // --- RIDE BREAKDOWN DATA ---
-  const rideStatsMap: Record<string, {
-    name: string;
-    park: string;
-    ridden: number;
-    totalWait: number;
-    waitTimes: number[];
-    walkOns: number;
-  }> = {};
-
+  // Ride Breakdown
+  const rideStatsMap: Record<string, { name: string; park: string; ridden: number; totalWait: number; waitTimes: number[]; walkOns: number; }> = {};
   visits.forEach(v => {
     if (selectedPark && v.parkName !== selectedPark) return;
-
     const party = parseAttendees(v.attendees);
     if (selectedAttendee !== 'ALL' && !party.includes(selectedAttendee)) return;
 
     v.activities.forEach(act => {
       if (selectedAttendee !== 'ALL' && !isPersonRider(act, v, selectedAttendee)) return;
-
       const rideKey = `${v.parkName}___${act.rideName}`;
       if (!rideStatsMap[rideKey]) {
-        rideStatsMap[rideKey] = {
-          name: act.rideName,
-          park: v.parkName,
-          ridden: 0,
-          totalWait: 0,
-          waitTimes: [],
-          walkOns: 0
-        };
+        rideStatsMap[rideKey] = { name: act.rideName, park: v.parkName, ridden: 0, totalWait: 0, waitTimes: [], walkOns: 0 };
       }
-
       const wait = act.waitTimeMinutes || 0;
       const isWalkOn = act.isWalkOn || wait === 0 || act.notes?.includes('[Walk On]');
-
       rideStatsMap[rideKey].ridden += 1;
       rideStatsMap[rideKey].totalWait += wait;
       rideStatsMap[rideKey].waitTimes.push(wait);
-      if (isWalkOn) {
-        rideStatsMap[rideKey].walkOns += 1;
-      }
+      if (isWalkOn) rideStatsMap[rideKey].walkOns += 1;
     });
   });
 
-  const rideList = Object.values(rideStatsMap).map(r => {
-    const avgWait = r.ridden > 0 ? Math.round(r.totalWait / r.ridden) : 0;
-    const maxWait = r.waitTimes.length > 0 ? Math.max(...r.waitTimes) : 0;
-    const minWait = r.waitTimes.length > 0 ? Math.min(...r.waitTimes) : 0;
-
-    return {
-      name: r.name,
-      park: r.park,
-      ridden: r.ridden,
-      totalWait: r.totalWait,
-      avgWait,
-      maxWait,
-      minWait,
-      walkOns: r.walkOns
-    };
-  });
+  const rideList = Object.values(rideStatsMap).map(r => ({
+    name: r.name,
+    park: r.park,
+    ridden: r.ridden,
+    totalWait: r.totalWait,
+    avgWait: r.ridden > 0 ? Math.round(r.totalWait / r.ridden) : 0,
+    maxWait: r.waitTimes.length > 0 ? Math.max(...r.waitTimes) : 0,
+    minWait: r.waitTimes.length > 0 ? Math.min(...r.waitTimes) : 0,
+    walkOns: r.walkOns
+  }));
 
   const sortedRides = [...rideList].sort((a, b) => {
     const valA = a[sortField];
     const valB = b[sortField];
-
     if (typeof valA === 'string' && typeof valB === 'string') {
-      const cmp = valA.localeCompare(valB);
-      return sortOrder === 'asc' ? cmp : -cmp;
+      return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     }
-
-    const numA = valA as number;
-    const numB = valB as number;
-    return sortOrder === 'asc' ? numA - numB : numB - numA;
+    return sortOrder === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
   });
+
+  // --- VISITS TAB CALCULATIONS ---
+  const mappedVisits = filteredVisits.map(v => {
+    const duration = getVisitDuration(v, selectedAttendee);
+    const party = parseAttendees(v.attendees);
+    const validActs = selectedAttendee === 'ALL' ? v.activities : v.activities.filter(a => isPersonRider(a, v, selectedAttendee));
+    return { ...v, duration, party, rideCount: validActs.length };
+  });
+
+  const longestDays = [...mappedVisits].sort((a, b) => b.duration - a.duration).slice(0, 10);
+  const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
+  const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
   return (
     <div>
@@ -230,7 +210,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const avgVisit = avgVisitVal;
             const avgWait = Math.round(avgWaitVal);
 
-            // Park Rankings (comparing 1-4 parks)
             const rActs = getRank(parkActivitiesArr, stats.activities, false);
             const rTimeInPark = getRank(parkTimeInParkArr, stats.timeInPark, false);
             const rWaitTime = getRank(parkWaitTimeArr, stats.waitTime, false);
@@ -238,24 +217,23 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const rAvgVisit = getRank(parkAvgVisitArr, avgVisitVal, false);
             const rAvgWait = getRank(parkAvgWaitArr, avgWaitVal, true);
 
-            // Pie Chart calculations
             const totalTime = Math.max(1, stats.timeInPark);
             const lineTime = Math.min(stats.waitTime, totalTime);
             const linePercent = Math.round((lineTime / totalTime) * 100);
 
-            // Activities Logged Progress
             const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
-            const parkVisits = visits.filter(v => v.parkName === park);
+            const parkVisits = visits.filter(v => {
+              const matchesPark = v.parkName === park;
+              const matchesAttendee = selectedAttendee === 'ALL' || parseAttendees(v.attendees).includes(selectedAttendee);
+              return matchesPark && matchesAttendee;
+            });
+
             const rideCounts = getRideCountsMap(parkVisits, selectedAttendee);
             const riddenCount = PARK_ATTRACTIONS[park]?.filter(r => (rideCounts[r] || 0) > 0).length || 0;
             const rideEverythingPercent = Math.round((riddenCount / totalParkRides) * 100);
 
-            // Top 5 Popular Rides
-            const parkRides = getRideBreakdown(parkVisits, selectedAttendee)
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 5);
+            const parkRides = getRideBreakdown(parkVisits, selectedAttendee).sort((a, b) => b.count - a.count).slice(0, 5);
 
-            // Who Visits Most Leaderboard
             const visitorStats: Record<string, { visits: number; timeInPark: number }> = {};
             FIXED_FAMILY_MEMBERS.forEach(m => { visitorStats[m] = { visits: 0, timeInPark: 0 }; });
 
@@ -279,7 +257,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               .filter(item => item.visits > 0)
               .sort((a, b) => b.visits - a.visits);
 
-            // Days of the Week Group Visits Calculation
+            // Days of the Week Visits Calculation (Filtered by Attendee)
             const parkDayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             parkVisits.forEach(v => {
               if (v.visitDate) {
@@ -293,12 +271,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
             return (
               <div key={park} style={{ background: '#FFF', borderRadius: '24px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-                
-                {/* Full Width Banner Image */}
                 <img src={PARK_BANNERS[park]} alt={park} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
 
                 <div style={{ padding: '18px' }}>
-                  {/* Park Title Header with Group Visits */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #EDF2F7', paddingBottom: '10px' }}>
                     <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>
                       {PARK_EMOJIS[park]} {park}
@@ -308,7 +283,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </span>
                   </div>
 
-                  {/* 2x3 Grid Stats with Rankings */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
                     <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                       <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{stats.activities}</div>
@@ -343,18 +317,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Conic Pie Chart */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div
-                      style={{
-                        width: '54px',
-                        height: '54px',
-                        borderRadius: '50%',
-                        background: `conic-gradient(#ED8936 0% ${linePercent}%, #9F7AEA ${linePercent}% 100%)`,
-                        flexShrink: 0,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                      }}
-                    />
+                    <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: `conic-gradient(#ED8936 0% ${linePercent}%, #9F7AEA ${linePercent}% 100%)`, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
                       <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
@@ -364,7 +328,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Activities Logged Progress Bar */}
                   <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '6px' }}>
                       <span>ACTIVITIES LOGGED</span>
@@ -375,62 +338,54 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Most Popular Rides */}
                   {parkRides.length > 0 && (
                     <div style={{ marginBottom: '16px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '8px', letterSpacing: '0.8px' }}>
                         MOST POPULAR RIDES
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {parkRides.map((r, idx) => {
-                          const isTop = idx === 0;
-                          return (
-                            <div key={r.name} style={{ background: isTop ? '#FFFDF5' : '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontSize: '12px', fontWeight: '800', color: '#2D3748', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
-                                <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                                  Avg Wait: <strong>{r.avgWait}m</strong> • Total Wait: <strong>{formatMinutes(r.totalWait)}</strong>
-                                </div>
+                        {parkRides.map((r, idx) => (
+                          <div key={r.name} style={{ background: idx === 0 ? '#FFFDF5' : '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: idx === 0 ? '1px solid #D4AF37' : '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: '#2D3748', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                              <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                                Avg Wait: <strong>{r.avgWait}m</strong> • Total Wait: <strong>{formatMinutes(r.totalWait)}</strong>
                               </div>
-                              <div style={{ fontSize: '14px', fontWeight: '900', color: '#004487', flexShrink: 0 }}>{r.count}x</div>
                             </div>
-                          );
-                        })}
+                            <div style={{ fontSize: '14px', fontWeight: '900', color: '#004487', flexShrink: 0 }}>{r.count}x</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Who Visits Most Leaderboard */}
                   {leaderboard.length > 0 && (
                     <div style={{ marginBottom: '16px' }}>
                       <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '8px', letterSpacing: '0.8px' }}>
                         WHO VISITS MOST
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {leaderboard.map((item, idx) => {
-                          const isTop = idx === 0;
-                          return (
-                            <div key={item.name} style={{ background: isTop ? '#FFFDF5' : '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <div style={{ fontSize: '12px', fontWeight: '800', color: '#2D3748' }}>{item.name}</div>
-                                <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-                                  Total Park Time: <strong>{formatMinutes(item.timeInPark)}</strong> • Avg Visit: <strong>{formatMinutes(item.avgVisit)}</strong>
-                                </div>
-                              </div>
-                              <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169' }}>
-                                {item.visits} {item.visits === 1 ? 'visit' : 'visits'}
+                        {leaderboard.map((item, idx) => (
+                          <div key={item.name} style={{ background: idx === 0 ? '#FFFDF5' : '#F8FAFC', padding: '8px 12px', borderRadius: '10px', border: idx === 0 ? '1px solid #D4AF37' : '1px solid #EDF2F7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: '#2D3748' }}>{item.name}</div>
+                              <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
+                                Total Park Time: <strong>{formatMinutes(item.timeInPark)}</strong> • Avg Visit: <strong>{formatMinutes(item.avgVisit)}</strong>
                               </div>
                             </div>
-                          );
-                        })}
+                            <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169' }}>
+                              {item.visits} {item.visits === 1 ? 'visit' : 'visits'}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Days of the Week Vertical Bar Chart Widget */}
+                  {/* Days of Week Vertical Chart (Attendee-Filtered) */}
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
-                      DAYS OF THE WEEK
+                      DAYS OF THE WEEK {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
                     </div>
 
                     <div style={{ background: '#F8FAFC', padding: '16px 12px 12px 16px', borderRadius: '16px', border: '1px solid #EDF2F7' }}>
@@ -445,15 +400,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                                 {count}
                               </div>
                               <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                                <div
-                                  style={{
-                                    width: '18px',
-                                    height: `${heightPercent}%`,
-                                    background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0',
-                                    borderRadius: '6px 6px 4px 4px',
-                                    transition: 'height 0.3s ease'
-                                  }}
-                                />
+                                <div style={{ width: '18px', height: `${heightPercent}%`, background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0', borderRadius: '6px 6px 4px 4px', transition: 'height 0.3s ease' }} />
                               </div>
                               <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
                                 {day.label}
@@ -472,19 +419,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Attendees */}
+      {/* Subtab: People (formerly Attendees) */}
       {analyticsSubTab === 'cards' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {FIXED_FAMILY_MEMBERS.map(person => {
             const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
             const pDays = personVisits.length;
-
             const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
-
-            const pWaitMinutes = personVisits.reduce((sum, v) => {
-              return sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0);
-            }, 0);
-
+            const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
             const pParkMinutes = personVisits.reduce((sum, v) => {
               const pEndTime = getPersonEndTime(v, person);
               if (v.startTime && pEndTime) {
@@ -503,7 +445,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const pAvgPark = pAvgParkVal;
             const pAvgWait = Math.round(pAvgWaitVal);
 
-            // Attendee Rankings (comparing 1-6 attendees)
             const totalAtt = FIXED_FAMILY_MEMBERS.length;
             const rAttActs = getRank(attActivitiesArr, pActivities, false);
             const rAttParkMin = getRank(attParkMinutesArr, pParkMinutes, false);
@@ -512,7 +453,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const rAttAvgPark = getRank(attAvgParkArr, pAvgParkVal, false);
             const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true);
 
-            // Personal Pie Chart Calculations
             const pTotalTime = Math.max(1, pParkMinutes);
             const pLineTime = Math.min(pWaitMinutes, pTotalTime);
             const pLinePercent = Math.round((pLineTime / pTotalTime) * 100);
@@ -520,7 +460,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
             const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0, avgWait: 0 };
 
-            // Days of the Week Visits Calculation
             const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             personVisits.forEach(v => {
               if (v.visitDate) {
@@ -529,13 +468,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 dayVisitsMap[dayIndex] = (dayVisitsMap[dayIndex] || 0) + 1;
               }
             });
-
             const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
             return (
               <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-                
-                {/* Header: Name and Visit Count Pill */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
@@ -543,7 +479,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* 2x3 Grid Stats with Rankings (#1 Gold, #6 Red) */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
                     <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
@@ -578,18 +513,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Personalized Conic Pie Chart */}
                 <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div
-                    style={{
-                      width: '54px',
-                      height: '54px',
-                      borderRadius: '50%',
-                      background: `conic-gradient(#ED8936 0% ${pLinePercent}%, #9F7AEA ${pLinePercent}% 100%)`,
-                      flexShrink: 0,
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                    }}
-                  />
+                  <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: `conic-gradient(#ED8936 0% ${pLinePercent}%, #9F7AEA ${pLinePercent}% 100%)`, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
                     <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
@@ -599,7 +524,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Favorite Ride Block */}
                 <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                     <span>⭐</span> FAVORITE RIDE
@@ -610,7 +534,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Activities Logged Bar Charts Per Park (Click -> Filter Checklist) */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
                     ACTIVITIES LOGGED
@@ -630,14 +553,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                             if (setSelectedAttendee) setSelectedAttendee(person);
                             if (setMainTab) setMainTab('checklist');
                           }}
-                          style={{
-                            background: '#F8FAFC',
-                            padding: '12px 14px',
-                            borderRadius: '14px',
-                            border: '1px solid #EDF2F7',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
+                          style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EDF2F7', cursor: 'pointer' }}
                           title={`Click to view ${person}'s checklist`}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
@@ -657,7 +573,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Days of the Week Vertical Bar Chart Widget */}
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
                     DAYS OF THE WEEK
@@ -675,15 +590,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                               {count}
                             </div>
                             <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                              <div
-                                style={{
-                                  width: '18px',
-                                  height: `${heightPercent}%`,
-                                  background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0',
-                                  borderRadius: '6px 6px 4px 4px',
-                                  transition: 'height 0.3s ease'
-                                }}
-                              />
+                              <div style={{ width: '18px', height: `${heightPercent}%`, background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0', borderRadius: '6px 6px 4px 4px', transition: 'height 0.3s ease' }} />
                             </div>
                             <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
                               {day.label}
@@ -704,7 +611,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* Park Filter Bar */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
               PARK
@@ -742,118 +648,68 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             </div>
           </div>
 
-          {/* Rides Sortable Table Container */}
           {sortedRides.length === 0 ? (
             <div style={{ background: '#FFF', borderRadius: '16px', padding: '30px', textAlign: 'center', color: '#718096', border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
               No rides logged matching your filter selection.
             </div>
           ) : (
             <div style={{ background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-              
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#4A5568', fontSize: '11px', fontWeight: '900' }}>
-                      
-                      <th
-                        onClick={() => handleSort('park')}
-                        style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}
-                      >
+                      <th onClick={() => handleSort('park')} style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}>
                         Park {sortField === 'park' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
-                      <th
-                        onClick={() => handleSort('name')}
-                        style={{
-                          padding: '12px 12px',
-                          cursor: 'pointer',
-                          position: 'sticky',
-                          left: 0,
-                          background: '#F8FAFC',
-                          zIndex: 2,
-                          boxShadow: '2px 0 5px rgba(0,0,0,0.04)',
-                          minWidth: '150px'
-                        }}
-                      >
+                      <th onClick={() => handleSort('name')} style={{ padding: '12px 12px', cursor: 'pointer', position: 'sticky', left: 0, background: '#F8FAFC', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', minWidth: '150px' }}>
                         Ride {sortField === 'name' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('ridden')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Ridden {sortField === 'ridden' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('avgWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Avg Wait {sortField === 'avgWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('totalWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Tot Wait {sortField === 'totalWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('maxWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Max {sortField === 'maxWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('minWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Min {sortField === 'minWait' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                       <th onClick={() => handleSort('walkOns')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
                         Walk-Ons {sortField === 'walkOns' && (sortOrder === 'desc' ? '▼' : '▲')}
                       </th>
-
                     </tr>
                   </thead>
                   <tbody>
                     {sortedRides.map((r, idx) => {
-                      const isEven = idx % 2 === 0;
-                      const rowBg = isEven ? '#FFF' : '#F8FAFC';
-
+                      const rowBg = idx % 2 === 0 ? '#FFF' : '#F8FAFC';
                       return (
                         <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', borderRight: '1px solid #EDF2F7', background: rowBg }}>
                             {PARK_EMOJIS[r.park] || '🏰'}
                           </td>
-
-                          <td
-                            style={{
-                              padding: '10px 12px',
-                              fontWeight: '800',
-                              color: '#1A202C',
-                              position: 'sticky',
-                              left: 0,
-                              background: rowBg,
-                              zIndex: 1,
-                              boxShadow: '2px 0 5px rgba(0,0,0,0.04)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: '180px'
-                            }}
-                          >
+                          <td style={{ padding: '10px 12px', fontWeight: '800', color: '#1A202C', position: 'sticky', left: 0, background: rowBg, zIndex: 1, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
                             {r.name}
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
                             {r.ridden}
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#2D3748', background: rowBg }}>
                             {r.avgWait}m
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#ED8936', background: rowBg }}>
                             {r.totalWait}m
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#C53030', background: rowBg }}>
                             {r.maxWait}m
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#276749', background: rowBg }}>
                             {r.minWait}m
                           </td>
-
                           <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#D69E2E', background: rowBg }}>
                             {r.walkOns}
                           </td>
@@ -865,6 +721,142 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Subtab: Visits (New Subtab with Leaderboards) */}
+      {analyticsSubTab === ('visits' as AnalyticsSubTab) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* LONGEST DAYS */}
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
+              ⏱️ LONGEST DAYS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </div>
+            {longestDays.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {longestDays.map((v, idx) => {
+                  const isTop = idx === 0;
+                  return (
+                    <div
+                      key={v.id}
+                      style={{
+                        background: isTop ? '#FFFDF5' : '#F8FAFC',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        display: 'flex',
+                        justify: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
+                          👥 {v.party.join(', ')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#9F7AEA', flexShrink: 0 }}>
+                        {formatMinutes(v.duration)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SHORTEST DAYS */}
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
+              ⚡ SHORTEST DAYS {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </div>
+            {shortestDays.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {shortestDays.map((v, idx) => {
+                  const isTop = idx === 0;
+                  return (
+                    <div
+                      key={v.id}
+                      style={{
+                        background: isTop ? '#FFFDF5' : '#F8FAFC',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        display: 'flex',
+                        justify: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
+                          👥 {v.party.join(', ')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#38A169', flexShrink: 0 }}>
+                        {formatMinutes(v.duration)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* BUSIEST DAYS */}
+          <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
+            <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px' }}>
+              🎢 BUSIEST DAYS (MOST RIDES LOGGED) {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+            </div>
+            {busiestDays.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic' }}>No completed visits found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {busiestDays.map((v, idx) => {
+                  const isTop = idx === 0;
+                  return (
+                    <div
+                      key={v.id}
+                      style={{
+                        background: isTop ? '#FFFDF5' : '#F8FAFC',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: isTop ? '1px solid #D4AF37' : '1px solid #EDF2F7',
+                        display: 'flex',
+                        justify: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C' }}>
+                          {PARK_EMOJIS[v.parkName] || ''} {v.parkName} on {formatDisplayDate(v.visitDate)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#718096', marginTop: '3px' }}>
+                          👥 {v.party.join(', ')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: '900', color: '#004487', flexShrink: 0 }}>
+                        {v.rideCount} {v.rideCount === 1 ? 'ride' : 'rides'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
     </div>
