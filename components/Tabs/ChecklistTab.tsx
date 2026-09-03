@@ -201,7 +201,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({ rideCountsMap, visit
                                 key={song}
                                 style={{
                                   display: 'flex',
-                                  justify: 'space-between',
+                                  justifyContent: 'space-between',
                                   alignItems: 'center',
                                   padding: '5px 8px',
                                   borderRadius: '8px',
