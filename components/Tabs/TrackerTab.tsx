@@ -82,7 +82,7 @@ const PARK_BANNERS: Record<string, string> = {
 };
 
 const COASTER_SONGS: Record<string, string[]> = {
-  'Guardians of the Galaxy: Cosmic Rewind': [
+  "Guardians of the Galaxy: Cosmic Rewind": [
     '"September" by Earth, Wind & Fire',
     '"Disco Inferno" by The Trammps',
     '"Everybody Wants to Rule the World" by Tears for Fears',
@@ -90,7 +90,7 @@ const COASTER_SONGS: Record<string, string[]> = {
     '"One Way or Another" by Blondie',
     '"Conga" by Gloria Estefan',
   ],
-  'Rock \'n\' Roller Coaster Starring Aerosmith': [
+  "Rock 'n' Roller Coaster Starring Aerosmith": [
     '"Song 2"',
     '"Born To Be Wild"',
     '"Love Rollercoaster"',
@@ -242,7 +242,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
   });
   const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
-  const monthVisitsMap: Record<number, number> = {};
+const monthVisitsMap: Record<number, number> = {};
   filteredVisits.forEach(v => {
     if (v.visitDate) {
       const [y, m] = v.visitDate.split('-').map(Number);
