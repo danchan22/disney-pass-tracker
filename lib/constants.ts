@@ -37,7 +37,7 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Walt Disney World Railroad'
   ],
   'Epcot': [
-    'Beauty and the Beast Sing-Along', 'Canada Circle-Vision 360', 'Disney and Pixar Short Film Festival',
+    'Awesome Planet', 'Beauty and the Beast Sing-Along', 'Canada Circle-Vision 360', 'Disney and Pixar Short Film Festival',
     'Frozen Ever After', 'Gran Fiesta Tour Starring The Three Caballeros', 'Guardians of the Galaxy: Cosmic Rewind',
     'ImageWorks What If Labs', 'Impressions de France', 'Journey into Imagination with Figment',
     'Journey of Water, Inspired by Moana', 'Living with the Land', 'Mission: SPACE (Green)',
