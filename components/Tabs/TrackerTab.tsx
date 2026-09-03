@@ -261,21 +261,25 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
           {activeVisit ? (
             <>
               {/* CURRENTLY AT CARD CONTAINER */}
-             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
-             {/* PARK BANNER HEADER */}
-{PARK_BANNERS[activeVisit.parkName] && (
-  <img src={PARK_BANNERS[activeVisit.parkName]} alt={activeVisit.parkName} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
-)}
-               <div style={{ marginBottom: '10px' }}>
-                  <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
-                    ✨ CURRENTLY AT
-                  </span>
-                </div>
+<div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
+  
+  {/* PARK BANNER HEADER (Edge-to-Edge) */}
+  {PARK_BANNERS[activeVisit.parkName] && (
+    <img src={PARK_BANNERS[activeVisit.parkName]} alt={activeVisit.parkName} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
+  )}
 
-                <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <ParkIcon parkName={activeVisit.parkName} size={28} />
-                  <span>{activeVisit.parkName}</span>
-                </h2>
+  {/* INNER CONTENT WITH PADDING */}
+  <div style={{ padding: '20px' }}>
+    <div style={{ marginBottom: '10px' }}>
+      <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
+        ✨ CURRENTLY AT
+      </span>
+    </div>
+
+    <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <ParkIcon parkName={activeVisit.parkName} size={28} />
+      <span>{activeVisit.parkName}</span>
+    </h2>
 
                 <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '12px', fontWeight: '600' }}>
                   📅 {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; ⏰ Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
