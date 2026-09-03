@@ -93,6 +93,13 @@ const COASTER_SONGS: Record<string, string[]> = {
   ],
 };
 
+const PARK_BANNERS: Record<string, string> = {
+  'Magic Kingdom': '/park-magic-kingdom.png',
+  'Epcot': '/park-epcot.png',
+  'Hollywood Studios': '/park-hollywood-studios.png',
+  'Animal Kingdom': '/park-animal-kingdom.png'
+};
+
 const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const getCoasterSongs = (ride: string): string[] | null => {
@@ -254,8 +261,12 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
           {activeVisit ? (
             <>
               {/* CURRENTLY AT CARD CONTAINER */}
-              <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
-                <div style={{ marginBottom: '10px' }}>
+             <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
+             {/* PARK BANNER HEADER */}
+{PARK_BANNERS[activeVisit.parkName] && (
+  <img src={PARK_BANNERS[activeVisit.parkName]} alt={activeVisit.parkName} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
+)}
+               <div style={{ marginBottom: '10px' }}>
                   <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
                     ✨ CURRENTLY AT
                   </span>
