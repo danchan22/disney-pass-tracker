@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Visit, AnalyticsSubTab, MainTab } from '../../lib/types';
 import { PARK_NAMES, PARK_EMOJIS, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/constants';
-import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate } from '../../lib/helpers';
+import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate, format12Hour } from '../../lib/helpers';
 
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
@@ -200,12 +200,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     });
 
     const hasEarlyDepartures = earlyMembers.length > 0 && fullDayMembers.length > 0;
+    const ridesListStr = validActs.map(a => a.rideName).join(' • ');
 
     return { 
       ...v, 
       duration, 
       party, 
       rideCount: validActs.length,
+      ridesListStr,
       hasEarlyDepartures,
       fullDayMembers,
       earlyMembers
@@ -805,6 +807,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                           {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
                         </div>
 
+                        {/* Line 3: Start & End Time */}
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '2px' }}>
+                          ⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}
+                        </div>
+
                         {/* Split Day Note */}
                         {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
                           <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
@@ -891,6 +898,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         {/* Line 2: Park & Date */}
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
                           {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
+                        </div>
+
+                        {/* Line 3: Start & End Time */}
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: '#4A5568', marginTop: '2px' }}>
+                          ⏰ {format12Hour(v.startTime)} - {format12Hour(v.endTime)}
                         </div>
 
                         {/* Split Day Note */}
@@ -980,6 +992,20 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#718096', marginTop: '2px' }}>
                           {PARK_EMOJIS[v.parkName] || ''} {v.parkName} • {formatDisplayDate(v.visitDate)}
                         </div>
+
+                        {/* Line 3: Rides List Separated by Bullets */}
+                        {v.ridesListStr && (
+                          <div style={{ fontSize: '10px', color: '#4A5568', fontWeight: '600', marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            🎠 {v.ridesListStr}
+                          </div>
+                        )}
+
+                        {/* Split Day Note */}
+                        {selectedAttendee === 'ALL' && v.hasEarlyDepartures && (
+                          <div style={{ fontSize: '10px', color: '#DD6B20', fontWeight: '700', marginTop: '2px' }}>
+                            ⚡ Split Day ({v.fullDayMembers.join(', ')} stayed full day)
+                          </div>
+                        )}
                       </div>
 
                       {/* Right Callout Badge */}
