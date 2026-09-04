@@ -9,27 +9,26 @@ import { UploadPhotoModal } from '../Modals/UploadPhotoModal';
 import { LightboxModal } from '../Modals/LightboxModal';
 import { ParkIcon } from '../Shared/ParkIcon';
 
-// --- SEGMENTED CONTROL COMPONENT ---
-interface SegmentedControlProps<T extends string> {
+// --- LEVEL 3: TEXT LINK SWITCHER WITH ACTIVE BLUE UNDERLINE ---
+interface TextSegmentedControlProps<T extends string> {
   options: readonly T[];
   selected: T;
   onChange: (value: T) => void;
 }
 
-function SegmentedControl<T extends string>({
+function TextSegmentedControl<T extends string>({
   options,
   selected,
   onChange,
-}: SegmentedControlProps<T>) {
+}: TextSegmentedControlProps<T>) {
   return (
     <div
       style={{
         display: 'flex',
-        background: '#EDF2F7',
-        padding: '3px',
-        borderRadius: '12px',
-        width: '100%',
-        boxSizing: 'border-box',
+        borderBottom: '2px solid #E2E8F0',
+        marginBottom: '16px',
+        paddingBottom: '2px',
+        gap: '16px',
       }}
     >
       {options.map((option) => {
@@ -40,20 +39,32 @@ function SegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(option)}
             style={{
-              flex: 1,
-              padding: '8px 12px',
+              background: 'none',
               border: 'none',
-              borderRadius: '9px',
-              background: isSelected ? '#FFFFFF' : 'transparent',
+              padding: '8px 4px 10px 4px',
+              fontSize: '13px',
+              fontWeight: isSelected ? '900' : '600',
               color: isSelected ? '#004487' : '#718096',
-              fontSize: '12px',
-              fontWeight: '800',
               cursor: 'pointer',
-              boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease',
+              position: 'relative',
+              transition: 'color 0.15s ease',
             }}
           >
             {option}
+            {/* Active Blue Underline Accent */}
+            {isSelected && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '-4px',
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: '#004487',
+                  borderRadius: '3px 3px 0 0',
+                }}
+              />
+            )}
           </button>
         );
       })}
@@ -156,15 +167,13 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
   return (
     <div>
-      {/* LEVEL 3 MENU: Directly below the 2nd level subtab bar */}
+      {/* LEVEL 3 MENU: Text Links with Active Blue Underline Line */}
       {rainbowSubTab === 'stream' && (
-        <div style={{ marginBottom: '14px' }}>
-          <SegmentedControl
-            options={['Cards', 'Compact Grid'] as const}
-            selected={streamView}
-            onChange={setStreamView}
-          />
-        </div>
+        <TextSegmentedControl
+          options={['Cards', 'Compact Grid'] as const}
+          selected={streamView}
+          onChange={setStreamView}
+        />
       )}
 
       {/* HEADER CARD */}
