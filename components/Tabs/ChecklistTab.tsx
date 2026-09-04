@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Visit } from '../../lib/types';
+import { Visit, Activity } from '../../lib/types';
 import { PARK_NAMES, PARK_ATTRACTIONS } from '../../lib/constants';
 import { ParkIcon } from '../Shared/ParkIcon';
+import { parseAttendees } from '../../lib/helpers';
 
 interface ChecklistTabProps {
   rideCountsMap: Record<string, number>;
   visits?: Visit[];
+  activeVisit?: Visit | null;
+  selectedAttendee?: string;
 }
 
 const PARK_BANNERS: Record<string, string> = {
@@ -51,27 +54,51 @@ const getCoasterSongsForAttraction = (attraction: string): string[] | null => {
   return null;
 };
 
-export const ChecklistTab: React.FC<ChecklistTabProps> = ({ rideCountsMap, visits = [] }) => {
+export const ChecklistTab: React.FC<ChecklistTabProps> = ({ 
+  rideCountsMap, 
+  visits = [], 
+  activeVisit = null,
+  selectedAttendee = 'ALL' 
+}) => {
   const [selectedPark, setSelectedPark] = useState<string>('ALL');
 
-// Calculate song tally map from visits notes (filtered by selected park)
-const songCountsMap: Record<string, number> = {};
-visits.forEach(v => {
-  // Only process visits for the selected park (or all if selectedPark === 'ALL')
-  if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
-
-  v.activities.forEach(act => {
-    if (act.notes) {
-      const cleanNote = cleanStr(act.notes);
-      Object.values(COASTER_SONGS).flat().forEach(song => {
-        const cleanSong = cleanStr(song);
-        if (cleanNote.includes(cleanSong)) {
-          songCountsMap[song] = (songCountsMap[song] || 0) + 1;
-        }
-      });
+  // Helper to check if a specific attendee rode this activity
+  const isAttendeeRider = (act: Activity, visitAttendees: string[] | string) => {
+    if (selectedAttendee === 'ALL') return true;
+    const ridersList = parseAttendees(act.riders);
+    if (ridersList.length > 0) {
+      return ridersList.includes(selectedAttendee);
     }
-  });
-});
+    const allParty = parseAttendees(visitAttendees);
+    return allParty.includes(selectedAttendee);
+  };
+
+  // Calculate song tally map based on selected park, selected attendee, and active/past visits
+  const songCountsMap: Record<string, number> = {};
+
+  const processVisitForSongs = (v: Visit) => {
+    if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
+
+    v.activities.forEach(act => {
+      if (act.notes && isAttendeeRider(act, v.attendees)) {
+        const cleanNote = cleanStr(act.notes);
+        Object.values(COASTER_SONGS).flat().forEach(song => {
+          const cleanSong = cleanStr(song);
+          if (cleanNote.includes(cleanSong)) {
+            songCountsMap[song] = (songCountsMap[song] || 0) + 1;
+          }
+        });
+      }
+    });
+  };
+
+  // Process completed past visits
+  visits.forEach(processVisitForSongs);
+
+  // Process currently active visit if one exists
+  if (activeVisit) {
+    processVisitForSongs(activeVisit);
+  }
 
   const parkEntries = Object.entries(PARK_ATTRACTIONS).filter(([park]) => {
     if (selectedPark === 'ALL') return true;
@@ -97,7 +124,7 @@ visits.forEach(v => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justify: 'center',
                   gap: '8px',
                   padding: '10px 8px',
                   borderRadius: '14px',
