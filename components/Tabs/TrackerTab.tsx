@@ -8,6 +8,12 @@ import { ParkingSubtab } from './ParkingSubtab';
 import { AddPersonModal } from '../Modals/AddPersonModal';
 import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimesWidget';
 import { ParkIcon } from '../Shared/ParkIcon';
+import { useState } from 'react';
+import { SegmentedControl } from '../Shared/SegmentedControl';
+
+// Define the options as a const array
+const VIEW_OPTIONS = ['Cards', 'Leaderboard'] as const;
+type ViewMode = typeof VIEW_OPTIONS[number];
 
 const PARK_BANNERS: Record<string, string> = {
   "Magic Kingdom": "/park-magic-kingdom.png",
