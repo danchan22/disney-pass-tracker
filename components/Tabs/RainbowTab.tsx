@@ -74,7 +74,6 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
   photoLoading,
   fetchPhotoGrids,
 }) => {
-  // STEP 2: State variable to track whether we're viewing "Cards" or "Compact Grid"
   const [streamView, setStreamView] = useState<'Cards' | 'Compact Grid'>('Cards');
 
   const [filterPhotographer, setFilterPhotographer] = useState<string>('ALL');
@@ -168,7 +167,14 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
       {rainbowSubTab === 'stream' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* UPLOAD BUTTON DIRECTLY ON STREAM */}
+          {/* LEVEL 3 SEGMENTED CONTROL DIRECTLY AT TOP OF SUBTAB */}
+          <SegmentedControl
+            options={['Cards', 'Compact Grid'] as const}
+            selected={streamView}
+            onChange={setStreamView}
+          />
+
+          {/* UPLOAD BUTTON */}
           <button
             type="button"
             onClick={() => {
@@ -263,7 +269,7 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
               </div>
             </div>
 
-            {/* Color Selector: 4x2 Full Width Grid */}
+            {/* Color Selector */}
             <div>
               <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>COLOR</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
@@ -296,13 +302,6 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
             </div>
 
           </div>
-
-          {/* STEP 3: SEGMENTED CONTROL VIEW TOGGLE */}
-          <SegmentedControl
-            options={['Cards', 'Compact Grid'] as const}
-            selected={streamView}
-            onChange={setStreamView}
-          />
 
           {/* PHOTO STREAM CONTENT */}
           {photoLoading ? (
