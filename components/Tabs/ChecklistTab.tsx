@@ -61,17 +61,16 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({
   selectedAttendee = 'ALL' 
 }) => {
   const [selectedPark, setSelectedPark] = useState<string>('ALL');
-
-  // Helper to check if a specific attendee rode this activity
-  const isAttendeeRider = (act: Activity, visitAttendees: string[] | string) => {
-    if (selectedAttendee === 'ALL') return true;
-    const ridersList = parseAttendees(act.riders);
-    if (ridersList.length > 0) {
-      return ridersList.includes(selectedAttendee);
-    }
-    const allParty = parseAttendees(visitAttendees);
-    return allParty.includes(selectedAttendee);
-  };
+// Helper to check if a specific attendee rode this activity
+const isAttendeeRider = (act: Activity, visitAttendees: string[] | string | undefined) => {
+  if (selectedAttendee === 'ALL') return true;
+  const ridersList = parseAttendees(act.riders);
+  if (ridersList.length > 0) {
+    return ridersList.includes(selectedAttendee);
+  }
+  const allParty = parseAttendees(visitAttendees || []);
+  return allParty.includes(selectedAttendee);
+};
 
   // Calculate song tally map based on selected park, selected attendee, and active/past visits
   const songCountsMap: Record<string, number> = {};
