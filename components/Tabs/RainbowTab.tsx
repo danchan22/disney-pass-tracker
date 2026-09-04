@@ -156,6 +156,18 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
   return (
     <div>
+      {/* LEVEL 3 MENU: Directly below the 2nd level subtab bar */}
+      {rainbowSubTab === 'stream' && (
+        <div style={{ marginBottom: '14px' }}>
+          <SegmentedControl
+            options={['Cards', 'Compact Grid'] as const}
+            selected={streamView}
+            onChange={setStreamView}
+          />
+        </div>
+      )}
+
+      {/* HEADER CARD */}
       <div style={{ textAlign: 'center', marginBottom: '14px', background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: '0 0 4px 0' }}>Rainbow Challenge</h2>
         <p style={{ margin: 0, fontSize: '12px', color: '#718096', fontWeight: '600' }}>
@@ -167,13 +179,6 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
       {rainbowSubTab === 'stream' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* LEVEL 3 SEGMENTED CONTROL DIRECTLY AT TOP OF SUBTAB */}
-          <SegmentedControl
-            options={['Cards', 'Compact Grid'] as const}
-            selected={streamView}
-            onChange={setStreamView}
-          />
-
           {/* UPLOAD BUTTON */}
           <button
             type="button"
