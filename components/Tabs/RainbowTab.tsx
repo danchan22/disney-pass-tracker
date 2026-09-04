@@ -9,6 +9,58 @@ import { UploadPhotoModal } from '../Modals/UploadPhotoModal';
 import { LightboxModal } from '../Modals/LightboxModal';
 import { ParkIcon } from '../Shared/ParkIcon';
 
+// --- SEGMENTED CONTROL COMPONENT ---
+interface SegmentedControlProps<T extends string> {
+  options: readonly T[];
+  selected: T;
+  onChange: (value: T) => void;
+}
+
+function SegmentedControl<T extends string>({
+  options,
+  selected,
+  onChange,
+}: SegmentedControlProps<T>) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        background: '#EDF2F7',
+        padding: '3px',
+        borderRadius: '12px',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      {options.map((option) => {
+        const isSelected = option === selected;
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: 'none',
+              borderRadius: '9px',
+              background: isSelected ? '#FFFFFF' : 'transparent',
+              color: isSelected ? '#004487' : '#718096',
+              fontSize: '12px',
+              fontWeight: '800',
+              cursor: 'pointer',
+              boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface RainbowTabProps {
   rainbowSubTab: RainbowSubTab;
   photoGrids: PhotoGridRecord[];
@@ -22,6 +74,9 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
   photoLoading,
   fetchPhotoGrids,
 }) => {
+  // STEP 2: State variable to track whether we're viewing "Cards" or "Compact Grid"
+  const [streamView, setStreamView] = useState<'Cards' | 'Compact Grid'>('Cards');
+
   const [filterPhotographer, setFilterPhotographer] = useState<string>('ALL');
   const [filterPark, setFilterPark] = useState<string>('ALL');
   const [filterColor, setFilterColor] = useState<string>('ALL');
@@ -242,7 +297,14 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
 
           </div>
 
-          {/* PHOTO STREAM CARDS */}
+          {/* STEP 3: SEGMENTED CONTROL VIEW TOGGLE */}
+          <SegmentedControl
+            options={['Cards', 'Compact Grid'] as const}
+            selected={streamView}
+            onChange={setStreamView}
+          />
+
+          {/* PHOTO STREAM CONTENT */}
           {photoLoading ? (
             <div style={{ textAlign: 'center', color: '#A0AEC0', padding: '20px' }}>Loading photos...</div>
           ) : filteredPhotos.length === 0 ? (
@@ -250,35 +312,62 @@ export const RainbowTab: React.FC<RainbowTabProps> = ({
               No photo grids found for this filter.
             </div>
           ) : (
-            filteredPhotos.map(photo => {
-              const colorConfig = RAINBOW_COLORS.find(c => c.name === photo.color) || RAINBOW_COLORS[0];
-              return (
-                <div key={photo.id} style={{ background: '#FFF', borderRadius: '20px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-                  <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7' }}>
-                    <div>
-                      <div style={{ fontWeight: '900', fontSize: '15px', color: '#1A202C' }}>{photo.user_name}</div>
-                      <div style={{ fontSize: '12px', color: '#718096', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <ParkIcon parkName={photo.park_name} size={14} />
-                        <span>{photo.park_name}</span>
+            <>
+              {/* VIEW 1: FULL CARDS VIEW */}
+              {streamView === 'Cards' && (
+                filteredPhotos.map(photo => {
+                  const colorConfig = RAINBOW_COLORS.find(c => c.name === photo.color) || RAINBOW_COLORS[0];
+                  return (
+                    <div key={photo.id} style={{ background: '#FFF', borderRadius: '20px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
+                      <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7' }}>
+                        <div>
+                          <div style={{ fontWeight: '900', fontSize: '15px', color: '#1A202C' }}>{photo.user_name}</div>
+                          <div style={{ fontSize: '12px', color: '#718096', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ParkIcon parkName={photo.park_name} size={14} />
+                            <span>{photo.park_name}</span>
+                          </div>
+                        </div>
+                        <span style={{ padding: '4px 12px', borderRadius: '12px', fontWeight: '800', fontSize: '12px', background: colorConfig.hex, color: photo.color === 'White' ? '#1A202C' : '#FFF', border: photo.color === 'White' ? '1px solid #CBD5E0' : 'none' }}>
+                          {photo.color}
+                        </span>
                       </div>
-                    </div>
-                    <span style={{ padding: '4px 12px', borderRadius: '12px', fontWeight: '800', fontSize: '12px', background: colorConfig.hex, color: photo.color === 'White' ? '#1A202C' : '#FFF', border: photo.color === 'White' ? '1px solid #CBD5E0' : 'none' }}>
-                      {photo.color}
-                    </span>
-                  </div>
 
-                  <div style={{ cursor: 'pointer' }} onClick={() => setLightboxGrid(photo)}>
-                    <img src={photo.image_url} alt={`${photo.color} grid by ${photo.user_name}`} style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} />
-                  </div>
+                      <div style={{ cursor: 'pointer' }} onClick={() => setLightboxGrid(photo)}>
+                        <img src={photo.image_url} alt={`${photo.color} grid by ${photo.user_name}`} style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} />
+                      </div>
 
-                  {photo.caption && (
-                    <div style={{ padding: '10px 14px', fontSize: '12px', color: '#4A5568', background: '#F8FAFC', borderTop: '1px solid #EDF2F7' }}>
-                      {photo.caption}
+                      {photo.caption && (
+                        <div style={{ padding: '10px 14px', fontSize: '12px', color: '#4A5568', background: '#F8FAFC', borderTop: '1px solid #EDF2F7' }}>
+                          {photo.caption}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  );
+                })
+              )}
+
+              {/* VIEW 2: COMPACT INSTAGRAM-STYLE 3-COLUMN GRID */}
+              {streamView === 'Compact Grid' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                  {filteredPhotos.map(photo => (
+                    <div
+                      key={photo.id}
+                      onClick={() => setLightboxGrid(photo)}
+                      style={{
+                        aspectRatio: '1 / 1',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: '1px solid #CBD5E0',
+                        position: 'relative'
+                      }}
+                    >
+                      <img src={photo.image_url} alt={photo.caption || photo.color} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ))}
                 </div>
-              );
-            })
+              )}
+            </>
           )}
 
         </div>
