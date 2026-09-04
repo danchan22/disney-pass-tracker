@@ -20,61 +20,99 @@ export const Subheader: React.FC<SubheaderProps> = ({
   rainbowSubTab,
   setRainbowSubTab
 }) => {
+  // Common container style for centered, spread text subtabs
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '24px',
+    borderBottom: '2px solid #E2E8F0',
+    marginBottom: '16px',
+    paddingBottom: '2px',
+    width: '100%',
+    boxSizing: 'border-box'
+  };
+
+  // Helper renderer for text buttons with blue underlines
+  const renderTextTab = (label: string, isActive: boolean, onClick: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'none',
+        border: 'none',
+        padding: '8px 10px 10px 10px',
+        fontSize: '14px',
+        fontWeight: isActive ? '900' : '600',
+        color: isActive ? '#004487' : '#718096',
+        cursor: 'pointer',
+        position: 'relative',
+        transition: 'color 0.15s ease'
+      }}
+    >
+      {label}
+      {isActive && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '-4px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '80%',
+            height: '3px',
+            background: '#004487',
+            borderRadius: '3px 3px 0 0'
+          }}
+        />
+      )}
+    </button>
+  );
+
   if (mainTab === 'tracker') {
+    const tabs: { label: string; value: TrackerSubTab }[] = [
+      { label: 'Today', value: 'Today' },
+      { label: 'History', value: 'History' },
+      { label: 'Parking', value: 'Parking' }
+    ];
+
     return (
-      <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '12px' }}>
-        {(['Today', 'History', 'Parking'] as TrackerSubTab[]).map((sub) => (
-          <button
-            key={sub}
-            onClick={() => setTrackerSubTab(sub)}
-            style={{
-              flex: 1,
-              padding: '9px 2px',
-              border: 'none',
-              borderRadius: '9px',
-              fontWeight: '800',
-              fontSize: '12px',
-              cursor: 'pointer',
-              background: trackerSubTab === sub ? '#004487' : 'transparent',
-              color: trackerSubTab === sub ? '#FFF' : '#4A5568',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {sub}
-          </button>
-        ))}
+      <div style={containerStyle}>
+        {tabs.map(tab =>
+          renderTextTab(tab.label, trackerSubTab === tab.value, () => setTrackerSubTab(tab.value))
+        )}
       </div>
     );
   }
 
-if (mainTab === 'analytics') {
+  if (mainTab === 'analytics') {
+    const tabs: { label: string; value: AnalyticsSubTab }[] = [
+      { label: 'Parks', value: 'averages' },
+      { label: 'People', value: 'cards' },
+      { label: 'Rides', value: 'top10' },
+      { label: 'Visits', value: 'visits' as any }
+    ];
+
     return (
-      <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '10px' }}>
-        <button onClick={() => setAnalyticsSubTab('averages')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'averages' ? '#004487' : 'transparent', color: analyticsSubTab === 'averages' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Parks
-        </button>
-        <button onClick={() => setAnalyticsSubTab('cards')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'cards' ? '#004487' : 'transparent', color: analyticsSubTab === 'cards' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          People
-        </button>
-        <button onClick={() => setAnalyticsSubTab('top10')} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === 'top10' ? '#004487' : 'transparent', color: analyticsSubTab === 'top10' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Rides
-        </button>
-        <button onClick={() => setAnalyticsSubTab('visits' as any)} style={{ flex: 1, padding: '9px 2px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: analyticsSubTab === ('visits' as any) ? '#004487' : 'transparent', color: analyticsSubTab === ('visits' as any) ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Visits
-        </button>
+      <div style={containerStyle}>
+        {tabs.map(tab =>
+          renderTextTab(tab.label, analyticsSubTab === tab.value, () => setAnalyticsSubTab(tab.value))
+        )}
       </div>
     );
   }
 
   if (mainTab === 'rainbow') {
+    const tabs: { label: string; value: RainbowSubTab }[] = [
+      { label: 'Photo Stream', value: 'stream' },
+      { label: 'Badges', value: 'badges' }
+    ];
+
     return (
-      <div style={{ display: 'flex', background: '#FFF', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '3px', marginBottom: '14px' }}>
-        <button onClick={() => setRainbowSubTab('stream')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: rainbowSubTab === 'stream' ? '#004487' : 'transparent', color: rainbowSubTab === 'stream' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Photo Stream
-        </button>
-        <button onClick={() => setRainbowSubTab('badges')} style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '9px', fontWeight: '800', fontSize: '12px', cursor: 'pointer', background: rainbowSubTab === 'badges' ? '#004487' : 'transparent', color: rainbowSubTab === 'badges' ? '#FFF' : '#4A5568', transition: 'all 0.2s ease' }}>
-          Badges
-        </button>
+      <div style={containerStyle}>
+        {tabs.map(tab =>
+          renderTextTab(tab.label, rainbowSubTab === tab.value, () => setRainbowSubTab(tab.value))
+        )}
       </div>
     );
   }
