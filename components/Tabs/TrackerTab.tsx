@@ -9,6 +9,13 @@ import { AddPersonModal } from '../Modals/AddPersonModal';
 import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimesWidget';
 import { ParkIcon } from '../Shared/ParkIcon';
 
+const PARK_BANNERS: Record<string, string> = {
+  "Magic Kingdom": "/park-magic-kingdom.png",
+  "Epcot": "/park-epcot.png",
+  "Hollywood Studios": "/park-hollywood-studios.png",
+  "Animal Kingdom": "/park-animal-kingdom.png"
+};
+
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
   activeVisit: Visit | null;
@@ -253,13 +260,20 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
         <div>
           {activeVisit ? (
             <>
-              {/* CURRENTLY AT CARD CONTAINER */}
-              <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', padding: '20px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37' }}>
-                <div style={{ marginBottom: '10px' }}>
-                  <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
-                    ✨ CURRENTLY AT
-                  </span>
-                </div>
+{/* CURRENTLY AT CARD CONTAINER */}
+<div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
+  
+  {/* PARK BANNER HEADER */}
+  {PARK_BANNERS[activeVisit.parkName] && (
+    <img src={PARK_BANNERS[activeVisit.parkName]} alt={activeVisit.parkName} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
+  )}
+
+  <div style={{ padding: '20px' }}>
+    <div style={{ marginBottom: '10px' }}>
+      <span style={{ background: '#D4AF37', color: '#003366', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
+        ✨ CURRENTLY AT
+      </span>
+    </div>
 
                 <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ParkIcon parkName={activeVisit.parkName} size={28} />
@@ -274,13 +288,23 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   <div style={{ fontSize: '14px', color: '#F7FAFC' }}>
                     👥 <strong>Active Party:</strong> {activePartyList.join(', ')}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPersonModal(true)}
-                    style={{ background: '#D4AF37', color: '#003366', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    Add Someone
-                  </button>
+<button
+  type="button"
+  onClick={() => setShowAddPersonModal(true)}
+  style={{
+    background: 'none',
+    color: '#FFFFFF',
+    border: 'none',
+    padding: 0,
+    fontSize: '13px',
+    fontWeight: '800',
+    cursor: 'pointer',
+    flexShrink: 0,
+    textDecoration: 'underline'
+  }}
+>
+  + Add Someone
+</button>
                 </div>
 
                 {/* TRACK ATTRACTION CARD */}
@@ -566,6 +590,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                   Leave the Park & Save Day
                 </button>
               </div>
+    </div>
 
               <LiveWaitTimesWidget parkName={activeVisit.parkName} />
             </>
