@@ -123,7 +123,7 @@ if (act.notes && isAttendeeRider(act, v.attendees || [])) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'center',
+                  justifyContent: 'center',
                   gap: '8px',
                   padding: '10px 8px',
                   borderRadius: '14px',
