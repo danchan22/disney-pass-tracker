@@ -54,21 +54,24 @@ const getCoasterSongsForAttraction = (attraction: string): string[] | null => {
 export const ChecklistTab: React.FC<ChecklistTabProps> = ({ rideCountsMap, visits = [] }) => {
   const [selectedPark, setSelectedPark] = useState<string>('ALL');
 
-  // Calculate song tally map from visits notes
-  const songCountsMap: Record<string, number> = {};
-  visits.forEach(v => {
-    v.activities.forEach(act => {
-      if (act.notes) {
-        const cleanNote = cleanStr(act.notes);
-        Object.values(COASTER_SONGS).flat().forEach(song => {
-          const cleanSong = cleanStr(song);
-          if (cleanNote.includes(cleanSong)) {
-            songCountsMap[song] = (songCountsMap[song] || 0) + 1;
-          }
-        });
-      }
-    });
+// Calculate song tally map from visits notes (filtered by selected park)
+const songCountsMap: Record<string, number> = {};
+visits.forEach(v => {
+  // Only process visits for the selected park (or all if selectedPark === 'ALL')
+  if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
+
+  v.activities.forEach(act => {
+    if (act.notes) {
+      const cleanNote = cleanStr(act.notes);
+      Object.values(COASTER_SONGS).flat().forEach(song => {
+        const cleanSong = cleanStr(song);
+        if (cleanNote.includes(cleanSong)) {
+          songCountsMap[song] = (songCountsMap[song] || 0) + 1;
+        }
+      });
+    }
   });
+});
 
   const parkEntries = Object.entries(PARK_ATTRACTIONS).filter(([park]) => {
     if (selectedPark === 'ALL') return true;
