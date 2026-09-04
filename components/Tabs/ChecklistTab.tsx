@@ -80,7 +80,7 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({
     if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
 
     v.activities.forEach(act => {
-      if (act.notes && isAttendeeRider(act, v.attendees)) {
+if (act.notes && isAttendeeRider(act, v.attendees || [])) {
         const cleanNote = cleanStr(act.notes);
         Object.values(COASTER_SONGS).flat().forEach(song => {
           const cleanSong = cleanStr(song);
