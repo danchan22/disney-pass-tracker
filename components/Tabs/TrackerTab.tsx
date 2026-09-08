@@ -682,7 +682,12 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                   ) : (
                                     `⏱️ ${act.waitTimeMinutes} mins wait`
                                   )}
-                                  {act.notes && !act.notes.includes('[Walk On]') ? ` • ${act.notes}` : ''}
+                                 {act.notes && (
+  (() => {
+    const displayNotes = act.notes.replace(/\[Walk On\]\s*•?\s*/g, '').trim();
+    return displayNotes ? ` • ${displayNotes}` : '';
+  })()
+)}
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
                                   👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
