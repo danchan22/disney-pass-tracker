@@ -39,6 +39,8 @@ const COASTER_SONGS: Record<string, string[]> = {
   ],
 };
 
+const SMUGGLERS_ROLES = ['Pilot', 'Gunner', 'Engineer'];
+
 const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const getCoasterSongsForAttraction = (attraction: string): string[] | null => {
@@ -54,6 +56,11 @@ const getCoasterSongsForAttraction = (attraction: string): string[] | null => {
   return null;
 };
 
+const isSmugglersRun = (attraction: string): boolean => {
+  const clean = cleanStr(attraction);
+  return clean.includes('smugglersrun') || clean.includes('millenniumfalcon');
+};
+
 export const ChecklistTab: React.FC<ChecklistTabProps> = ({ 
   rideCountsMap, 
   visits = [], 
@@ -61,25 +68,30 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({
   selectedAttendee = 'ALL' 
 }) => {
   const [selectedPark, setSelectedPark] = useState<string>('ALL');
-// Helper to check if a specific attendee rode this activity
-const isAttendeeRider = (act: Activity, visitAttendees: string[] | string | undefined) => {
-  if (selectedAttendee === 'ALL') return true;
-  const ridersList = parseAttendees(act.riders);
-  if (ridersList.length > 0) {
-    return ridersList.includes(selectedAttendee);
-  }
-  const allParty = parseAttendees(visitAttendees || []);
-  return allParty.includes(selectedAttendee);
-};
 
-  // Calculate song tally map based on selected park, selected attendee, and active/past visits
+  // Helper to check if a specific attendee rode this activity
+  const isAttendeeRider = (act: Activity, visitAttendees: string[] | string | undefined) => {
+    if (selectedAttendee === 'ALL') return true;
+    const ridersList = parseAttendees(act.riders);
+    if (ridersList.length > 0) {
+      return ridersList.includes(selectedAttendee);
+    }
+    const allParty = parseAttendees(visitAttendees || []);
+    return allParty.includes(selectedAttendee);
+  };
+
+  // Tallies for Coaster Songs and Smugglers Run Roles
   const songCountsMap: Record<string, number> = {};
+  const roleCountsMap: Record<string, number> = { Pilot: 0, Gunner: 0, Engineer: 0 };
 
-  const processVisitForSongs = (v: Visit) => {
+  const processVisitData = (v: Visit) => {
     if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
 
     v.activities.forEach(act => {
-if (act.notes && isAttendeeRider(act, v.attendees || [])) {
+      if (!isAttendeeRider(act, v.attendees || [])) return;
+
+      // Tally Coaster Songs from notes
+      if (act.notes) {
         const cleanNote = cleanStr(act.notes);
         Object.values(COASTER_SONGS).flat().forEach(song => {
           const cleanSong = cleanStr(song);
@@ -88,16 +100,23 @@ if (act.notes && isAttendeeRider(act, v.attendees || [])) {
           }
         });
       }
+
+      // Tally Smugglers Run Roles using correct `rideName` property
+      if (act.roles && isSmugglersRun(act.rideName || '')) {
+        if (selectedAttendee === 'ALL') {
+          Object.values(act.roles).forEach(r => {
+            if (roleCountsMap[r] !== undefined) roleCountsMap[r]++;
+          });
+        } else if (act.roles[selectedAttendee]) {
+          const personRole = act.roles[selectedAttendee];
+          if (roleCountsMap[personRole] !== undefined) roleCountsMap[personRole]++;
+        }
+      }
     });
   };
 
-  // Process completed past visits
-  visits.forEach(processVisitForSongs);
-
-  // Process currently active visit if one exists
-  if (activeVisit) {
-    processVisitForSongs(activeVisit);
-  }
+  visits.forEach(processVisitData);
+  if (activeVisit) processVisitData(activeVisit);
 
   const parkEntries = Object.entries(PARK_ATTRACTIONS).filter(([park]) => {
     if (selectedPark === 'ALL') return true;
@@ -156,7 +175,6 @@ if (act.notes && isAttendeeRider(act, v.attendees || [])) {
         return (
           <div key={park} style={{ background: '#FFF', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
             
-            {/* Park Banner Header */}
             {PARK_BANNERS[park] && (
               <img src={PARK_BANNERS[park]} alt={park} style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
             )}
@@ -184,6 +202,7 @@ if (act.notes && isAttendeeRider(act, v.attendees || [])) {
                   const count = rideCountsMap[attraction] || 0;
                   const isCompleted = count > 0;
                   const coasterSongs = getCoasterSongsForAttraction(attraction);
+                  const isSmugglers = isSmugglersRun(attraction);
 
                   return (
                     <React.Fragment key={attraction}>
@@ -231,6 +250,43 @@ if (act.notes && isAttendeeRider(act, v.attendees || [])) {
                                 </div>
                                 <div style={{ fontSize: '11px', fontWeight: 'bold', color: hasGottenSong ? '#6B21A8' : '#A855F7', flexShrink: 0 }}>
                                   {hasGottenSong ? `(${songCount})` : '0'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* INDENTED SMUGGLERS RUN ROLE SUB-CHECKS */}
+                      {isSmugglers && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '24px', marginTop: '2px', marginBottom: '4px' }}>
+                          {SMUGGLERS_ROLES.map(role => {
+                            const rCount = roleCountsMap[role] || 0;
+                            const hasRole = rCount > 0;
+
+                            return (
+                              <div
+                                key={role}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '5px 8px',
+                                  borderRadius: '8px',
+                                  background: hasRole ? '#EBF8FF' : '#F7FAFC',
+                                  border: hasRole ? '1px solid #BEE3F8' : '1px dashed #CBD5E0'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, paddingRight: '6px' }}>
+                                  <span style={{ fontSize: '11px', flexShrink: 0 }}>
+                                    {hasRole ? '🚀' : '⚪'}
+                                  </span>
+                                  <span style={{ fontSize: '11px', fontWeight: hasRole ? '700' : '500', color: hasRole ? '#2B6CB0' : '#4A5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    Role: {role}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '11px', fontWeight: 'bold', color: hasRole ? '#2B6CB0' : '#A0AEC0', flexShrink: 0 }}>
+                                  {hasRole ? `(${rCount})` : '0'}
                                 </div>
                               </div>
                             );
