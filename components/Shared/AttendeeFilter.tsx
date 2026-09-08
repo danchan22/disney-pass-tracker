@@ -16,6 +16,7 @@ export const AttendeeFilter: React.FC<AttendeeFilterProps> = ({ selectedAttendee
           return (
             <button
               key={m}
+              type="button"
               onClick={() => setSelectedAttendee(prev => prev === m ? 'ALL' : m)}
               style={{
                 padding: '10px 4px',
@@ -23,13 +24,13 @@ export const AttendeeFilter: React.FC<AttendeeFilterProps> = ({ selectedAttendee
                 fontSize: '13px',
                 fontWeight: isSelected ? '800' : '500',
                 border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-                background: isSelected ? '#004487' : '#FFF',
-                color: isSelected ? '#FFF' : '#2D3748',
+                background: isSelected ? '#EBF8FF' : '#FFF',
+                color: isSelected ? '#004487' : '#2D3748',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
             >
-              {isSelected ? `✓ ${m}` : m}
+              {m}
             </button>
           );
         })}
