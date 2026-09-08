@@ -548,6 +548,91 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                 </div>
                               )}
 
+                              {/* ROLE SELECTOR FOR SMUGGLERS RUN */}
+{isSmugglersRun(editRideName) && (
+  <div style={{ marginBottom: '8px', background: '#EBF8FF', padding: '8px', borderRadius: '8px', border: '1px solid #BEE3F8' }}>
+    <label style={{ fontSize: '10px', fontWeight: '800', color: '#2B6CB0', display: 'block', marginBottom: '6px' }}>
+      🚀 SELECT ROLES PER RIDER:
+    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {editRiders.map(rider => {
+        const currentRole = editNotes.match(new RegExp(`${rider}:\\s*(Pilot|Gunner|Engineer)`))?.[1] || '';
+        return (
+          <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {SMUGGLERS_ROLES.map(role => {
+                const isSelected = currentRole === role;
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => {
+                      let updatedNotes = editNotes;
+                      SMUGGLERS_ROLES.forEach(r => {
+                        updatedNotes = updatedNotes.replace(new RegExp(`\\s*•?\\s*🚀\\s*${rider}:\\s*${r}`), '').trim();
+                      });
+                      if (!isSelected) {
+                        updatedNotes = updatedNotes ? `${updatedNotes} • 🚀 ${rider}: ${role}` : `🚀 ${rider}: ${role}`;
+                      }
+                      setEditNotes(updatedNotes);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#004487' : '#F7FAFC',
+                      color: isSelected ? '#FFF' : '#4A5568',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {role}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
+{/* SCORE INPUTS FOR TOY STORY MANIA & BUZZ LIGHTYEAR */}
+{isShooterRide(editRideName) && (
+  <div style={{ marginBottom: '8px', background: '#FFF5F7', padding: '8px', borderRadius: '8px', border: '1px solid #FED7E2' }}>
+    <label style={{ fontSize: '10px', fontWeight: '800', color: '#9B2C2C', display: 'block', marginBottom: '6px' }}>
+      🎯 ENTER SCORES PER RIDER:
+    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {editRiders.map(rider => {
+        const currentScore = editNotes.match(new RegExp(`${rider}:\\s*(\\d+)`))?.[1] || '';
+        return (
+          <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+            <input
+              type="number"
+              placeholder="Score"
+              value={currentScore}
+              onChange={(e) => {
+                const newScore = e.target.value;
+                let updatedNotes = editNotes.replace(new RegExp(`\\s*•?\\s*🎯\\s*${rider}:\\s*\\d+`), '').trim();
+                if (newScore) {
+                  updatedNotes = updatedNotes ? `${updatedNotes} • 🎯 ${rider}: ${newScore}` : `🎯 ${rider}: ${newScore}`;
+                }
+                setEditNotes(updatedNotes);
+              }}
+              style={{ width: '90px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #CBD5E0', fontSize: '12px', fontWeight: '700', textAlign: 'right' }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
                               <div style={{ marginBottom: '6px' }}>
                                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -953,6 +1038,91 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                                   </select>
                                 </div>
                               )}
+
+                              {/* ROLE SELECTOR FOR SMUGGLERS RUN (HISTORY) */}
+{isSmugglersRun(editRideName) && (
+  <div style={{ marginBottom: '8px', background: '#EBF8FF', padding: '8px', borderRadius: '8px', border: '1px solid #BEE3F8' }}>
+    <label style={{ fontSize: '10px', fontWeight: '800', color: '#2B6CB0', display: 'block', marginBottom: '6px' }}>
+      🚀 SELECT ROLES PER RIDER:
+    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {editRiders.map(rider => {
+        const currentRole = editNotes.match(new RegExp(`${rider}:\\s*(Pilot|Gunner|Engineer)`))?.[1] || '';
+        return (
+          <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {SMUGGLERS_ROLES.map(role => {
+                const isSelected = currentRole === role;
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => {
+                      let updatedNotes = editNotes;
+                      SMUGGLERS_ROLES.forEach(r => {
+                        updatedNotes = updatedNotes.replace(new RegExp(`\\s*•?\\s*🚀\\s*${rider}:\\s*${r}`), '').trim();
+                      });
+                      if (!isSelected) {
+                        updatedNotes = updatedNotes ? `${updatedNotes} • 🚀 ${rider}: ${role}` : `🚀 ${rider}: ${role}`;
+                      }
+                      setEditNotes(updatedNotes);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#004487' : '#F7FAFC',
+                      color: isSelected ? '#FFF' : '#4A5568',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {role}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
+{/* SCORE INPUTS FOR TOY STORY MANIA & BUZZ LIGHTYEAR (HISTORY) */}
+{isShooterRide(editRideName) && (
+  <div style={{ marginBottom: '8px', background: '#FFF5F7', padding: '8px', borderRadius: '8px', border: '1px solid #FED7E2' }}>
+    <label style={{ fontSize: '10px', fontWeight: '800', color: '#9B2C2C', display: 'block', marginBottom: '6px' }}>
+      🎯 ENTER SCORES PER RIDER:
+    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {editRiders.map(rider => {
+        const currentScore = editNotes.match(new RegExp(`${rider}:\\s*(\\d+)`))?.[1] || '';
+        return (
+          <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+            <input
+              type="number"
+              placeholder="Score"
+              value={currentScore}
+              onChange={(e) => {
+                const newScore = e.target.value;
+                let updatedNotes = editNotes.replace(new RegExp(`\\s*•?\\s*🎯\\s*${rider}:\\s*\\d+`), '').trim();
+                if (newScore) {
+                  updatedNotes = updatedNotes ? `${updatedNotes} • 🎯 ${rider}: ${newScore}` : `🎯 ${rider}: ${newScore}`;
+                }
+                setEditNotes(updatedNotes);
+              }}
+              style={{ width: '90px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #CBD5E0', fontSize: '12px', fontWeight: '700', textAlign: 'right' }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
 
                               <div style={{ marginBottom: '6px' }}>
                                 <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
