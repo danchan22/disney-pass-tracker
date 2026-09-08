@@ -84,36 +84,49 @@ export const ChecklistTab: React.FC<ChecklistTabProps> = ({
   const songCountsMap: Record<string, number> = {};
   const roleCountsMap: Record<string, number> = { Pilot: 0, Gunner: 0, Engineer: 0 };
 
-  const processVisitData = (v: Visit) => {
-    if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
+const processVisitData = (v: Visit) => {
+  if (selectedPark !== 'ALL' && v.parkName !== selectedPark) return;
 
-    v.activities.forEach(act => {
-      if (!isAttendeeRider(act, v.attendees || [])) return;
+  v.activities.forEach(act => {
+    if (!isAttendeeRider(act, v.attendees || [])) return;
 
-      // Tally Coaster Songs from notes
-      if (act.notes) {
-        const cleanNote = cleanStr(act.notes);
-        Object.values(COASTER_SONGS).flat().forEach(song => {
-          const cleanSong = cleanStr(song);
-          if (cleanNote.includes(cleanSong)) {
-            songCountsMap[song] = (songCountsMap[song] || 0) + 1;
-          }
-        });
-      }
-
-      // Tally Smugglers Run Roles using correct `rideName` property
-      if (act.roles && isSmugglersRun(act.rideName || '')) {
-        if (selectedAttendee === 'ALL') {
-          Object.values(act.roles).forEach(r => {
-            if (roleCountsMap[r] !== undefined) roleCountsMap[r]++;
-          });
-        } else if (act.roles[selectedAttendee]) {
-          const personRole = act.roles[selectedAttendee];
-          if (roleCountsMap[personRole] !== undefined) roleCountsMap[personRole]++;
+    // Tally Coaster Songs from notes
+    if (act.notes) {
+      const cleanNote = cleanStr(act.notes);
+      Object.values(COASTER_SONGS).flat().forEach(song => {
+        const cleanSong = cleanStr(song);
+        if (cleanNote.includes(cleanSong)) {
+          songCountsMap[song] = (songCountsMap[song] || 0) + 1;
         }
-      }
-    });
-  };
+      });
+    }
+
+    // Tally Smugglers Run Roles from notes or roles object
+    if (isSmugglersRun(act.rideName || '')) {
+      SMUGGLERS_ROLES.forEach(role => {
+        if (selectedAttendee === 'ALL') {
+          // Check if any rider had this role in notes (e.g. "🚀 Mandie: Engineer")
+          if (act.notes && act.notes.includes(`: ${role}`)) {
+            // Count occurrences in notes
+            const matches = act.notes.match(new RegExp(`:\\s*${role}`, 'g'));
+            if (matches) roleCountsMap[role] += matches.length;
+          } else if (act.roles) {
+            Object.values(act.roles).forEach(r => {
+              if (r === role) roleCountsMap[role]++;
+            });
+          }
+        } else {
+          // Check for specific attendee (e.g. "Mandie: Engineer")
+          if (act.notes && (act.notes.includes(`${selectedAttendee}: ${role}`) || act.notes.includes(`${selectedAttendee}: ${role}`))) {
+            roleCountsMap[role]++;
+          } else if (act.roles && act.roles[selectedAttendee] === role) {
+            roleCountsMap[role]++;
+          }
+        }
+      });
+    }
+  });
+};
 
   visits.forEach(processVisitData);
   if (activeVisit) processVisitData(activeVisit);
