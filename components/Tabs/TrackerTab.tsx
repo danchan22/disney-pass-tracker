@@ -106,6 +106,8 @@ const COASTER_SONGS: Record<string, string[]> = {
   ],
 };
 
+
+
 const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const getCoasterSongs = (ride: string): string[] | null => {
@@ -120,6 +122,19 @@ const getCoasterSongs = (ride: string): string[] | null => {
     }
   }
   return null;
+};
+
+// Smugglers Run Role Definitions
+const SMUGGLERS_ROLES = ['Pilot', 'Gunner', 'Engineer'] as const;
+
+const isSmugglersRun = (name: string): boolean => {
+  const clean = cleanStr(name);
+  return clean.includes('smugglersrun') || clean.includes('millenniumfalcon');
+};
+
+const isShooterRide = (name: string): boolean => {
+  const clean = cleanStr(name);
+  return clean.includes('toystorymania') || clean.includes('buzzlightyear');
 };
 
 const WEEKDAYS = [
