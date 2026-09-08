@@ -6,6 +6,8 @@ export interface Activity {
   isWalkOn?: boolean;
   notes?: string;
   riders?: string | string[];
+  roles?: Record<string, 'Pilot' | 'Gunner' | 'Engineer'>; // e.g. { "Dan": "Pilot", "Mandie": "Gunner" }
+  scores?: Record<string, number>;                         // e.g. { "Dan": 185000, "Mandie": 142000 }
 }
 
 export interface Visit {
