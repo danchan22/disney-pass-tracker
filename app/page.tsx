@@ -247,22 +247,28 @@ export default function DisneyTracker() {
         setActiveVisit(active);
         setVisits(formattedVisits.filter(v => v.endTime));
 
-        // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud
-        const localStart = localStorage.getItem('disney_queue_start_ts');
-        const localStr = localStorage.getItem('disney_queue_start_str');
-        const localRide = localStorage.getItem('disney_queue_ride_name');
+    // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud, Clear if Ended
+const localStart = localStorage.getItem('disney_queue_start_ts');
+const localStr = localStorage.getItem('disney_queue_start_str');
+const localRide = localStorage.getItem('disney_queue_ride_name');
 
-        if (localStart && localStr) {
-          setQueueStartTimestamp(Number(localStart));
-          setQueueStartTimeStr(localStr);
-          if (localRide) setRideName(localRide);
-        } else if (active && (active as any).queue_start_ts) {
-          setQueueStartTimestamp(Number((active as any).queue_start_ts));
-          setQueueStartTimeStr((active as any).queue_start_str || null);
-          if ((active as any).queue_ride_name) {
-            setRideName((active as any).queue_ride_name);
-          }
-        }
+if (localStart && localStr) {
+  setQueueStartTimestamp(Number(localStart));
+  setQueueStartTimeStr(localStr);
+  if (localRide) setRideName(localRide);
+} else if (active && (active as any).queue_start_ts) {
+  setQueueStartTimestamp(Number((active as any).queue_start_ts));
+  setQueueStartTimeStr((active as any).queue_start_str || null);
+  if ((active as any).queue_ride_name) {
+    setRideName((active as any).queue_ride_name);
+  }
+} else {
+  // Cloud and localStorage agree there is no running timer -> reset state for all devices
+  setQueueStartTimestamp(null);
+  setQueueStartTimeStr(null);
+  setRideTrivia(null);
+  setHiddenMickey(null);
+}
       }
     } catch (err: any) {
       setErrorMessage("Could not load cloud visits. " + (err.message || ''));
