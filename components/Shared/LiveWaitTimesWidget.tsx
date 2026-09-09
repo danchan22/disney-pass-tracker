@@ -16,14 +16,14 @@ interface LiveWaitTimesWidgetProps {
   parkName: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
 }
 
-// Helper: Filter out showtimes that have already passed today
-const isShowInFuture = (timeStr: string): boolean => {
+const isShowInFuture = (timeStr: any): boolean => {
+  if (!timeStr || typeof timeStr !== 'string') return true;
+
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Parse time strings like "2:30 PM", "10:15 AM", or "14:30"
   const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-  if (!match) return true; // Fallback to display if format isn't standard
+  if (!match) return true;
 
   let hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
@@ -47,10 +47,20 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
     setError(null);
     try {
       const res = await fetch(`/api/live-wait-times?park=${encodeURIComponent(parkName)}`);
-      if (!res.ok) throw new Error('Failed to fetch live wait times');
-      const data: AttractionWaitData[] = await res.json();
-      setAttractions(data);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error((data && data.error) || `Server error (${res.status})`);
+      }
+
+      if (Array.isArray(data)) {
+        setAttractions(data);
+      } else {
+        setAttractions([]);
+        setError((data && data.error) || 'Invalid data format returned');
+      }
     } catch (err: any) {
+      setAttractions([]);
       setError(err.message || 'Unable to load wait times');
     } finally {
       setLoading(false);
@@ -59,13 +69,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
 
   useEffect(() => {
     fetchLiveWaitTimes();
-    // Refresh wait times automatically every 3 minutes
     const interval = setInterval(fetchLiveWaitTimes, 180000);
     return () => clearInterval(interval);
   }, [parkName]);
 
-  const filteredAttractions = attractions.filter(att => 
-    att.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const safeAttractions = Array.isArray(attractions) ? attractions : [];
+  const filteredAttractions = safeAttractions.filter(att => 
+    att && typeof att.name === 'string' && att.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -139,7 +149,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       />
 
       {/* CONTENT LIST */}
-      {loading && attractions.length === 0 ? (
+      {loading && safeAttractions.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#A0AEC0', padding: '16px 0', fontSize: '13px', fontStyle: 'italic' }}>
           Fetching current Disney park data...
         </div>
@@ -154,9 +164,9 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '2px' }}>
           {filteredAttractions.map((att) => {
-            // Filter showtimes to show only future showtimes today
-            const futureShowtimes = (att.showtimes || []).filter(isShowInFuture);
-            const isShow = att.type === 'SHOW' || (att.showtimes && att.showtimes.length > 0);
+            const showtimes = Array.isArray(att.showtimes) ? att.showtimes : [];
+            const futureShowtimes = showtimes.filter(isShowInFuture);
+            const isShow = att.type === 'SHOW' || showtimes.length > 0;
 
             return (
               <div
