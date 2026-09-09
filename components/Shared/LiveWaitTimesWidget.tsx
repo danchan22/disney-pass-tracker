@@ -46,7 +46,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/wait-times?park=${encodeURIComponent(parkName)}`);
+      const res = await fetch(`/api/live-wait-times?park=${encodeURIComponent(parkName)}`);
       if (!res.ok) throw new Error('Failed to fetch live wait times');
       const data: AttractionWaitData[] = await res.json();
       setAttractions(data);
