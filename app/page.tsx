@@ -92,6 +92,13 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
+const channel = supabase
+  .channel('schema-db-changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
+    fetchVisits(); // Auto-refreshes state instantly when Sam or anyone updates
+  })
+  .subscribe();
+  
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
