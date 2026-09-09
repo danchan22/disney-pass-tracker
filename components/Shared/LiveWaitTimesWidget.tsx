@@ -1,273 +1,249 @@
-import React, { useState, useEffect, useCallback } from 'react';
+'use client';
 
-interface AttractionLive {
+import React, { useEffect, useState } from 'react';
+import { ParkIcon } from './ParkIcon';
+
+interface AttractionWaitData {
   id: string;
   name: string;
-  status: string;
-  waitTime: number | null;
-}
-
-interface ShowLive {
-  id: string;
-  name: string;
-  status: string;
-  showtimes: string[];
+  is_open: boolean;
+  wait_time: number | null;
+  type: 'RIDE' | 'SHOW' | 'EVENT';
+  showtimes?: string[];
 }
 
 interface LiveWaitTimesWidgetProps {
-  parkName: string;
+  parkName: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
 }
 
-// Helper to determine wait time pill color styling
-const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
-  if (!isOperating) {
-    return {
-      bg: '#FFF5F5',
-      color: '#9B2C2C',
-      border: '#FEB2B2',
-    };
-  }
+// Helper: Filter out showtimes that have already passed today
+const isShowInFuture = (timeStr: string): boolean => {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Green tier for 0-29 mins OR general OPEN status
-  if (waitTime === null || waitTime <= 29) {
-    return {
-      bg: '#E6FFFA',
-      color: '#22543D',
-      border: '#B2F5EA',
-    };
-  } else if (waitTime <= 44) {
-    return {
-      bg: '#FEFCBF',
-      color: '#744210',
-      border: '#F6E05E',
-    };
-  } else if (waitTime <= 59) {
-    return {
-      bg: '#FEEBC8',
-      color: '#7B341E',
-      border: '#FBD38D',
-    };
-  } else {
-    return {
-      bg: '#FFF5F5',
-      color: '#9B2C2C',
-      border: '#FEB2B2',
-    };
-  }
+  // Parse time strings like "2:30 PM", "10:15 AM", or "14:30"
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!match) return true; // Fallback to display if format isn't standard
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const modifier = match[3]?.toUpperCase();
+
+  if (modifier === 'PM' && hours < 12) hours += 12;
+  if (modifier === 'AM' && hours === 12) hours = 0;
+
+  const showMinutes = hours * 60 + minutes;
+  return showMinutes >= currentMinutes;
 };
 
 export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkName }) => {
-  const [viewType, setViewType] = useState<'rides' | 'shows'>('rides');
-  const [rides, setRides] = useState<AttractionLive[]>([]);
-  const [shows, setShows] = useState<ShowLive[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [attractions, setAttractions] = useState<AttractionWaitData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const fetchWaitTimes = useCallback(async () => {
+  const fetchLiveWaitTimes = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/live-wait-times?park=${encodeURIComponent(parkName)}`);
-      const data = await res.json();
-
-      if (data.error) throw new Error(data.error);
-
-      setRides(data.rides || []);
-      setShows(data.shows || []);
-
-      const nowET = new Date().toLocaleTimeString('en-US', {
-        timeZone: 'America/New_York',
-        hour12: true,
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-      setLastUpdated(nowET);
+      const res = await fetch(`/api/wait-times?park=${encodeURIComponent(parkName)}`);
+      if (!res.ok) throw new Error('Failed to fetch live wait times');
+      const data: AttractionWaitData[] = await res.json();
+      setAttractions(data);
     } catch (err: any) {
-      setError(err.message || 'Could not load live wait times.');
+      setError(err.message || 'Unable to load wait times');
     } finally {
       setLoading(false);
     }
-  }, [parkName]);
+  };
 
   useEffect(() => {
-    fetchWaitTimes();
-    const interval = setInterval(fetchWaitTimes, 150000);
+    fetchLiveWaitTimes();
+    // Refresh wait times automatically every 3 minutes
+    const interval = setInterval(fetchLiveWaitTimes, 180000);
     return () => clearInterval(interval);
-  }, [fetchWaitTimes]);
+  }, [parkName]);
+
+  const filteredAttractions = attractions.filter(att => 
+    att.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div style={{ background: '#FFF', borderRadius: '18px', padding: '16px', marginBottom: '15px', color: '#1A202C', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-      {/* Header Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#004487' }}>
-            ⏱️ Live Wait Times
+    <div
+      style={{
+        background: '#FFF',
+        borderRadius: '24px',
+        padding: '18px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+        border: '1px solid #E2E8F0',
+        marginBottom: '25px',
+      }}
+    >
+      {/* HEADER */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ParkIcon parkName={parkName} size={20} />
+          <h3
+            style={{
+              fontSize: '15px',
+              fontWeight: '900',
+              color: '#004487',
+              margin: 0,
+            }}
+          >
+            Live Wait & Show Times
           </h3>
-          {lastUpdated && (
-            <div style={{ fontSize: '10px', color: '#718096', marginTop: '2px' }}>
-              Updated: {lastUpdated}
-            </div>
-          )}
         </div>
-
         <button
           type="button"
-          onClick={fetchWaitTimes}
+          onClick={fetchLiveWaitTimes}
           disabled={loading}
           style={{
-            background: loading ? '#CBD5E0' : '#EBF8FF',
-            color: '#2B6CB0',
+            background: '#EBF8FF',
+            color: '#004487',
             border: '1px solid #BEE3F8',
-            padding: '6px 12px',
-            borderRadius: '10px',
+            borderRadius: '8px',
+            padding: '4px 10px',
             fontSize: '11px',
             fontWeight: '800',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            flexShrink: 0
+            cursor: 'pointer',
           }}
         >
-          {loading ? 'Refreshing...' : '🔄 Refresh'}
+          {loading ? '↻ Syncing...' : '↻ Refresh'}
         </button>
       </div>
 
-      {/* Rides | Shows Toggle Switch */}
-      <div style={{ display: 'flex', background: '#F8FAFC', padding: '3px', borderRadius: '10px', border: '1px solid #EDF2F7', marginBottom: '12px' }}>
-        <button
-          type="button"
-          onClick={() => setViewType('rides')}
-          style={{
-            flex: 1,
-            padding: '6px',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            background: viewType === 'rides' ? '#004487' : 'transparent',
-            color: viewType === 'rides' ? '#FFF' : '#4A5568',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          Rides
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewType('shows')}
-          style={{
-            flex: 1,
-            padding: '6px',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            background: viewType === 'shows' ? '#004487' : 'transparent',
-            color: viewType === 'shows' ? '#FFF' : '#4A5568',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          Shows
-        </button>
-      </div>
+      {/* SEARCH INPUT */}
+      <input
+        type="text"
+        placeholder="Filter attractions or shows..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '9px 12px',
+          borderRadius: '10px',
+          border: '1px solid #CBD5E0',
+          fontSize: '13px',
+          marginBottom: '12px',
+          boxSizing: 'border-box',
+          background: '#F8FAFC',
+        }}
+      />
 
-      {/* Content Display */}
-      {error ? (
-        <div style={{ fontSize: '12px', color: '#C53030', background: '#FFF5F5', padding: '10px', borderRadius: '10px', fontStyle: 'italic' }}>
+      {/* CONTENT LIST */}
+      {loading && attractions.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#A0AEC0', padding: '16px 0', fontSize: '13px', fontStyle: 'italic' }}>
+          Fetching current Disney park data...
+        </div>
+      ) : error ? (
+        <div style={{ color: '#E53E3E', fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>
           {error}
         </div>
-      ) : viewType === 'rides' ? (
-        /* RIDES VIEW */
-        rides.length === 0 && !loading ? (
-          <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
-            No matching park attractions found right now.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {rides.map((att) => {
-              const isOperating = att.status === 'OPERATING';
-              const displayWait = isOperating ? (att.waitTime !== null ? `${att.waitTime}m` : 'OPEN') : att.status;
-              const pillStyle = getWaitTimeStyle(isOperating, att.waitTime);
-
-              return (
-                <div
-                  key={att.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '8px 10px',
-                    background: '#F8FAFC',
-                    borderRadius: '10px',
-                    border: '1px solid #EDF2F7',
-                    fontSize: '12px'
-                  }}
-                >
-                  <span style={{ fontWeight: '700', color: '#2D3748', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, paddingRight: '8px' }}>
-                    {att.name}
-                  </span>
-                  <span
-                    style={{
-                      fontWeight: '900',
-                      fontSize: '11px',
-                      padding: '3px 8px',
-                      borderRadius: '8px',
-                      flexShrink: 0,
-                      background: pillStyle.bg,
-                      color: pillStyle.color,
-                      border: `1px solid ${pillStyle.border}`
-                    }}
-                  >
-                    {displayWait}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )
+      ) : filteredAttractions.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#A0AEC0', padding: '12px 0', fontSize: '12px', fontStyle: 'italic' }}>
+          No attractions found matching "{searchQuery}".
+        </div>
       ) : (
-        /* SHOWS VIEW */
-        shows.length === 0 && !loading ? (
-          <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
-            No scheduled showtimes available today.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {shows.map((show) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '2px' }}>
+          {filteredAttractions.map((att) => {
+            // Filter showtimes to show only future showtimes today
+            const futureShowtimes = (att.showtimes || []).filter(isShowInFuture);
+            const isShow = att.type === 'SHOW' || (att.showtimes && att.showtimes.length > 0);
+
+            return (
               <div
-                key={show.id}
+                key={att.id || att.name}
                 style={{
-                  padding: '10px',
-                  background: '#F8FAFC',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 12px',
                   borderRadius: '12px',
-                  border: '1px solid #EDF2F7'
+                  background: '#F8FAFC',
+                  border: '1px solid #EDF2F7',
                 }}
               >
-                <div style={{ fontWeight: '800', fontSize: '12px', color: '#1A202C', marginBottom: '6px' }}>
-                  {show.name}
+                <div style={{ minWidth: 0, flex: 1, paddingRight: '10px' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#1A202C' }}>
+                    {att.name}
+                  </div>
+
+                  {/* SHOWTIMES RENDERING */}
+                  {isShow && (
+                    <div style={{ fontSize: '11px', color: '#4A5568', marginTop: '4px' }}>
+                      {futureShowtimes.length > 0 ? (
+                        <div>
+                          <strong style={{ color: '#2B6CB0' }}>Next Shows:</strong>{' '}
+                          {futureShowtimes.slice(0, 4).join(', ')}
+                          {futureShowtimes.length > 4 && ` (+${futureShowtimes.length - 4} more)`}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#A0AEC0', fontStyle: 'italic' }}>
+                          No remaining showtimes scheduled for today
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                  {show.showtimes.map((st, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        background: '#EBF8FF',
-                        color: '#2B6CB0',
-                        border: '1px solid #BEE3F8',
-                        padding: '2px 7px',
-                        borderRadius: '6px',
-                        fontSize: '10px',
-                        fontWeight: '800'
-                      }}
-                    >
-                      {st}
-                    </span>
-                  ))}
-                </div>
+
+                {/* WAIT TIME / STATUS BADGE */}
+                {!isShow && (
+                  <div style={{ flexShrink: 0 }}>
+                    {!att.is_open ? (
+                      <span
+                        style={{
+                          background: '#FED7D7',
+                          color: '#C53030',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                        }}
+                      >
+                        Closed
+                      </span>
+                    ) : att.wait_time === 0 ? (
+                      <span
+                        style={{
+                          background: '#FEFCBF',
+                          color: '#B7791F',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                        }}
+                      >
+                        ⚡ Walk On
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          background: '#EBF8FF',
+                          color: '#2B6CB0',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '900',
+                          border: '1px solid #BEE3F8',
+                        }}
+                      >
+                        {att.wait_time}m
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )
+            );
+          })}
+        </div>
       )}
     </div>
   );
