@@ -284,7 +284,7 @@ export default function DisneyTracker() {
       if (data) setPhotoGrids(data as PhotoGridRecord[]);
     } catch (err) {
       console.warn("Could not fetch photo grids:", err);
-    } fontally {
+} finally {
       setPhotoLoading(false);
     }
   };
