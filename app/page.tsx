@@ -98,6 +98,14 @@ const channel = supabase
     fetchVisits(); // Auto-refreshes state instantly when Sam or anyone updates
   })
   .subscribe();
+
+  useEffect(() => {
+  const handleVisibility = () => {
+    if (document.visibilityState === 'visible') fetchVisits();
+  };
+  window.addEventListener('visibilitychange', handleVisibility);
+  return () => window.removeEventListener('visibilitychange', handleVisibility);
+}, []);
   
   useEffect(() => {
     if (activeVisit) {
