@@ -99,12 +99,42 @@ const channel = supabase
   })
   .subscribe();
 
-  useEffect(() => {
-  const handleVisibility = () => {
-    if (document.visibilityState === 'visible') fetchVisits();
+useEffect(() => {
+  let channel: any;
+
+  const setupRealtimeSubscription = async () => {
+    const supabase = await getSupabase();
+
+    channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'visits' },
+        () => {
+          fetchVisits(); // Auto-refreshes state instantly when anyone checks in or updates
+        }
+      )
+      .subscribe();
   };
+
+  setupRealtimeSubscription();
+
+  // Page visibility listener so mobile shortcuts/PWAs refresh when reopened
+  const handleVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      fetchVisits();
+    }
+  };
+
   window.addEventListener('visibilitychange', handleVisibility);
-  return () => window.removeEventListener('visibilitychange', handleVisibility);
+
+  // Clean up channel & event listener on unmount
+  return () => {
+    if (channel) {
+      getSupabase().then((supabase) => supabase.removeChannel(channel));
+    }
+    window.removeEventListener('visibilitychange', handleVisibility);
+  };
 }, []);
   
   useEffect(() => {
