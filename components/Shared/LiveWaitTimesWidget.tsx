@@ -53,8 +53,31 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
         throw new Error((data && data.error) || `Server error (${res.status})`);
       }
 
-      if (Array.isArray(data)) {
-        setAttractions(data);
+      // Unwraps direct arrays as well as ThemeParks.wiki wrappers like { liveData: [...] }
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.liveData)
+        ? data.liveData
+        : Array.isArray(data?.attractions)
+        ? data.attractions
+        : null;
+
+      if (items) {
+        // Normalize items if necessary
+        const normalized: AttractionWaitData[] = items.map((item: any, idx: number) => ({
+          id: item.id || item.id || `att-${idx}`,
+          name: item.name || 'Unknown Attraction',
+          is_open: item.is_open !== undefined ? Boolean(item.is_open) : item.status === 'OPERATING',
+          wait_time: item.wait_time !== undefined 
+            ? item.wait_time 
+            : item.queue?.STANDBY?.waitTime !== undefined 
+            ? item.queue.STANDBY.waitTime 
+            : null,
+          type: item.type || (item.entityType === 'SHOW' ? 'SHOW' : 'RIDE'),
+          showtimes: Array.isArray(item.showtimes) ? item.showtimes : []
+        }));
+
+        setAttractions(normalized);
       } else {
         setAttractions([]);
         setError((data && data.error) || 'Invalid data format returned');
