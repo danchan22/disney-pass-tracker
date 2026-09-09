@@ -92,50 +92,43 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
-const channel = supabase
-  .channel('schema-db-changes')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
-    fetchVisits(); // Auto-refreshes state instantly when Sam or anyone updates
-  })
-  .subscribe();
+  // Realtime Supabase Subscription & Mobile PWA Focus Listener
+  useEffect(() => {
+    let channel: any;
 
-useEffect(() => {
-  let channel: any;
+    const setupRealtimeSubscription = async () => {
+      const supabase = await getSupabase();
 
-  const setupRealtimeSubscription = async () => {
-    const supabase = await getSupabase();
+      channel = supabase
+        .channel('schema-db-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'visits' },
+          () => {
+            fetchCloudVisits(); // Auto-refreshes state instantly when anyone checks in or updates
+          }
+        )
+        .subscribe();
+    };
 
-    channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'visits' },
-        () => {
-          fetchVisits(); // Auto-refreshes state instantly when anyone checks in or updates
-        }
-      )
-      .subscribe();
-  };
+    setupRealtimeSubscription();
 
-  setupRealtimeSubscription();
+    // Re-fetch when Sam or anyone re-opens the app shortcut on mobile
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCloudVisits();
+      }
+    };
 
-  // Page visibility listener so mobile shortcuts/PWAs refresh when reopened
-  const handleVisibility = () => {
-    if (document.visibilityState === 'visible') {
-      fetchVisits();
-    }
-  };
+    window.addEventListener('visibilitychange', handleVisibility);
 
-  window.addEventListener('visibilitychange', handleVisibility);
-
-  // Clean up channel & event listener on unmount
-  return () => {
-    if (channel) {
-      getSupabase().then((supabase) => supabase.removeChannel(channel));
-    }
-    window.removeEventListener('visibilitychange', handleVisibility);
-  };
-}, []);
+    return () => {
+      if (channel) {
+        getSupabase().then((supabase) => supabase.removeChannel(channel));
+      }
+      window.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
   
   useEffect(() => {
     if (activeVisit) {
@@ -291,7 +284,7 @@ useEffect(() => {
       if (data) setPhotoGrids(data as PhotoGridRecord[]);
     } catch (err) {
       console.warn("Could not fetch photo grids:", err);
-    } finally {
+    } fontally {
       setPhotoLoading(false);
     }
   };
@@ -924,14 +917,14 @@ useEffect(() => {
         />
       )}
 
-{mainTab === 'checklist' && (
-  <ChecklistTab 
-    rideCountsMap={rideCountsMap} 
-    visits={visits} 
-    activeVisit={activeVisit}
-    selectedAttendee={selectedAttendee} 
-  />
-)}
+      {mainTab === 'checklist' && (
+        <ChecklistTab 
+          rideCountsMap={rideCountsMap} 
+          visits={visits} 
+          activeVisit={activeVisit}
+          selectedAttendee={selectedAttendee} 
+        />
+      )}
 
       {mainTab === 'rainbow' && (
         <RainbowTab
