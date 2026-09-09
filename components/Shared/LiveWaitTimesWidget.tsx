@@ -89,7 +89,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
   const [viewType, setViewType] = useState<'rides' | 'shows'>('rides');
   const [rides, setRides] = useState<AttractionLive[]>([]);
   const [shows, setShows] = useState<ShowLive[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,9 +124,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
     const interval = setInterval(fetchWaitTimes, 150000);
     return () => clearInterval(interval);
   }, [fetchWaitTimes]);
-
-  const filteredRides = rides.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const filteredShows = shows.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div style={{ background: '#FFF', borderRadius: '18px', padding: '16px', marginBottom: '25px', color: '#1A202C', border: '1px solid #E2E8F0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
@@ -169,7 +165,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
       </div>
 
       {/* RIDES | SHOWS TOGGLE SWITCH */}
-      <div style={{ display: 'flex', background: '#F8FAFC', padding: '3px', borderRadius: '10px', border: '1px solid #EDF2F7', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', background: '#F8FAFC', padding: '3px', borderRadius: '10px', border: '1px solid #EDF2F7', marginBottom: '12px' }}>
         <button
           type="button"
           onClick={() => setViewType('rides')}
@@ -208,24 +204,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
         </button>
       </div>
 
-      {/* SEARCH BAR */}
-      <input
-        type="text"
-        placeholder={`Search ${viewType}...`}
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        style={{
-          width: '100%',
-          padding: '8px 10px',
-          borderRadius: '8px',
-          border: '1px solid #CBD5E0',
-          fontSize: '12px',
-          marginBottom: '10px',
-          boxSizing: 'border-box',
-          background: '#F8FAFC'
-        }}
-      />
-
       {/* CONTENT DISPLAY */}
       {error ? (
         <div style={{ fontSize: '12px', color: '#C53030', background: '#FFF5F5', padding: '10px', borderRadius: '10px', fontStyle: 'italic' }}>
@@ -233,13 +211,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
         </div>
       ) : viewType === 'rides' ? (
         /* RIDES VIEW */
-        filteredRides.length === 0 && !loading ? (
+        rides.length === 0 && !loading ? (
           <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
             No matching park attractions found right now.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '350px', overflowY: 'auto' }}>
-            {filteredRides.map((att) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {rides.map((att) => {
               const isOperating = att.status === 'OPERATING';
               const displayWait = !isOperating 
                 ? 'CLOSED' 
@@ -288,13 +266,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({ parkNa
         )
       ) : (
         /* SHOWS VIEW */
-        filteredShows.length === 0 && !loading ? (
+        shows.length === 0 && !loading ? (
           <div style={{ fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>
             No scheduled showtimes available right now.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
-            {filteredShows.map((show) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {shows.map((show) => {
               const futureShowtimes = (show.showtimes || []).filter(isShowInFuture);
 
               return (
