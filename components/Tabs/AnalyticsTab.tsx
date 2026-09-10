@@ -65,6 +65,15 @@ const getVisitDuration = (v: Visit, personFilter: string): number => {
   return 0;
 };
 
+const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+interface ScoreRecord {
+  attendee: string;
+  score: number;
+  date: string;
+  park: string;
+}
+
 export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   analyticsSubTab,
   parkStats,
@@ -232,6 +241,126 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
+  // SCORE LEADERBOARD PARSER FOR BUZZ & TOY STORY MANIA
+  const getShooterScores = (rideMatchStr: string): ScoreRecord[] => {
+    const results: ScoreRecord[] = [];
+
+    visits.forEach(v => {
+      if (selectedPark && v.parkName !== selectedPark) return;
+
+      v.activities.forEach(act => {
+        const cleanRide = cleanStr(act.rideName || '');
+        if (!cleanRide.includes(rideMatchStr)) return;
+
+        if (act.notes) {
+          // Parse patterns like "🎯 Dan: 185000" or "🎯 Mandie: 95000"
+          const matches = act.notes.matchAll(/🎯\s*([^:]+):\s*(\d+)/g);
+          for (const match of matches) {
+            const attendee = match[1].trim();
+            const score = parseInt(match[2], 10);
+
+            if (selectedAttendee !== 'ALL' && attendee !== selectedAttendee) continue;
+
+            if (attendee && !isNaN(score)) {
+              results.push({
+                attendee,
+                score,
+                date: v.visitDate,
+                park: v.parkName
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return results.sort((a, b) => b.score - a.score).slice(0, 10);
+  };
+
+  const buzzScores = getShooterScores('buzzlightyear');
+  const toyStoryScores = getShooterScores('toystorymania');
+
+  // Render Leaderboard Score Card
+  const renderScoreLeaderboardCard = (title: string, icon: string, scores: ScoreRecord[]) => (
+    <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', marginBottom: '20px' }}>
+      <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span>{icon}</span> {title} {selectedAttendee !== 'ALL' ? `(${selectedAttendee})` : ''}
+      </h3>
+
+      {scores.length === 0 ? (
+        <div style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
+          No scores logged yet for this filter selection.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {scores.map((s, idx) => {
+            const isTop = idx === 0;
+
+            return (
+              <div
+                key={`${s.attendee}-${s.score}-${idx}`}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 14px',
+                  borderRadius: '16px',
+                  background: isTop ? '#FFFDF5' : '#F8FAFC',
+                  border: isTop ? '2px solid #D4AF37' : '1px solid #EDF2F7',
+                  boxShadow: isTop ? '0 2px 8px rgba(212, 175, 55, 0.15)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                  {/* RANK BADGE */}
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: isTop ? '#D4AF37' : '#004487',
+                    color: '#FFF',
+                    fontWeight: '900',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {idx + 1}
+                  </div>
+
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <h1 style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: '#1A202C', lineHeight: '1.2' }}>
+                      {s.attendee}
+                    </h1>
+                    <div style={{ fontSize: '11px', color: '#718096', fontWeight: '600', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📅 {formatDisplayDate(s.date)}</span>
+                      <span>•</span>
+                      <ParkIcon parkName={s.park} size={14} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SCORE PILL */}
+                <div style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: isTop ? '#FEFCBF' : '#EBF8FF',
+                  color: isTop ? '#744210' : '#004487',
+                  border: isTop ? '1px solid #F6E05E' : '1px solid #BEE3F8',
+                  fontSize: '15px',
+                  fontWeight: '900',
+                  flexShrink: 0
+                }}>
+                  {s.score.toLocaleString()}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   // 👤 FILTER BY ATTENDEE CARD
   const renderAttendeeFilterWidget = () => (
     <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '10px' }}>
@@ -306,7 +435,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     </div>
   );
 
-  // Placeholder for Leaderboards / Badges
+  // Placeholder for Badges
   const renderComingSoon = () => (
     <div style={{
       background: '#FFF',
@@ -780,7 +909,13 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             </div>
           )}
 
-          {peopleSubTab === 'Leaderboards' && renderComingSoon()}
+          {peopleSubTab === 'Leaderboards' && (
+            <div>
+              {renderScoreLeaderboardCard('Buzz Lightyear Scores', '🚀', buzzScores)}
+              {renderScoreLeaderboardCard('Toy Story Mania Scores', '🎯', toyStoryScores)}
+            </div>
+          )}
+
           {peopleSubTab === 'Badges' && renderComingSoon()}
         </div>
       )}
@@ -896,7 +1031,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             )
           )}
 
-          {ridesSubTab === 'Leaderboards' && renderComingSoon()}
+          {ridesSubTab === 'Leaderboards' && (
+            <div>
+              {renderScoreLeaderboardCard('Buzz Lightyear Scores', '🚀', buzzScores)}
+              {renderScoreLeaderboardCard('Toy Story Mania Scores', '🎯', toyStoryScores)}
+            </div>
+          )}
         </div>
       )}
 
@@ -904,7 +1044,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === ('visits' as AnalyticsSubTab) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* ATTENDEE & PARK FILTERS FOR VISITS TAB */}
+          {/* ATTENDEE & PARK FILTERS */}
           {renderAttendeeFilterWidget()}
           {renderParkFilterWidget()}
 
