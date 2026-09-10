@@ -853,10 +853,9 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         rainbowSubTab={rainbowSubTab}
         setRainbowSubTab={setRainbowSubTab}
       />
-
-      {(mainTab === 'checklist' || (mainTab === 'analytics' && analyticsSubTab !== 'cards')) && (
-        <AttendeeFilter selectedAttendee={selectedAttendee} setSelectedAttendee={setSelectedAttendee} />
-      )}
+{mainTab === 'checklist' && (
+  <AttendeeFilter selectedAttendee={selectedAttendee} setSelectedAttendee={setSelectedAttendee} />
+)}
 
       {mainTab === 'tracker' && (
         <TrackerTab
