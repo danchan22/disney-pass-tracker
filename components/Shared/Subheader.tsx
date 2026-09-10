@@ -5,12 +5,12 @@ export type FunSubTab = 'rainbow' | 'trivia';
 
 interface SubheaderProps {
   mainTab: MainTab;
-  trackerSubTab: TrackerSubTab;
-  setTrackerSubTab: (sub: TrackerSubTab) => void;
-  analyticsSubTab: AnalyticsSubTab;
-  setAnalyticsSubTab: (sub: AnalyticsSubTab) => void;
-  funSubTab: FunSubTab;
-  setFunSubTab: (sub: FunSubTab) => void;
+  trackerSubTab?: TrackerSubTab;
+  setTrackerSubTab?: (sub: TrackerSubTab) => void;
+  analyticsSubTab?: AnalyticsSubTab;
+  setAnalyticsSubTab?: (sub: AnalyticsSubTab) => void;
+  funSubTab?: FunSubTab;
+  setFunSubTab?: (sub: FunSubTab) => void;
 }
 
 export const Subheader: React.FC<SubheaderProps> = ({
@@ -19,7 +19,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
   setTrackerSubTab,
   analyticsSubTab,
   setAnalyticsSubTab,
-  funSubTab,
+  funSubTab = 'rainbow',
   setFunSubTab
 }) => {
   // Common container style for centered, spread text subtabs
@@ -71,7 +71,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
     </button>
   );
 
-  if (mainTab === 'tracker') {
+  if (mainTab === 'tracker' && trackerSubTab && setTrackerSubTab) {
     const tabs: { label: string; value: TrackerSubTab }[] = [
       { label: 'Today', value: 'Today' },
       { label: 'History', value: 'History' },
@@ -87,7 +87,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
     );
   }
 
-  if (mainTab === 'analytics') {
+  if (mainTab === 'analytics' && analyticsSubTab && setAnalyticsSubTab) {
     const tabs: { label: string; value: AnalyticsSubTab }[] = [
       { label: 'Parks', value: 'averages' },
       { label: 'People', value: 'cards' },
@@ -104,7 +104,7 @@ export const Subheader: React.FC<SubheaderProps> = ({
     );
   }
 
-  if (mainTab === 'rainbow' || (mainTab as any) === 'fun') {
+  if ((mainTab === 'rainbow' || (mainTab as any) === 'fun') && setFunSubTab) {
     const tabs: { label: string; value: FunSubTab }[] = [
       { label: 'Rainbow', value: 'rainbow' },
       { label: 'Trivia', value: 'trivia' }
