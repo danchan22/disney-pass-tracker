@@ -119,7 +119,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const parkAvgVisitArr = allParkMetrics.map(p => p.avgVisit);
   const parkAvgWaitArr = allParkMetrics.map(p => p.avgWait);
 
-  // Pre-calculate Attendee Metrics (Dynamically filtered by selectedPark)
+  // Pre-calculate Attendee Metrics
   const allAttendeeMetrics = FIXED_FAMILY_MEMBERS.map(person => {
     const personVisits = visits.filter(v => {
       const hasPerson = parseAttendees(v.attendees).includes(person);
@@ -232,7 +232,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
-  // 👤 FILTER BY ATTENDEE (MATCHING ENCLOSED CARD)
+  // 👤 FILTER BY ATTENDEE CARD
   const renderAttendeeFilterWidget = () => (
     <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '10px' }}>
       <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
@@ -266,7 +266,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     </div>
   );
 
-  // 🎡 FILTER BY PARK (MATCHING ENCLOSED CARD)
+  // 🎡 FILTER BY PARK CARD
   const renderParkFilterWidget = () => (
     <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '14px' }}>
       <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
@@ -329,7 +329,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === 'averages' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* ATTENDEE & PARK FILTERS FOR PARKS TAB */}
+          {/* ATTENDEE & PARK FILTERS */}
           {renderAttendeeFilterWidget()}
           {renderParkFilterWidget()}
 
