@@ -1,5 +1,7 @@
 import React from 'react';
-import { MainTab, TrackerSubTab, AnalyticsSubTab, RainbowSubTab } from '../../lib/types';
+import { MainTab, TrackerSubTab, AnalyticsSubTab } from '../../lib/types';
+
+export type FunSubTab = 'rainbow' | 'trivia';
 
 interface SubheaderProps {
   mainTab: MainTab;
@@ -7,8 +9,8 @@ interface SubheaderProps {
   setTrackerSubTab: (sub: TrackerSubTab) => void;
   analyticsSubTab: AnalyticsSubTab;
   setAnalyticsSubTab: (sub: AnalyticsSubTab) => void;
-  rainbowSubTab: RainbowSubTab;
-  setRainbowSubTab: (sub: RainbowSubTab) => void;
+  funSubTab: FunSubTab;
+  setFunSubTab: (sub: FunSubTab) => void;
 }
 
 export const Subheader: React.FC<SubheaderProps> = ({
@@ -17,8 +19,8 @@ export const Subheader: React.FC<SubheaderProps> = ({
   setTrackerSubTab,
   analyticsSubTab,
   setAnalyticsSubTab,
-  rainbowSubTab,
-  setRainbowSubTab
+  funSubTab,
+  setFunSubTab
 }) => {
   // Common container style for centered, spread text subtabs
   const containerStyle: React.CSSProperties = {
@@ -102,16 +104,16 @@ export const Subheader: React.FC<SubheaderProps> = ({
     );
   }
 
-  if (mainTab === 'rainbow') {
-    const tabs: { label: string; value: RainbowSubTab }[] = [
-      { label: 'Photo Stream', value: 'stream' },
-      { label: 'Badges', value: 'badges' }
+  if (mainTab === 'rainbow' || (mainTab as any) === 'fun') {
+    const tabs: { label: string; value: FunSubTab }[] = [
+      { label: 'Rainbow', value: 'rainbow' },
+      { label: 'Trivia', value: 'trivia' }
     ];
 
     return (
       <div style={containerStyle}>
         {tabs.map(tab =>
-          renderTextTab(tab.label, rainbowSubTab === tab.value, () => setRainbowSubTab(tab.value))
+          renderTextTab(tab.label, funSubTab === tab.value, () => setFunSubTab(tab.value))
         )}
       </div>
     );
