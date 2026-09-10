@@ -6,6 +6,9 @@ import { PARK_NAMES, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/co
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate, format12Hour } from '../../lib/helpers';
 import { ParkIcon } from '../Shared/ParkIcon';
 
+type PeopleSubTab = 'Cards' | 'Leaderboards' | 'Badges';
+type RidesSubTab = 'Big Chart' | 'Leaderboards';
+
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
   parkStats: Record<string, { visits: number; activities: number; timeInPark: number; waitTime: number }>;
@@ -78,6 +81,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const [selectedPark, setSelectedPark] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('ridden');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Tertiary Navigation States
+  const [peopleSubTab, setPeopleSubTab] = useState<PeopleSubTab>('Cards');
+  const [ridesSubTab, setRidesSubTab] = useState<RidesSubTab>('Big Chart');
 
   const handleParkSelect = (park: string) => {
     setSelectedPark(prev => (prev === park ? null : park));
@@ -217,12 +224,106 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
+  // Shared Filter Block (Attendee + Park)
+  const renderAttendeeAndParkFilters = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+      {/* ATTENDEE FILTER */}
+      <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+        <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>👤 FILTER BY ATTENDEE</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+          {FIXED_FAMILY_MEMBERS.map(m => {
+            const isSelected = selectedAttendee === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setSelectedAttendee && setSelectedAttendee(isSelected ? 'ALL' : m)}
+                style={{
+                  padding: '10px 4px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: isSelected ? '800' : '500',
+                  border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                  background: isSelected ? '#EBF8FF' : '#FFF',
+                  color: isSelected ? '#004487' : '#2D3748',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* PARK FILTER */}
+      <div>
+        <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+          PARK
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {PARK_NAMES.map(park => {
+            const isSelected = selectedPark === park;
+            return (
+              <button
+                key={park}
+                type="button"
+                onClick={() => handleParkSelect(park)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '10px 6px',
+                  borderRadius: '14px',
+                  border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                  background: isSelected ? '#EBF8FF' : '#FFF',
+                  color: isSelected ? '#004487' : '#2D3748',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                  overflow: 'hidden'
+                }}
+              >
+                <ParkIcon parkName={park} size={16} />
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Coming Soon Placeholder
+  const renderComingSoon = () => (
+    <div style={{
+      background: '#FFF',
+      borderRadius: '20px',
+      padding: '40px 20px',
+      textAlign: 'center',
+      border: '1px solid #E2E8F0',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+    }}>
+      <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
+      <div style={{ fontSize: '16px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>Coming soon!</div>
+      <div style={{ fontSize: '12px', color: '#718096' }}>We're building something magical for this view.</div>
+    </div>
+  );
+
   return (
     <div>
       {/* Subtab: Parks */}
       {analyticsSubTab === 'averages' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {PARK_NAMES.map((park) => {
+          
+          {/* ATTENDEE & PARK FILTERS FOR PARKS TAB */}
+          {renderAttendeeAndParkFilters()}
+
+          {PARK_NAMES.filter(p => selectedPark === null || selectedPark === p).map((park) => {
             const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
             const avgActivitiesVal = stats.visits > 0 ? stats.activities / stats.visits : 0;
             const avgVisitVal = stats.visits > 0 ? stats.timeInPark / stats.visits : 0;
@@ -442,307 +543,343 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
       {/* Subtab: People */}
       {analyticsSubTab === 'cards' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {FIXED_FAMILY_MEMBERS.map(person => {
-            const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
-            const pDays = personVisits.length;
-            const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
-            const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
-            const pParkMinutes = personVisits.reduce((sum, v) => {
-              const pEndTime = getPersonEndTime(v, person);
-              if (v.startTime && pEndTime) {
-                const start = parseTimeToMinutes(v.startTime);
-                const end = parseTimeToMinutes(pEndTime);
-                return sum + (end >= start ? (end - start) : ((1440 - start) + end));
-              }
-              return sum;
-            }, 0);
+        <div>
+          {/* LEVEL 3 PILLS: Cards | Leaderboards | Badges */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', paddingLeft: '2px' }}>
+            {(['Cards', 'Leaderboards', 'Badges'] as PeopleSubTab[]).map(pill => {
+              const isSelected = peopleSubTab === pill;
+              return (
+                <button
+                  key={pill}
+                  type="button"
+                  onClick={() => setPeopleSubTab(pill)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    background: isSelected ? '#004487' : 'transparent',
+                    color: isSelected ? '#FFF' : '#4A5568',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? '800' : '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {pill}
+                </button>
+              );
+            })}
+          </div>
 
-            const pAvgActsVal = pDays > 0 ? pActivities / pDays : 0;
-            const pAvgParkVal = pDays > 0 ? pParkMinutes / pDays : 0;
-            const pAvgWaitVal = pActivities > 0 ? pWaitMinutes / pActivities : 0;
+          {/* ATTENDEE & PARK FILTERS */}
+          {renderAttendeeAndParkFilters()}
 
-            const pAvgActs = pAvgActsVal.toFixed(1);
-            const pAvgPark = pAvgParkVal;
-            const pAvgWait = Math.round(pAvgWaitVal);
+          {/* SUBTAB CONTENTS */}
+          {peopleSubTab === 'Cards' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {FIXED_FAMILY_MEMBERS.filter(p => selectedAttendee === 'ALL' || p === selectedAttendee).map(person => {
+                const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
+                const pDays = personVisits.length;
+                const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
+                const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
+                const pParkMinutes = personVisits.reduce((sum, v) => {
+                  const pEndTime = getPersonEndTime(v, person);
+                  if (v.startTime && pEndTime) {
+                    const start = parseTimeToMinutes(v.startTime);
+                    const end = parseTimeToMinutes(pEndTime);
+                    return sum + (end >= start ? (end - start) : ((1440 - start) + end));
+                  }
+                  return sum;
+                }, 0);
 
-            const totalAtt = FIXED_FAMILY_MEMBERS.length;
-            const rAttActs = getRank(attActivitiesArr, pActivities, false);
-            const rAttParkMin = getRank(attParkMinutesArr, pParkMinutes, false);
-            const rAttWaitMin = getRank(attWaitMinutesArr, pWaitMinutes, false);
-            const rAttAvgActs = getRank(attAvgActsArr, pAvgActsVal, false);
-            const rAttAvgPark = getRank(attAvgParkArr, pAvgParkVal, false);
-            const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true);
+                const pAvgActsVal = pDays > 0 ? pActivities / pDays : 0;
+                const pAvgParkVal = pDays > 0 ? pParkMinutes / pDays : 0;
+                const pAvgWaitVal = pActivities > 0 ? pWaitMinutes / pActivities : 0;
 
-            const pTotalTime = Math.max(1, pParkMinutes);
-            const pLineTime = Math.min(pWaitMinutes, pTotalTime);
-            const pLinePercent = Math.round((pLineTime / pTotalTime) * 100);
+                const pAvgActs = pAvgActsVal.toFixed(1);
+                const pAvgPark = pAvgParkVal;
+                const pAvgWait = Math.round(pAvgWaitVal);
 
-            const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
-            const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0, avgWait: 0 };
+                const totalAtt = FIXED_FAMILY_MEMBERS.length;
+                const rAttActs = getRank(attActivitiesArr, pActivities, false);
+                const rAttParkMin = getRank(attParkMinutesArr, pParkMinutes, false);
+                const rAttWaitMin = getRank(attWaitMinutesArr, pWaitMinutes, false);
+                const rAttAvgActs = getRank(attAvgActsArr, pAvgActsVal, false);
+                const rAttAvgPark = getRank(attAvgParkArr, pAvgParkVal, false);
+                const rAttAvgWait = getRank(attAvgWaitArr, pAvgWaitVal, true);
 
-            const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-            personVisits.forEach(v => {
-              if (v.visitDate) {
-                const [y, m, d] = v.visitDate.split('-').map(Number);
-                const dayIndex = new Date(y, m - 1, d).getDay();
-                dayVisitsMap[dayIndex] = (dayVisitsMap[dayIndex] || 0) + 1;
-              }
-            });
-            const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
+                const pTotalTime = Math.max(1, pParkMinutes);
+                const pLineTime = Math.min(pWaitMinutes, pTotalTime);
+                const pLinePercent = Math.round((pLineTime / pTotalTime) * 100);
 
-            return (
-              <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
-                    {pDays} {pDays === 1 ? 'Park Visit' : 'Park Visits'}
-                  </div>
-                </div>
+                const personRides = getRideBreakdown(personVisits, person).sort((a, b) => b.count - a.count);
+                const topPersonRide = personRides[0] || { name: 'None Yet', count: 0, totalWait: 0, avgWait: 0 };
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttActs, totalAtt), marginTop: '3px' }}>#{rAttActs}</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttParkMin, totalAtt), marginTop: '3px' }}>#{rAttParkMin}</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttWaitMin, totalAtt), marginTop: '3px' }}>#{rAttWaitMin}</div>
-                  </div>
+                const dayVisitsMap: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                personVisits.forEach(v => {
+                  if (v.visitDate) {
+                    const [y, m, d] = v.visitDate.split('-').map(Number);
+                    const dayIndex = new Date(y, m - 1, d).getDay();
+                    dayVisitsMap[dayIndex] = (dayVisitsMap[dayIndex] || 0) + 1;
+                  }
+                });
+                const maxDayVisits = Math.max(1, ...Object.values(dayVisitsMap));
 
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgActs}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgActs, totalAtt), marginTop: '3px' }}>#{rAttAvgActs}</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(pAvgPark)}</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgPark, totalAtt), marginTop: '3px' }}>#{rAttAvgPark}</div>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgWait}m</div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgWait, totalAtt), marginTop: '3px' }}>#{rAttAvgWait}</div>
-                  </div>
-                </div>
-
-                <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: `conic-gradient(#ED8936 0% ${pLinePercent}%, #9F7AEA ${pLinePercent}% 100%)`, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
-                    <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
-                      <div><span style={{ color: '#ED8936', fontWeight: '800' }}>{pLinePercent}%</span> waiting in lines</div>
-                      <div><span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - pLinePercent}%</span> not waiting in lines</div>
+                return (
+                  <div key={person} style={{ background: '#FFF', borderRadius: '24px', padding: '20px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.04)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #EDF2F7', paddingBottom: '14px', marginBottom: '16px' }}>
+                      <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#003366' }}>{person}</h3>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#2B6CB0', background: '#EBF8FF', padding: '6px 14px', borderRadius: '20px' }}>
+                        {pDays} {pDays === 1 ? 'Park Visit' : 'Park Visits'}
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                    <span>⭐</span> FAVORITE RIDE
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#1A202C' }}>{topPersonRide.name}</div>
-                  <div style={{ fontSize: '12px', color: '#718096', marginTop: '4px' }}>
-                    Ridden {topPersonRide.count}x • Avg Wait: {topPersonRide.avgWait || 0}m • Total Wait: {formatMinutes(topPersonRide.totalWait || 0)}
-                  </div>
-                </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#38A169' }}>{pActivities}</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>ACTIVITIES</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttActs, totalAtt), marginTop: '3px' }}>#{rAttActs}</div>
+                      </div>
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#9F7AEA' }}>{formatMinutes(pParkMinutes)}</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN PARK</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttParkMin, totalAtt), marginTop: '3px' }}>#{rAttParkMin}</div>
+                      </div>
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#ED8936' }}>{formatMinutes(pWaitMinutes)}</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>TIME IN LINES</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttWaitMin, totalAtt), marginTop: '3px' }}>#{rAttWaitMin}</div>
+                      </div>
 
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
-                    ACTIVITIES LOGGED
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {PARK_NAMES.map(park => {
-                      const parkCounts = getRideCountsMap(personVisits, person);
-                      const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
-                      const riddenInPark = PARK_ATTRACTIONS[park]?.filter(r => (parkCounts[r] || 0) > 0).length || 0;
-                      const percentComplete = Math.round((riddenInPark / totalParkRides) * 100);
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgActs}</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG ACTIVITIES</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgActs, totalAtt), marginTop: '3px' }}>#{rAttAvgActs}</div>
+                      </div>
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{formatMinutes(pAvgPark)}</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG VISIT</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgPark, totalAtt), marginTop: '3px' }}>#{rAttAvgPark}</div>
+                      </div>
+                      <div style={{ background: '#F8FAFC', padding: '10px 4px', borderRadius: '12px', textAlign: 'center', border: '1px solid #EDF2F7' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '900', color: '#2D3748' }}>{pAvgWait}m</div>
+                        <div style={{ fontSize: '9px', fontWeight: '800', color: '#718096', marginTop: '2px' }}>AVG WAIT</div>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: getRankColor(rAttAvgWait, totalAtt), marginTop: '3px' }}>#{rAttAvgWait}</div>
+                      </div>
+                    </div>
 
-                      return (
-                        <div
-                          key={park}
-                          onClick={() => {
-                            if (setSelectedAttendee) setSelectedAttendee(person);
-                            if (setMainTab) setMainTab('checklist');
-                          }}
-                          style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EDF2F7', cursor: 'pointer' }}
-                          title={`Click to view ${person}'s checklist`}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <ParkIcon parkName={park} size={16} />
-                              <span>{park}</span>
-                            </span>
-                            <span style={{ color: '#004487', fontWeight: '900' }}>
-                              {riddenInPark} / {totalParkRides} ({percentComplete}%)
-                            </span>
-                          </div>
-                          <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '6px', overflow: 'hidden' }}>
-                            <div style={{ width: `${percentComplete}%`, height: '100%', background: 'linear-gradient(to right, #0056b3, #D4AF37)', transition: 'width 0.3s ease' }}></div>
-                          </div>
+                    <div style={{ background: '#F8FAFC', padding: '14px', borderRadius: '16px', border: '1px solid #EDF2F7', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ width: '54px', height: '54px', borderRadius: '50%', background: `conic-gradient(#ED8936 0% ${pLinePercent}%, #9F7AEA ${pLinePercent}% 100%)`, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: '#4A5568', marginBottom: '4px' }}>TIME SPENT IN LINE VS PARK</div>
+                        <div style={{ fontSize: '12px', color: '#2D3748', lineHeight: '1.4' }}>
+                          <div><span style={{ color: '#ED8936', fontWeight: '800' }}>{pLinePercent}%</span> waiting in lines</div>
+                          <div><span style={{ color: '#9F7AEA', fontWeight: '800' }}>{100 - pLinePercent}%</span> not waiting in lines</div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
-                    DAYS OF THE WEEK
-                  </div>
-
-                  <div style={{ background: '#F8FAFC', padding: '16px 12px 12px 16px', borderRadius: '16px', border: '1px solid #EDF2F7' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', alignItems: 'end', height: '110px' }}>
-                      {WEEKDAYS.map((day) => {
-                        const count = dayVisitsMap[day.dayIndex] || 0;
-                        const heightPercent = count > 0 ? Math.max(16, Math.round((count / maxDayVisits) * 100)) : 0;
-
-                        return (
-                          <div key={day.label + day.dayIndex} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                            <div style={{ fontSize: '11px', fontWeight: '900', color: count > 0 ? '#004487' : '#A0AEC0', marginBottom: '4px' }}>
-                              {count}
-                            </div>
-                            <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                              <div style={{ width: '18px', height: `${heightPercent}%`, background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0', borderRadius: '6px 6px 4px 4px', transition: 'height 0.3s ease' }} />
-                            </div>
-                            <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
-                              {day.label}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-              </div>
-            );
-          })}
+                    <div style={{ background: '#FFFDF5', padding: '14px', borderRadius: '12px', border: '1px solid #FEEBC8', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: '#DD6B20', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                        <span>⭐</span> FAVORITE RIDE
+                      </div>
+                      <div style={{ fontSize: '16px', fontWeight: '900', color: '#1A202C' }}>{topPersonRide.name}</div>
+                      <div style={{ fontSize: '12px', color: '#718096', marginTop: '4px' }}>
+                        Ridden {topPersonRide.count}x • Avg Wait: {topPersonRide.avgWait || 0}m • Total Wait: {formatMinutes(topPersonRide.totalWait || 0)}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '10px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+                        ACTIVITIES LOGGED
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {PARK_NAMES.filter(park => selectedPark === null || selectedPark === park).map(park => {
+                          const parkCounts = getRideCountsMap(personVisits, person);
+                          const totalParkRides = PARK_ATTRACTIONS[park]?.length || 1;
+                          const riddenInPark = PARK_ATTRACTIONS[park]?.filter(r => (parkCounts[r] || 0) > 0).length || 0;
+                          const percentComplete = Math.round((riddenInPark / totalParkRides) * 100);
+
+                          return (
+                            <div
+                              key={park}
+                              onClick={() => {
+                                if (setSelectedAttendee) setSelectedAttendee(person);
+                                if (setMainTab) setMainTab('checklist');
+                              }}
+                              style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: '14px', border: '1px solid #EDF2F7', cursor: 'pointer' }}
+                              title={`Click to view ${person}'s checklist`}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '800', color: '#2D3748', marginBottom: '6px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <ParkIcon parkName={park} size={16} />
+                                  <span>{park}</span>
+                                </span>
+                                <span style={{ color: '#004487', fontWeight: '900' }}>
+                                  {riddenInPark} / {totalParkRides} ({percentComplete}%)
+                                </span>
+                              </div>
+                              <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '6px', overflow: 'hidden' }}>
+                                <div style={{ width: `${percentComplete}%`, height: '100%', background: 'linear-gradient(to right, #0056b3, #D4AF37)', transition: 'width 0.3s ease' }}></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: '#A0AEC0', marginBottom: '12px', letterSpacing: '0.8px', borderTop: '1px dashed #E2E8F0', paddingTop: '16px' }}>
+                        DAYS OF THE WEEK
+                      </div>
+
+                      <div style={{ background: '#F8FAFC', padding: '16px 12px 12px 16px', borderRadius: '16px', border: '1px solid #EDF2F7' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', alignItems: 'end', height: '110px' }}>
+                          {WEEKDAYS.map((day) => {
+                            const count = dayVisitsMap[day.dayIndex] || 0;
+                            const heightPercent = count > 0 ? Math.max(16, Math.round((count / maxDayVisits) * 100)) : 0;
+
+                            return (
+                              <div key={day.label + day.dayIndex} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                                <div style={{ fontSize: '11px', fontWeight: '900', color: count > 0 ? '#004487' : '#A0AEC0', marginBottom: '4px' }}>
+                                  {count}
+                                </div>
+                                <div style={{ width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                                  <div style={{ width: '18px', height: `${heightPercent}%`, background: count > 0 ? 'linear-gradient(to top, #004487, #2B6CB0)' : '#E2E8F0', borderRadius: '6px 6px 4px 4px', transition: 'height 0.3s ease' }} />
+                                </div>
+                                <div style={{ fontSize: '11px', fontWeight: '800', color: '#4A5568', marginTop: '6px' }}>
+                                  {day.label}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {peopleSubTab === 'Leaderboards' && renderComingSoon()}
+          {peopleSubTab === 'Badges' && renderComingSoon()}
         </div>
       )}
 
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
-              PARK
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {PARK_NAMES.map(park => {
-                const isSelected = selectedPark === park;
-                return (
-                  <button
-                    key={park}
-                    onClick={() => handleParkSelect(park)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '10px 6px',
-                      borderRadius: '14px',
-                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-                      background: isSelected ? '#EBF8FF' : '#FFF',
-                      color: isSelected ? '#004487' : '#2D3748',
-                      fontSize: '11px',
-                      fontWeight: '800',
-                      whiteSpace: 'nowrap',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <ParkIcon parkName={park} size={16} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
-                  </button>
-                );
-              })}
-            </div>
+          {/* LEVEL 3 PILLS: Big Chart | Leaderboards */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', paddingLeft: '2px' }}>
+            {(['Big Chart', 'Leaderboards'] as RidesSubTab[]).map(pill => {
+              const isSelected = ridesSubTab === pill;
+              return (
+                <button
+                  key={pill}
+                  type="button"
+                  onClick={() => setRidesSubTab(pill)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    background: isSelected ? '#004487' : 'transparent',
+                    color: isSelected ? '#FFF' : '#4A5568',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? '800' : '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {pill}
+                </button>
+              );
+            })}
           </div>
 
-          {sortedRides.length === 0 ? (
-            <div style={{ background: '#FFF', borderRadius: '16px', padding: '30px', textAlign: 'center', color: '#718096', border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
-              No rides logged matching your filter selection.
-            </div>
-          ) : (
-            <div style={{ background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px', fontSize: '12px' }}>
-                  <thead>
-                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#4A5568', fontSize: '11px', fontWeight: '900' }}>
-                      <th onClick={() => handleSort('park')} style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}>
-                        Park {sortField === 'park' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('name')} style={{ padding: '12px 12px', cursor: 'pointer', position: 'sticky', left: 0, background: '#F8FAFC', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', minWidth: '150px' }}>
-                        Ride {sortField === 'name' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('ridden')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Ridden {sortField === 'ridden' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('avgWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Avg Wait {sortField === 'avgWait' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('totalWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Tot Wait {sortField === 'totalWait' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('maxWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Max {sortField === 'maxWait' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('minWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Min {sortField === 'minWait' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                      <th onClick={() => handleSort('walkOns')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
-                        Walk-Ons {sortField === 'walkOns' && (sortOrder === 'desc' ? '▼' : '▲')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedRides.map((r, idx) => {
-                      const rowBg = idx % 2 === 0 ? '#FFF' : '#F8FAFC';
-                      return (
-                        <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', borderRight: '1px solid #EDF2F7', background: rowBg }}>
-                            <ParkIcon parkName={r.park} size={20} />
-                          </td>
-                          <td style={{ padding: '10px 12px', fontWeight: '800', color: '#1A202C', position: 'sticky', left: 0, background: rowBg, zIndex: 1, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                            {r.name}
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
-                            {r.ridden}
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#2D3748', background: rowBg }}>
-                            {r.avgWait}m
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#ED8936', background: rowBg }}>
-                            {r.totalWait}m
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#C53030', background: rowBg }}>
-                            {r.maxWait}m
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#276749', background: rowBg }}>
-                            {r.minWait}m
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#D69E2E', background: rowBg }}>
-                            {r.walkOns}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {/* ATTENDEE & PARK FILTERS */}
+          {renderAttendeeAndParkFilters()}
+
+          {/* SUBTAB CONTENTS */}
+          {ridesSubTab === 'Big Chart' && (
+            sortedRides.length === 0 ? (
+              <div style={{ background: '#FFF', borderRadius: '16px', padding: '30px', textAlign: 'center', color: '#718096', border: '1px solid #E2E8F0', fontStyle: 'italic' }}>
+                No rides logged matching your filter selection.
               </div>
-            </div>
+            ) : (
+              <div style={{ background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#4A5568', fontSize: '11px', fontWeight: '900' }}>
+                        <th onClick={() => handleSort('park')} style={{ padding: '12px 8px', cursor: 'pointer', width: '46px', textAlign: 'center', borderRight: '1px solid #EDF2F7' }}>
+                          Park {sortField === 'park' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('name')} style={{ padding: '12px 12px', cursor: 'pointer', position: 'sticky', left: 0, background: '#F8FAFC', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', minWidth: '150px' }}>
+                          Ride {sortField === 'name' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('ridden')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Ridden {sortField === 'ridden' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('avgWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Avg Wait {sortField === 'avgWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('totalWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Tot Wait {sortField === 'totalWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('maxWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Max {sortField === 'maxWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('minWait')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Min {sortField === 'minWait' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                        <th onClick={() => handleSort('walkOns')} style={{ padding: '12px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                          Walk-Ons {sortField === 'walkOns' && (sortOrder === 'desc' ? '▼' : '▲')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedRides.map((r, idx) => {
+                        const rowBg = idx % 2 === 0 ? '#FFF' : '#F8FAFC';
+                        return (
+                          <tr key={`${r.park}-${r.name}`} style={{ borderBottom: '1px solid #EDF2F7' }}>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', borderRight: '1px solid #EDF2F7', background: rowBg }}>
+                              <ParkIcon parkName={r.park} size={20} />
+                            </td>
+                            <td style={{ padding: '10px 12px', fontWeight: '800', color: '#1A202C', position: 'sticky', left: 0, background: rowBg, zIndex: 1, boxShadow: '2px 0 5px rgba(0,0,0,0.04)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                              {r.name}
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#004487', background: rowBg }}>
+                              {r.ridden}
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#2D3748', background: rowBg }}>
+                              {r.avgWait}m
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#ED8936', background: rowBg }}>
+                              {r.totalWait}m
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#C53030', background: rowBg }}>
+                              {r.maxWait}m
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '800', color: '#276749', background: rowBg }}>
+                              {r.minWait}m
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '900', color: '#D69E2E', background: rowBg }}>
+                              {r.walkOns}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
           )}
+
+          {ridesSubTab === 'Leaderboards' && renderComingSoon()}
         </div>
       )}
 
