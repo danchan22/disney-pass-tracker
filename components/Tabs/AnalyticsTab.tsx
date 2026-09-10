@@ -190,8 +190,10 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     return sortOrder === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
   });
 
-  // VISITS TAB CALCULATIONS
-  const mappedVisits = filteredVisits.map(v => {
+  // VISITS TAB CALCULATIONS WITH PARK FILTER SUPPORT
+  const visitsMatchingPark = filteredVisits.filter(v => selectedPark === null || v.parkName === selectedPark);
+
+  const mappedVisits = visitsMatchingPark.map(v => {
     const duration = getVisitDuration(v, selectedAttendee);
     const party = parseAttendees(v.attendees);
     const validActs = selectedAttendee === 'ALL' ? v.activities : v.activities.filter(a => isPersonRider(a, v, selectedAttendee));
@@ -224,81 +226,48 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
-  // Shared Filter Block (Attendee + Park)
-  const renderAttendeeAndParkFilters = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-      {/* ATTENDEE FILTER */}
-      <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
-        <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>👤 FILTER BY ATTENDEE</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-          {FIXED_FAMILY_MEMBERS.map(m => {
-            const isSelected = selectedAttendee === m;
-            return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setSelectedAttendee && setSelectedAttendee(isSelected ? 'ALL' : m)}
-                style={{
-                  padding: '10px 4px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  fontWeight: isSelected ? '800' : '500',
-                  border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-                  background: isSelected ? '#EBF8FF' : '#FFF',
-                  color: isSelected ? '#004487' : '#2D3748',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {m}
-              </button>
-            );
-          })}
-        </div>
+  // Standalone Park Filter Selector Component
+  const renderParkFilterGrid = () => (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
+        PARK
       </div>
-
-      {/* PARK FILTER */}
-      <div>
-        <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
-          PARK
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          {PARK_NAMES.map(park => {
-            const isSelected = selectedPark === park;
-            return (
-              <button
-                key={park}
-                type="button"
-                onClick={() => handleParkSelect(park)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '10px 6px',
-                  borderRadius: '14px',
-                  border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
-                  background: isSelected ? '#EBF8FF' : '#FFF',
-                  color: isSelected ? '#004487' : '#2D3748',
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                  overflow: 'hidden'
-                }}
-              >
-                <ParkIcon parkName={park} size={16} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+        {PARK_NAMES.map(park => {
+          const isSelected = selectedPark === park;
+          return (
+            <button
+              key={park}
+              type="button"
+              onClick={() => handleParkSelect(park)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '10px 6px',
+                borderRadius: '14px',
+                border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: isSelected ? '#EBF8FF' : '#FFF',
+                color: isSelected ? '#004487' : '#2D3748',
+                fontSize: '11px',
+                fontWeight: '800',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                overflow: 'hidden'
+              }}
+            >
+              <ParkIcon parkName={park} size={16} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{park}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 
-  // Coming Soon Placeholder
+  // Placeholder for Leaderboards / Badges
   const renderComingSoon = () => (
     <div style={{
       background: '#FFF',
@@ -306,7 +275,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       padding: '40px 20px',
       textAlign: 'center',
       border: '1px solid #E2E8F0',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+      marginTop: '10px'
     }}>
       <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
       <div style={{ fontSize: '16px', fontWeight: '800', color: '#004487', marginBottom: '4px' }}>Coming soon!</div>
@@ -320,8 +290,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === 'averages' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* ATTENDEE & PARK FILTERS FOR PARKS TAB */}
-          {renderAttendeeAndParkFilters()}
+          {/* PARK FILTER FOR PARKS TAB */}
+          {renderParkFilterGrid()}
 
           {PARK_NAMES.filter(p => selectedPark === null || selectedPark === p).map((park) => {
             const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
@@ -544,8 +514,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: People */}
       {analyticsSubTab === 'cards' && (
         <div>
-          {/* LEVEL 3 PILLS: Cards | Leaderboards | Badges */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', paddingLeft: '2px' }}>
+          {/* CENTERED LEVEL 3 PILLS: Cards | Leaderboards | Badges */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
             {(['Cards', 'Leaderboards', 'Badges'] as PeopleSubTab[]).map(pill => {
               const isSelected = peopleSubTab === pill;
               return (
@@ -571,14 +541,20 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             })}
           </div>
 
-          {/* ATTENDEE & PARK FILTERS */}
-          {renderAttendeeAndParkFilters()}
+          {/* PARK FILTER FOR PEOPLE CARDS */}
+          {renderParkFilterGrid()}
 
           {/* SUBTAB CONTENTS */}
           {peopleSubTab === 'Cards' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {FIXED_FAMILY_MEMBERS.filter(p => selectedAttendee === 'ALL' || p === selectedAttendee).map(person => {
-                const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
+                // Filter person's visits by selected park if active
+                const personVisits = visits.filter(v => {
+                  const hasPerson = parseAttendees(v.attendees).includes(person);
+                  const matchesPark = selectedPark === null || v.parkName === selectedPark;
+                  return hasPerson && matchesPark;
+                });
+
                 const pDays = personVisits.length;
                 const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
                 const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
@@ -772,8 +748,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* LEVEL 3 PILLS: Big Chart | Leaderboards */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', paddingLeft: '2px' }}>
+          {/* CENTERED LEVEL 3 PILLS: Big Chart | Leaderboards */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
             {(['Big Chart', 'Leaderboards'] as RidesSubTab[]).map(pill => {
               const isSelected = ridesSubTab === pill;
               return (
@@ -799,8 +775,8 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             })}
           </div>
 
-          {/* ATTENDEE & PARK FILTERS */}
-          {renderAttendeeAndParkFilters()}
+          {/* PARK FILTER FOR RIDES */}
+          {renderParkFilterGrid()}
 
           {/* SUBTAB CONTENTS */}
           {ridesSubTab === 'Big Chart' && (
@@ -887,6 +863,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === ('visits' as AnalyticsSubTab) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
+          {/* PARK FILTER FOR VISITS TAB */}
+          {renderParkFilterGrid()}
+
           {/* LONGEST DAYS */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
             <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '6px' }}>
