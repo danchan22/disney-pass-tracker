@@ -26,7 +26,7 @@ import { AttendeeFilter } from '../components/Shared/AttendeeFilter';
 import { TrackerTab } from '../components/Tabs/TrackerTab';
 import { AnalyticsTab } from '../components/Tabs/AnalyticsTab';
 import { ChecklistTab } from '../components/Tabs/ChecklistTab';
-import { RainbowTab } from '../components/Tabs/RainbowTab';
+import { FunTab } from '../components/Tabs/FunTab';
 
 import { EditVisitModal } from '../components/Modals/EditVisitModal';
 import { CheckoutModal } from '../components/Modals/CheckoutModal';
