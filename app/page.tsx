@@ -511,23 +511,53 @@ if (localStart && localStr) {
     }
   };
 
-  const fetchRideTrivia = async (attractionName: string, park: string) => {
-    setTriviaLoading(true);
-    setRideTrivia(getRideTriviaFact(attractionName, park));
-    const prompt = `Provide 1 short, fun, surprising Disney Imagineering secret fact or hidden detail for waiting in line at "${attractionName}" in ${park}. Keep it cheerful and under 50 words.`;
-    const result = await fetchGeminiQueueHint(prompt);
-    if (result) setRideTrivia(result);
-    setTriviaLoading(false);
-  };
+const fetchRideTrivia = async (attractionName: string, park: string) => {
+  setTriviaLoading(true);
+  try {
+    const supabase = await getSupabase();
+    // Query facts matching the ride name
+    const { data, error } = await supabase
+      .from('fun_facts')
+      .select('fun_fact')
+      .ilike('ride', `%${attractionName}%`);
 
-  const fetchHiddenMickey = async (attractionName: string, park: string) => {
-    setMickeyLoading(true);
-    setHiddenMickey(getHiddenMickeyFact(attractionName, park));
-    const prompt = `Where is a specific Hidden Mickey in "${attractionName}" at ${park} in Walt Disney World? Provide 1 specific, concise, fun location hint under 40 words.`;
-    const result = await fetchGeminiQueueHint(prompt);
-    if (result) setHiddenMickey(result);
+    if (error || !data || data.length === 0) {
+      setRideTrivia(null); // Hide card if no fact exists in database
+    } else {
+      // Pick a random fact from all entries for this ride
+      const randomIndex = Math.floor(Math.random() * data.length);
+      setRideTrivia(data[randomIndex].fun_fact);
+    }
+  } catch (err) {
+    setRideTrivia(null);
+  } finally {
+    setTriviaLoading(false);
+  }
+};
+
+const fetchHiddenMickey = async (attractionName: string, park: string) => {
+  setMickeyLoading(true);
+  try {
+    const supabase = await getSupabase();
+    // Query Hidden Mickeys matching the ride name
+    const { data, error } = await supabase
+      .from('hidden_mickeys')
+      .select('hidden_mickey')
+      .ilike('ride', `%${attractionName}%`);
+
+    if (error || !data || data.length === 0) {
+      setHiddenMickey(null); // Hide card if no Hidden Mickey exists in database
+    } else {
+      // Pick a random Hidden Mickey from all entries for this ride
+      const randomIndex = Math.floor(Math.random() * data.length);
+      setHiddenMickey(data[randomIndex].hidden_mickey);
+    }
+  } catch (err) {
+    setHiddenMickey(null);
+  } finally {
     setMickeyLoading(false);
-  };
+  }
+};
 
   const handleStartQueueTimer = async () => {
     if (!activeVisit) return;
