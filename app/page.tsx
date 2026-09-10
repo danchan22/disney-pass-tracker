@@ -39,7 +39,7 @@ export default function DisneyTracker() {
   const [mainTab, setMainTab] = useState<MainTab>('tracker');
   const [trackerSubTab, setTrackerSubTab] = useState<TrackerSubTab>('Today');
   const [analyticsSubTab, setAnalyticsSubTab] = useState<AnalyticsSubTab>('averages');
-  const [rainbowSubTab, setRainbowSubTab] = useState<RainbowSubTab>('stream');
+  const [funSubTab, setFunSubTab] = useState<'rainbow' | 'trivia'>('rainbow');
 
   const [loading, setLoading] = useState(true);
   const [submittingRide, setSubmittingRide] = useState(false);
@@ -844,15 +844,14 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         </div>
       )}
 
-      <Subheader
-        mainTab={mainTab}
-        trackerSubTab={trackerSubTab}
-        setTrackerSubTab={setTrackerSubTab}
-        analyticsSubTab={analyticsSubTab}
-        setAnalyticsSubTab={setAnalyticsSubTab}
-        rainbowSubTab={rainbowSubTab}
-        setRainbowSubTab={setRainbowSubTab}
-      />
+{/* SUBHEADER NAV */}
+<Subheader
+  mainTab={mainTab}
+  analyticsSubTab={analyticsSubTab}
+  setAnalyticsSubTab={setAnalyticsSubTab}
+  funSubTab={funSubTab}
+  setFunSubTab={setFunSubTab}
+/>
 {mainTab === 'checklist' && (
   <AttendeeFilter selectedAttendee={selectedAttendee} setSelectedAttendee={setSelectedAttendee} />
 )}
@@ -961,14 +960,15 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         />
       )}
 
-      {mainTab === 'rainbow' && (
-        <RainbowTab
-          rainbowSubTab={rainbowSubTab}
-          photoGrids={photoGrids}
-          photoLoading={photoLoading}
-          fetchPhotoGrids={fetchPhotoGrids}
-        />
-      )}
+{/* FUN TAB CONTENT */}
+{mainTab === ('rainbow' as MainTab) && (
+  <FunTab
+    funSubTab={funSubTab}
+    photoGrids={photoGrids}
+    photoLoading={photoLoading}
+    fetchPhotoGrids={fetchPhotoGrids}
+  />
+)}
 
       <EditVisitModal
         editingVisit={editingVisit}
