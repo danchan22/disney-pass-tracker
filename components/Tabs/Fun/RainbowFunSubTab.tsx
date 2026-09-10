@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { PhotoGridRecord, RainbowSubTab } from '../../../lib/types';
+import { PhotoGridRecord } from '../../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_NAMES, RAINBOW_COLORS } from '../../../lib/constants';
 import { getSupabase } from '../../../lib/supabase';
 import { compressImageToWebP } from '../../../lib/helpers';
@@ -9,19 +9,20 @@ import { UploadPhotoModal } from '../../Modals/UploadPhotoModal';
 import { LightboxModal } from '../../Modals/LightboxModal';
 import { ParkIcon } from '../../Shared/ParkIcon';
 
+type RainbowLevel3Tab = 'Photo Stream' | 'Badges';
+
 interface RainbowFunSubTabProps {
-  rainbowSubTab: RainbowSubTab;
   photoGrids: PhotoGridRecord[];
   photoLoading: boolean;
   fetchPhotoGrids: () => Promise<void>;
 }
 
 export const RainbowFunSubTab: React.FC<RainbowFunSubTabProps> = ({
-  rainbowSubTab,
   photoGrids,
   photoLoading,
   fetchPhotoGrids,
 }) => {
+  const [rainbowLevel3, setRainbowLevel3] = useState<RainbowLevel3Tab>('Photo Stream');
   const [filterPhotographer, setFilterPhotographer] = useState<string>('ALL');
   const [filterPark, setFilterPark] = useState<string>('ALL');
   const [filterColor, setFilterColor] = useState<string>('ALL');
@@ -102,6 +103,33 @@ export const RainbowFunSubTab: React.FC<RainbowFunSubTabProps> = ({
 
   return (
     <div>
+      {/* LEVEL 3 MENU: PHOTO STREAM | BADGES */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
+        {(['Photo Stream', 'Badges'] as RainbowLevel3Tab[]).map(pill => {
+          const isSelected = rainbowLevel3 === pill;
+          return (
+            <button
+              key={pill}
+              type="button"
+              onClick={() => setRainbowLevel3(pill)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: 'none',
+                background: isSelected ? '#004487' : 'transparent',
+                color: isSelected ? '#FFF' : '#718096',
+                fontSize: '13px',
+                fontWeight: isSelected ? '800' : '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {pill}
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ textAlign: 'center', marginBottom: '14px', background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '900', color: '#004487', margin: '0 0 4px 0' }}>Rainbow Challenge</h2>
         <p style={{ margin: 0, fontSize: '12px', color: '#718096', fontWeight: '600' }}>
@@ -110,7 +138,7 @@ export const RainbowFunSubTab: React.FC<RainbowFunSubTabProps> = ({
       </div>
 
       {/* Subtab: Photo Stream */}
-      {rainbowSubTab === 'stream' && (
+      {rainbowLevel3 === 'Photo Stream' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           <button
@@ -141,104 +169,108 @@ export const RainbowFunSubTab: React.FC<RainbowFunSubTabProps> = ({
             📸 Upload Photo Grid
           </button>
 
-          {/* FILTERS */}
-          <div style={{ background: '#FFF', padding: '16px', borderRadius: '20px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            
-            {/* Photographer */}
-            <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PHOTOGRAPHER</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                {FIXED_FAMILY_MEMBERS.map(m => {
-                  const isSel = filterPhotographer === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setFilterPhotographer(prev => prev === m ? 'ALL' : m)}
-                      style={{
-                        padding: '8px 4px',
-                        borderRadius: '10px',
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
-                        background: isSel ? '#004487' : '#F8FAFC',
-                        color: isSel ? '#FFF' : '#2D3748',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {isSel ? `✓ ${m}` : m}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* FILTER BY PHOTOGRAPHER CARD */}
+          <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+              👤 FILTER BY PHOTOGRAPHER
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+              {FIXED_FAMILY_MEMBERS.map(m => {
+                const isSelected = filterPhotographer === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setFilterPhotographer(prev => prev === m ? 'ALL' : m)}
+                    style={{
+                      padding: '10px 4px',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: isSelected ? '800' : '500',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#EBF8FF' : '#FFF',
+                      color: isSelected ? '#004487' : '#2D3748',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Park */}
-            <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PARK</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                {PARK_NAMES.map(p => {
-                  const isSel = filterPark === p;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setFilterPark(prev => prev === p ? 'ALL' : p)}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '10px',
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        border: isSel ? '2px solid #004487' : '1px solid #E2E8F0',
-                        background: isSel ? '#004487' : '#FFF',
-                        color: isSel ? '#FFF' : '#4A5568',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <ParkIcon parkName={p} size={16} />
-                      <span>{p}</span>
-                    </button>
-                  );
-                })}
-              </div>
+          {/* FILTER BY PARK CARD */}
+          <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+              🎡 FILTER BY PARK
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {PARK_NAMES.map(p => {
+                const isSelected = filterPark === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setFilterPark(prev => prev === p ? 'ALL' : p)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px 8px',
+                      borderRadius: '12px',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#EBF8FF' : '#FFF',
+                      color: isSelected ? '#004487' : '#2D3748',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      minWidth: 0
+                    }}
+                  >
+                    <ParkIcon parkName={p} size={16} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Color */}
-            <div>
-              <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>COLOR</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                {RAINBOW_COLORS.map(c => {
-                  const isSel = filterColor === c.name;
-                  return (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => setFilterColor(prev => prev === c.name ? 'ALL' : c.name)}
-                      style={{
-                        padding: '10px 2px',
-                        borderRadius: '10px',
-                        fontSize: '11px',
-                        fontWeight: '800',
-                        border: isSel ? `2px solid ${c.name === 'White' ? '#A0AEC0' : c.hex}` : '1px solid #CBD5E0',
-                        background: isSel ? c.hex : c.bgTint,
-                        color: isSel ? (c.name === 'White' ? '#1A202C' : '#FFF') : c.textHex,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        boxSizing: 'border-box',
-                        width: '100%'
-                      }}
-                    >
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* FILTER BY COLOR GRID */}
+          <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+              🎨 FILTER BY COLOR
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+              {RAINBOW_COLORS.map(c => {
+                const isSel = filterColor === c.name;
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setFilterColor(prev => prev === c.name ? 'ALL' : c.name)}
+                    style={{
+                      padding: '10px 2px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      border: isSel ? `2px solid ${c.name === 'White' ? '#A0AEC0' : c.hex}` : '1px solid #CBD5E0',
+                      background: isSel ? c.hex : c.bgTint,
+                      color: isSel ? (c.name === 'White' ? '#1A202C' : '#FFF') : c.textHex,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      boxSizing: 'border-box',
+                      width: '100%'
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
             </div>
-
           </div>
 
           {/* STREAM CARDS */}
@@ -284,15 +316,38 @@ export const RainbowFunSubTab: React.FC<RainbowFunSubTabProps> = ({
       )}
 
       {/* Subtab: Badges */}
-      {rainbowSubTab === 'badges' && (
+      {rainbowLevel3 === 'Badges' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          <div style={{ background: '#FFF', padding: '14px', borderRadius: '18px', border: '1px solid #E2E8F0' }}>
-            <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>PHOTOGRAPHER</label>
+          {/* BADGES PHOTOGRAPHER FILTER CARD */}
+          <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+            <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+              👤 PHOTOGRAPHER
+            </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-              {FIXED_FAMILY_MEMBERS.map(m => (
-                <button key={m} onClick={() => setBadgePhotographer(m)} style={{ padding: '8px 4px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', border: badgePhotographer === m ? '2px solid #004487' : '1px solid #CBD5E0', background: badgePhotographer === m ? '#004487' : '#FFF', color: badgePhotographer === m ? '#FFF' : '#4A5568', cursor: 'pointer' }}>{m}</button>
-              ))}
+              {FIXED_FAMILY_MEMBERS.map(m => {
+                const isSelected = badgePhotographer === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setBadgePhotographer(m)}
+                    style={{
+                      padding: '10px 4px',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: isSelected ? '800' : '500',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#EBF8FF' : '#FFF',
+                      color: isSelected ? '#004487' : '#2D3748',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
