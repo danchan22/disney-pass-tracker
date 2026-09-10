@@ -6,8 +6,8 @@ import { PARK_NAMES, PARK_ATTRACTIONS, FIXED_FAMILY_MEMBERS } from '../../lib/co
 import { formatMinutes, parseAttendees, getPersonEndTime, parseTimeToMinutes, isPersonRider, formatDisplayDate, format12Hour } from '../../lib/helpers';
 import { ParkIcon } from '../Shared/ParkIcon';
 
-type PeopleSubTab = 'Cards' | 'Leaderboards' | 'Badges';
-type RidesSubTab = 'Big Chart' | 'Leaderboards';
+type PeopleSubTab = 'Cards' | 'PeopleLeaderboards' | 'Badges';
+type RidesSubTab = 'Big Chart' | 'RidesLeaderboards';
 
 interface AnalyticsTabProps {
   analyticsSubTab: AnalyticsSubTab;
@@ -241,7 +241,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
-// SCORE LEADERBOARD PARSER FOR BUZZ & TOY STORY MANIA
+  // SCORE LEADERBOARD PARSER FOR BUZZ & TOY STORY MANIA
   const getShooterScores = (rideMatchStr: string): ScoreRecord[] => {
     const results: ScoreRecord[] = [];
 
@@ -253,7 +253,6 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         if (!cleanRide.includes(rideMatchStr)) return;
 
         if (act.notes) {
-          // Parse patterns like "🎯 Dan: 185000" or "🎯 Mandie: 95000"
           const matches = Array.from(act.notes.matchAll(/🎯\s*([^:]+):\s*(\d+)/g));
           matches.forEach(match => {
             const attendee = match[1].trim();
@@ -435,7 +434,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
     </div>
   );
 
-  // Placeholder for Badges
+  // Placeholder for Badges & People Leaderboards
   const renderComingSoon = () => (
     <div style={{
       background: '#FFF',
@@ -685,26 +684,30 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         <div>
           {/* LEVEL 3 MENU: CARDS | LEADERBOARDS | BADGES */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
-            {(['Cards', 'Leaderboards', 'Badges'] as PeopleSubTab[]).map(pill => {
-              const isSelected = peopleSubTab === pill;
+            {[
+              { id: 'Cards', label: 'Cards' },
+              { id: 'PeopleLeaderboards', label: 'Leaderboards' },
+              { id: 'Badges', label: 'Badges' }
+            ].map(pill => {
+              const isSelected = peopleSubTab === pill.id;
               return (
                 <button
-                  key={pill}
+                  key={pill.id}
                   type="button"
-                  onClick={() => setPeopleSubTab(pill)}
+                  onClick={() => setPeopleSubTab(pill.id as PeopleSubTab)}
                   style={{
                     padding: '6px 14px',
                     borderRadius: '20px',
                     border: 'none',
                     background: isSelected ? '#004487' : 'transparent',
-                    color: isSelected ? '#FFF' : '#4A5568',
+                    color: isSelected ? '#FFF' : '#718096',
                     fontSize: '13px',
                     fontWeight: isSelected ? '800' : '600',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {pill}
+                  {pill.label}
                 </button>
               );
             })}
@@ -909,13 +912,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             </div>
           )}
 
-          {peopleSubTab === 'Leaderboards' && (
-            <div>
-              {renderScoreLeaderboardCard('Buzz Lightyear Scores', '🚀', buzzScores)}
-              {renderScoreLeaderboardCard('Toy Story Mania Scores', '🎯', toyStoryScores)}
-            </div>
-          )}
-
+          {peopleSubTab === 'PeopleLeaderboards' && renderComingSoon()}
           {peopleSubTab === 'Badges' && renderComingSoon()}
         </div>
       )}
@@ -925,26 +922,29 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
         <div>
           {/* LEVEL 3 MENU: BIG CHART | LEADERBOARDS */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
-            {(['Big Chart', 'Leaderboards'] as RidesSubTab[]).map(pill => {
-              const isSelected = ridesSubTab === pill;
+            {[
+              { id: 'Big Chart', label: 'Big Chart' },
+              { id: 'RidesLeaderboards', label: 'Leaderboards' }
+            ].map(pill => {
+              const isSelected = ridesSubTab === pill.id;
               return (
                 <button
-                  key={pill}
+                  key={pill.id}
                   type="button"
-                  onClick={() => setRidesSubTab(pill)}
+                  onClick={() => setRidesSubTab(pill.id as RidesSubTab)}
                   style={{
                     padding: '6px 14px',
                     borderRadius: '20px',
                     border: 'none',
                     background: isSelected ? '#004487' : 'transparent',
-                    color: isSelected ? '#FFF' : '#4A5568',
+                    color: isSelected ? '#FFF' : '#718096',
                     fontSize: '13px',
                     fontWeight: isSelected ? '800' : '600',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {pill}
+                  {pill.label}
                 </button>
               );
             })}
@@ -1031,7 +1031,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             )
           )}
 
-          {ridesSubTab === 'Leaderboards' && (
+          {ridesSubTab === 'RidesLeaderboards' && (
             <div>
               {renderScoreLeaderboardCard('Buzz Lightyear Scores', '🚀', buzzScores)}
               {renderScoreLeaderboardCard('Toy Story Mania Scores', '🎯', toyStoryScores)}
