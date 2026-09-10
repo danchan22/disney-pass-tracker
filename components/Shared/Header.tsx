@@ -1,5 +1,6 @@
 import React from 'react';
 import { MainTab } from '../../lib/types';
+import { MickeyIcon } from './MickeyIcon';
 
 interface HeaderProps {
   mainTab: MainTab;
@@ -7,6 +8,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
+  const isFunActive = mainTab === ('rainbow' as MainTab) || mainTab === ('fun' as any);
+
   return (
     <>
       <header style={{ textAlign: 'center', marginBottom: '14px', padding: '6px 0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -20,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', background: '#FFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '6px', marginBottom: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
         {/* Tracker */}
         <button
+          type="button"
           onClick={() => setMainTab('tracker')}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -37,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
 
         {/* Analytics */}
         <button
+          type="button"
           onClick={() => setMainTab('analytics')}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -55,6 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
 
         {/* Checklist */}
         <button
+          type="button"
           onClick={() => setMainTab('checklist')}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -70,33 +76,26 @@ export const Header: React.FC<HeaderProps> = ({ mainTab, setMainTab }) => {
           <span style={{ fontSize: '11px', fontWeight: mainTab === 'checklist' ? '800' : '600', color: mainTab === 'checklist' ? '#38A169' : '#718096', marginTop: '4px' }}>Checklist</span>
         </button>
 
-        {/* Rainbow */}
+        {/* Fun (Mickey Silhouette) */}
         <button
-          onClick={() => setMainTab('rainbow')}
+          type="button"
+          onClick={() => setMainTab('rainbow' as MainTab)}
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             padding: '8px 2px 6px 2px', border: 'none', background: 'none', cursor: 'pointer',
-            borderBottom: mainTab === 'rainbow' ? '3px solid transparent' : '3px solid transparent',
-            borderImage: mainTab === 'rainbow' ? 'linear-gradient(to right, #E53E3E, #DD6B20, #D69E2E, #38A169, #3182CE, #805AD5) 1' : 'none',
+            borderBottom: isFunActive ? '3px solid #1A202C' : '3px solid transparent',
             transition: 'all 0.2s ease'
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mainTab === 'rainbow' ? '#805AD5' : '#718096'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
-            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
-            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
-            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
-            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.72 1.7-1.61 0-.43-.17-.83-.44-1.13-.27-.3-.43-.7-.43-1.13 0-.89.78-1.61 1.7-1.61h2.47c2.76 0 5-2.24 5-5 0-5.52-4.48-10-10-10z"></path>
-          </svg>
+          <MickeyIcon size={22} active={isFunActive} color={isFunActive ? '#1A202C' : '#718096'} />
           <span style={{
             fontSize: '11px',
-            fontWeight: mainTab === 'rainbow' ? '800' : '600',
-            color: mainTab === 'rainbow' ? 'transparent' : '#718096',
-            background: mainTab === 'rainbow' ? 'linear-gradient(90deg, #E53E3E, #DD6B20, #D69E2E, #38A169, #3182CE, #805AD5)' : 'none',
-            WebkitBackgroundClip: mainTab === 'rainbow' ? 'text' : 'unset',
-            WebkitTextFillColor: mainTab === 'rainbow' ? 'transparent' : 'unset',
+            fontWeight: isFunActive ? '800' : '600',
+            color: isFunActive ? '#1A202C' : '#718096',
             marginTop: '4px'
-          }}>Rainbow</span>
+          }}>
+            Fun
+          </span>
         </button>
       </div>
     </>
