@@ -847,6 +847,8 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
 {/* SUBHEADER NAV */}
 <Subheader
   mainTab={mainTab}
+  trackerSubTab={trackerSubTab}
+  setTrackerSubTab={setTrackerSubTab}
   analyticsSubTab={analyticsSubTab}
   setAnalyticsSubTab={setAnalyticsSubTab}
   funSubTab={funSubTab}
