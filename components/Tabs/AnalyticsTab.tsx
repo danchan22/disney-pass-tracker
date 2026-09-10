@@ -51,7 +51,8 @@ const getRankColor = (rank: number, total: number) => {
 
 const getRank = (values: number[], targetValue: number, ascending: boolean = false): number => {
   const sorted = [...values].sort((a, b) => (ascending ? a - b : b - a));
-  return sorted.indexOf(targetValue) + 1;
+  const idx = sorted.indexOf(targetValue);
+  return idx >= 0 ? idx + 1 : 1;
 };
 
 const getVisitDuration = (v: Visit, personFilter: string): number => {
@@ -118,9 +119,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const parkAvgVisitArr = allParkMetrics.map(p => p.avgVisit);
   const parkAvgWaitArr = allParkMetrics.map(p => p.avgWait);
 
-  // Pre-calculate Attendee Metrics
+  // Pre-calculate Attendee Metrics (Dynamically filtered by selectedPark)
   const allAttendeeMetrics = FIXED_FAMILY_MEMBERS.map(person => {
-    const personVisits = visits.filter(v => parseAttendees(v.attendees).includes(person));
+    const personVisits = visits.filter(v => {
+      const hasPerson = parseAttendees(v.attendees).includes(person);
+      const matchesPark = selectedPark === null || v.parkName === selectedPark;
+      return hasPerson && matchesPark;
+    });
+
     const pDays = personVisits.length;
     const pActivities = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).length, 0);
     const pWaitMinutes = personVisits.reduce((sum, v) => sum + v.activities.filter(a => isPersonRider(a, v, person)).reduce((aSum, act) => aSum + act.waitTimeMinutes, 0), 0);
@@ -226,12 +232,46 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
-  // Standalone Park Filter Selector Component
-  const renderParkFilterGrid = () => (
-    <div style={{ marginBottom: '16px' }}>
-      <div style={{ fontSize: '11px', fontWeight: '900', color: '#718096', marginBottom: '6px', letterSpacing: '0.8px' }}>
-        PARK
+  // 👤 FILTER BY ATTENDEE (MATCHING ENCLOSED CARD)
+  const renderAttendeeFilterWidget = () => (
+    <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '10px' }}>
+      <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+        👤 FILTER BY ATTENDEE
+      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+        {FIXED_FAMILY_MEMBERS.map(m => {
+          const isSelected = selectedAttendee === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setSelectedAttendee && setSelectedAttendee(isSelected ? 'ALL' : m)}
+              style={{
+                padding: '10px 4px',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: isSelected ? '800' : '500',
+                border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: isSelected ? '#EBF8FF' : '#FFF',
+                color: isSelected ? '#004487' : '#2D3748',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {m}
+            </button>
+          );
+        })}
       </div>
+    </div>
+  );
+
+  // 🎡 FILTER BY PARK (MATCHING ENCLOSED CARD)
+  const renderParkFilterWidget = () => (
+    <div style={{ background: '#FFF', padding: '12px 14px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '14px' }}>
+      <label style={{ fontSize: '10px', fontWeight: '800', color: '#718096', display: 'block', marginBottom: '6px' }}>
+        🎡 FILTER BY PARK
+      </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
         {PARK_NAMES.map(park => {
           const isSelected = selectedPark === park;
@@ -245,17 +285,16 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                padding: '10px 6px',
-                borderRadius: '14px',
+                padding: '10px 8px',
+                borderRadius: '12px',
                 border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
                 background: isSelected ? '#EBF8FF' : '#FFF',
                 color: isSelected ? '#004487' : '#2D3748',
                 fontSize: '11px',
                 fontWeight: '800',
-                whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                overflow: 'hidden'
+                minWidth: 0
               }}
             >
               <ParkIcon parkName={park} size={16} />
@@ -290,8 +329,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === 'averages' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* PARK FILTER FOR PARKS TAB */}
-          {renderParkFilterGrid()}
+          {/* ATTENDEE & PARK FILTERS FOR PARKS TAB */}
+          {renderAttendeeFilterWidget()}
+          {renderParkFilterWidget()}
 
           {PARK_NAMES.filter(p => selectedPark === null || selectedPark === p).map((park) => {
             const stats = parkStats[park] || { visits: 0, activities: 0, timeInPark: 0, waitTime: 0 };
@@ -514,7 +554,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: People */}
       {analyticsSubTab === 'cards' && (
         <div>
-          {/* CENTERED LEVEL 3 PILLS: Cards | Leaderboards | Badges */}
+          {/* LEVEL 3 MENU: CARDS | LEADERBOARDS | BADGES */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
             {(['Cards', 'Leaderboards', 'Badges'] as PeopleSubTab[]).map(pill => {
               const isSelected = peopleSubTab === pill;
@@ -541,14 +581,14 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             })}
           </div>
 
-          {/* PARK FILTER FOR PEOPLE CARDS */}
-          {renderParkFilterGrid()}
+          {/* ATTENDEE & PARK FILTERS */}
+          {renderAttendeeFilterWidget()}
+          {renderParkFilterWidget()}
 
           {/* SUBTAB CONTENTS */}
           {peopleSubTab === 'Cards' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {FIXED_FAMILY_MEMBERS.filter(p => selectedAttendee === 'ALL' || p === selectedAttendee).map(person => {
-                // Filter person's visits by selected park if active
                 const personVisits = visits.filter(v => {
                   const hasPerson = parseAttendees(v.attendees).includes(person);
                   const matchesPark = selectedPark === null || v.parkName === selectedPark;
@@ -748,7 +788,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {/* Subtab: Rides */}
       {analyticsSubTab === 'top10' && (
         <div>
-          {/* CENTERED LEVEL 3 PILLS: Big Chart | Leaderboards */}
+          {/* LEVEL 3 MENU: BIG CHART | LEADERBOARDS */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
             {(['Big Chart', 'Leaderboards'] as RidesSubTab[]).map(pill => {
               const isSelected = ridesSubTab === pill;
@@ -775,8 +815,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             })}
           </div>
 
-          {/* PARK FILTER FOR RIDES */}
-          {renderParkFilterGrid()}
+          {/* ATTENDEE & PARK FILTERS */}
+          {renderAttendeeFilterWidget()}
+          {renderParkFilterWidget()}
 
           {/* SUBTAB CONTENTS */}
           {ridesSubTab === 'Big Chart' && (
@@ -863,8 +904,9 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
       {analyticsSubTab === ('visits' as AnalyticsSubTab) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* PARK FILTER FOR VISITS TAB */}
-          {renderParkFilterGrid()}
+          {/* ATTENDEE & PARK FILTERS FOR VISITS TAB */}
+          {renderAttendeeFilterWidget()}
+          {renderParkFilterWidget()}
 
           {/* LONGEST DAYS */}
           <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
