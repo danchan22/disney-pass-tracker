@@ -241,7 +241,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
   const shortestDays = [...mappedVisits].filter(v => v.duration > 0).sort((a, b) => a.duration - b.duration).slice(0, 10);
   const busiestDays = [...mappedVisits].sort((a, b) => b.rideCount - a.rideCount).slice(0, 10);
 
-  // SCORE LEADERBOARD PARSER FOR BUZZ & TOY STORY MANIA
+// SCORE LEADERBOARD PARSER FOR BUZZ & TOY STORY MANIA
   const getShooterScores = (rideMatchStr: string): ScoreRecord[] => {
     const results: ScoreRecord[] = [];
 
@@ -254,12 +254,12 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
 
         if (act.notes) {
           // Parse patterns like "🎯 Dan: 185000" or "🎯 Mandie: 95000"
-          const matches = act.notes.matchAll(/🎯\s*([^:]+):\s*(\d+)/g);
-          for (const match of matches) {
+          const matches = Array.from(act.notes.matchAll(/🎯\s*([^:]+):\s*(\d+)/g));
+          matches.forEach(match => {
             const attendee = match[1].trim();
             const score = parseInt(match[2], 10);
 
-            if (selectedAttendee !== 'ALL' && attendee !== selectedAttendee) continue;
+            if (selectedAttendee !== 'ALL' && attendee !== selectedAttendee) return;
 
             if (attendee && !isNaN(score)) {
               results.push({
@@ -269,7 +269,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                 park: v.parkName
               });
             }
-          }
+          });
         }
       });
     });
