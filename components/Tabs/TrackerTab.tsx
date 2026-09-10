@@ -427,27 +427,33 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
                             Time in line: {getElapsedQueueTimeString()}
                           </div>
 
-                          <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
-                            <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ✨ Disney Fun Fact:
-                            </div>
-                            {triviaLoading ? (
-                              <div style={{ fontStyle: 'italic', color: '#718096' }}>Searching Imagineering vault for facts...</div>
-                            ) : (
-                              <div>{rideTrivia}</div>
-                            )}
-                          </div>
+{/* DISNEY FUN FACT CARD (Only renders if a fact exists or is loading) */}
+{(triviaLoading || rideTrivia) && (
+  <div style={{ background: '#F0FFF4', border: '1px solid #C6F6D5', padding: '10px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', fontSize: '12px', color: '#22543D' }}>
+    <div style={{ fontWeight: '800', color: '#276749', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      ✨ Disney Fun Fact:
+    </div>
+    {triviaLoading ? (
+      <div style={{ fontStyle: 'italic', color: '#718096' }}>Searching Disney vault...</div>
+    ) : (
+      <div>{rideTrivia}</div>
+    )}
+  </div>
+)}
 
-                          <div style={{ background: '#F0F5FF', border: '1px solid #C3DAFE', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#1A365D' }}>
-                            <div style={{ fontWeight: '800', color: '#2B6CB0', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              👀 Hidden Mickeys:
-                            </div>
-                            {mickeyLoading ? (
-                              <div style={{ fontStyle: 'italic', color: '#718096' }}>Scanning queue for Hidden Mickeys...</div>
-                            ) : (
-                              <div>{hiddenMickey}</div>
-                            )}
-                          </div>
+{/* HIDDEN MICKEYS CARD (Only renders if a Hidden Mickey exists or is loading) */}
+{(mickeyLoading || hiddenMickey) && (
+  <div style={{ background: '#F0F5FF', border: '1px solid #C3DAFE', padding: '10px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#1A365D' }}>
+    <div style={{ fontWeight: '800', color: '#2B6CB0', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      👀 Hidden Mickeys:
+    </div>
+    {mickeyLoading ? (
+      <div style={{ fontStyle: 'italic', color: '#718096' }}>Scanning queue for Hidden Mickeys...</div>
+    ) : (
+      <div>{hiddenMickey}</div>
+    )}
+  </div>
+)}
 
                           {activeCoasterSongs && (
                             <div style={{ background: '#F3E8FF', border: '1px solid #E9D5FF', padding: '10px 12px', borderRadius: '10px', marginTop: '8px', textAlign: 'left', fontSize: '12px', color: '#581C87' }}>
