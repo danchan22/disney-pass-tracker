@@ -7,7 +7,7 @@ import { TriviaFunSubTab } from './Fun/TriviaFunSubTab';
 
 interface FunTabProps {
   funSubTab: 'rainbow' | 'trivia';
-  rainbowSubTab: RainbowSubTab;
+  rainbowSubTab?: RainbowSubTab; // Optional or removable
   photoGrids: PhotoGridRecord[];
   photoLoading: boolean;
   fetchPhotoGrids: () => Promise<void>;
@@ -15,7 +15,6 @@ interface FunTabProps {
 
 export const FunTab: React.FC<FunTabProps> = ({
   funSubTab,
-  rainbowSubTab,
   photoGrids,
   photoLoading,
   fetchPhotoGrids,
@@ -24,7 +23,6 @@ export const FunTab: React.FC<FunTabProps> = ({
     <div>
       {funSubTab === 'rainbow' && (
         <RainbowFunSubTab
-          rainbowSubTab={rainbowSubTab}
           photoGrids={photoGrids}
           photoLoading={photoLoading}
           fetchPhotoGrids={fetchPhotoGrids}
