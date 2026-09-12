@@ -28,7 +28,7 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
   'Magic Kingdom': [
     'Astro Orbiter', 'The Barnstormer', 'Big Thunder Mountain Railroad', 'Buzz Lightyear’s Space Ranger Spin',
     'Carousel of Progress', 'Country Bear Musical Jamboree', 'Dumbo the Flying Elephant', 'Enchanted Tales with Belle',
-    'The Hall of Presidents', 'Haunted Mansion', '“it’s a small world”', 'Jessie’s Roundup: A Rip-Roaring Revue',
+    'The Hall of Presidents', 'Haunted Mansion', '“it’s a small world”', 
     'Jungle Cruise', 'Mad Tea Party', 'The Magic Carpets of Aladdin', 'The Many Adventures of Winnie the Pooh',
     'Mickey’s PhilharMagic', 'Monsters, Inc. Laugh Floor', 'Peter Pan’s Flight', 'Pirates of the Caribbean',
     'Prince Charming Regal Carrousel', 'Seven Dwarfs Mine Train', 'Space Mountain', 'Swiss Family Treehouse',
