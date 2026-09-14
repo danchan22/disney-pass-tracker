@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { PARK_ATTRACTIONS } from '../../../lib/constants';
 import { getLandForRide } from './landMappings';
 import { WaitTimeAlertModal, AlertTriggeredModal, AlertRule } from './WaitTimeAlertModal';
 import { ParkIcon } from '../ParkIcon';
 
+interface Showtime {
+  startTime: string;
+  endTime?: string;
+}
+
 interface RideItem {
   id: string;
   name: string;
-  waitTime: number;
-  isClosed: boolean;
-  isOpenState?: boolean;
-  showtimes?: any[];
+  waitTime: number | null;
+  isOperating: boolean;
+  showtimes?: Showtime[];
 }
 
 interface LiveWaitTimesWidgetProps {
@@ -22,7 +27,7 @@ interface LiveWaitTimesWidgetProps {
 const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
-// ThemeParks.wiki Entity UUIDs
+// Official ThemeParks.wiki Entity UUIDs
 const WDW_PARK_ENTITY_IDS: Record<string, string> = {
   'Magic Kingdom': '75ea578a-adc8-4116-a54d-dccb60765ef9',
   'Epcot': '47f935e4-3274-42a2-8682-f8f2e2ee9966',
@@ -30,27 +35,68 @@ const WDW_PARK_ENTITY_IDS: Record<string, string> = {
   'Animal Kingdom': '1c84b24b-abed-431c-92a4-321ac142c709',
 };
 
-// Color threshold styling
-const getWaitTimePillStyle = (wait: number, isClosed: boolean, isOpenState?: boolean) => {
-  if (isClosed) {
-    return { bg: '#718096', color: '#FFFFFF', label: 'CLOSED' };
+const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Reverted wait time pill color styling (exact user palette)
+const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
+  if (!isOperating) {
+    return {
+      bg: '#FFF5F5',
+      color: '#9B2C2C',
+      border: '#FEB2B2',
+      label: 'DOWN',
+    };
   }
-  if (wait <= 0 && isOpenState) {
-    return { bg: '#38A169', color: '#FFFFFF', label: 'OPEN' };
+
+  if (waitTime === null || waitTime === 0) {
+    return {
+      bg: '#FEFCBF',
+      color: '#B7791F',
+      border: '#F6E05E',
+      label: '0m',
+    };
+  } else if (waitTime <= 29) {
+    return {
+      bg: '#E6FFFA',
+      color: '#22543D',
+      border: '#B2F5EA',
+      label: `${waitTime}m`,
+    };
+  } else if (waitTime <= 44) {
+    return {
+      bg: '#FEFCBF',
+      color: '#744210',
+      border: '#F6E05E',
+      label: `${waitTime}m`,
+    };
+  } else if (waitTime <= 59) {
+    return {
+      bg: '#FEEBC8',
+      color: '#7B341E',
+      border: '#FBD38D',
+      label: `${waitTime}m`,
+    };
+  } else {
+    return {
+      bg: '#FFF5F5',
+      color: '#9B2C2C',
+      border: '#FEB2B2',
+      label: `${waitTime}m`,
+    };
   }
-  if (wait <= 15) {
-    return { bg: '#22543D', color: '#FFFFFF', label: `${wait}m` }; // 1-15: Dark Green
+};
+
+// Helper: Format showtime string to 12-hour AM/PM
+const formatShowtimeLabel = (timeStr: string): string => {
+  try {
+    const date = new Date(timeStr);
+    if (isNaN(date.getTime())) {
+      return timeStr;
+    }
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch {
+    return timeStr;
   }
-  if (wait <= 29) {
-    return { bg: '#38A169', color: '#FFFFFF', label: `${wait}m` }; // 16-29: Light Green
-  }
-  if (wait <= 44) {
-    return { bg: '#D69E2E', color: '#FFFFFF', label: `${wait}m` }; // 30-44: Yellow
-  }
-  if (wait <= 59) {
-    return { bg: '#DD6B20', color: '#FFFFFF', label: `${wait}m` }; // 45-59: Orange
-  }
-  return { bg: '#E53E3E', color: '#FFFFFF', label: `${wait}m` }; // 60+: Red
 };
 
 export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
@@ -60,7 +106,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   const [rides, setRides] = useState<RideItem[]>([]);
   const [shows, setShows] = useState<RideItem[]>([]);
   const [categoryTab, setCategoryTab] = useState<'rides' | 'shows'>('rides');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setLoading] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
 
   // Favorites & Filters state
@@ -105,8 +151,11 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   };
 
   // Fetch Live Wait & Show Times from API
-  const fetchLiveWaitTimes = async () => {
-    setLoading(true);
+  const fetchLiveWaitTimes = async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh && rides.length === 0) {
+      setLoading(true);
+    }
+
     try {
       const entityId = WDW_PARK_ENTITY_IDS[parkName];
       if (!entityId) {
@@ -123,36 +172,71 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         ? data
         : (data?.liveData || data?.live || []);
 
+      const allowedAttractions = PARK_ATTRACTIONS[parkName] || [];
+      const allowedCleanMap = new Map<string, string>();
+      allowedAttractions.forEach(att => allowedCleanMap.set(cleanStr(att), att));
+
       const parsedRides: RideItem[] = [];
       const parsedShows: RideItem[] = [];
+      const now = new Date();
 
       liveList.forEach((item: any) => {
         const type = (item.entityType || '').toUpperCase();
+        const rawName = item.name || '';
+        const itemClean = cleanStr(rawName);
+
         const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
 
-        const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? item.waitTime ?? 0;
-
-        const parsedItem: RideItem = {
-          id: item.id || item.name,
-          name: item.name,
-          waitTime: wait,
-          isClosed: item.status !== 'OPERATING',
-          isOpenState: item.status === 'OPERATING' && (item.queue?.STANDBY?.waitTime === null || item.queue?.STANDBY?.waitTime === undefined),
-          showtimes: item.showtimes || []
-        };
-
         if (isShow) {
-          parsedShows.push(parsedItem);
+          // Parse and filter out past showtimes
+          const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
+          const upcomingShowtimes: Showtime[] = rawShowtimes
+            .map(s => ({ startTime: s.startTime || s }))
+            .filter(s => {
+              const showDate = new Date(s.startTime);
+              return !isNaN(showDate.getTime()) && showDate > now;
+            });
+
+          if (upcomingShowtimes.length > 0) {
+            parsedShows.push({
+              id: item.id || rawName,
+              name: rawName,
+              waitTime: null,
+              isOperating: item.status === 'OPERATING',
+              showtimes: upcomingShowtimes
+            });
+          }
         } else {
-          parsedRides.push(parsedItem);
+          // STRICT FILTERING: Only include if it matches our constants file
+          let matchedConstantName: string | undefined = undefined;
+          for (const [cKey, cName] of allowedCleanMap.entries()) {
+            if (itemClean.includes(cKey) || cKey.includes(itemClean)) {
+              matchedConstantName = cName;
+              break;
+            }
+          }
+
+          if (matchedConstantName) {
+            const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
+
+            parsedRides.push({
+              id: item.id || matchedConstantName,
+              name: matchedConstantName,
+              waitTime: wait,
+              isOperating: item.status === 'OPERATING',
+            });
+          }
         }
       });
 
-      setRides(parsedRides);
-      setShows(parsedShows);
-      setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      // Deduplicate rides by matched constant name
+      const uniqueRides = Array.from(new Map(parsedRides.map(r => [r.name, r])).values());
 
-      checkAlerts([...parsedRides, ...parsedShows]);
+      setRides(uniqueRides);
+      setShows(parsedShows);
+      setLastRefreshed(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }));
+
+      checkAlerts([...uniqueRides, ...parsedShows]);
     } catch (err) {
       console.error("Failed to fetch live wait times:", err);
     } finally {
@@ -172,12 +256,12 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         let triggered = false;
         let msg = '';
 
-        if (!match.isClosed && match.waitTime <= alert.targetWait) {
+        if (match.isOperating && match.waitTime !== null && match.waitTime <= alert.targetWait) {
           triggered = true;
           msg = `Wait time is now ${match.waitTime} mins (target was ≤ ${alert.targetWait}m)!`;
-        } else if (alert.alertOnOpen && !match.isClosed) {
+        } else if (alert.alertOnOpen && match.isOperating) {
           triggered = true;
-          msg = `Ride is now OPEN!`;
+          msg = `Attraction is now OPEN!`;
         }
 
         if (triggered) {
@@ -197,8 +281,8 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   };
 
   useEffect(() => {
-    fetchLiveWaitTimes();
-    const interval = setInterval(fetchLiveWaitTimes, 60000);
+    fetchLiveWaitTimes(false);
+    const interval = setInterval(() => fetchLiveWaitTimes(true), 60000); // Background refresh without layout shift
     return () => clearInterval(interval);
   }, [parkName]);
 
@@ -223,16 +307,18 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       if (sortField === 'name') {
         return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       } else {
-        if (a.isClosed && !b.isClosed) return 1;
-        if (!a.isClosed && b.isClosed) return -1;
-        return sortOrder === 'asc' ? a.waitTime - b.waitTime : b.waitTime - a.waitTime;
+        if (!a.isOperating && b.isOperating) return 1;
+        if (a.isOperating && !b.isOperating) return -1;
+        const waitA = a.waitTime ?? 0;
+        const waitB = b.waitTime ?? 0;
+        return sortOrder === 'asc' ? waitA - waitB : waitB - waitA;
       }
     });
   }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder]);
 
   // Grouping by Land
   const groupedItems = useMemo(() => {
-    if (!groupByLand) return { 'All Attractions': filteredItems };
+    if (!groupByLand || categoryTab === 'shows') return { 'All Attractions': filteredItems };
 
     const groups: Record<string, RideItem[]> = {};
     filteredItems.forEach(r => {
@@ -241,7 +327,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       groups[land].push(r);
     });
     return groups;
-  }, [filteredItems, groupByLand, parkName]);
+  }, [filteredItems, groupByLand, parkName, categoryTab]);
 
   return (
     <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
@@ -262,7 +348,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
 
         <button
           type="button"
-          onClick={fetchLiveWaitTimes}
+          onClick={() => fetchLiveWaitTimes(false)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -374,23 +460,25 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
         <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
 
-        <button
-          type="button"
-          onClick={() => setGroupByLand(prev => !prev)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '12px',
-            border: groupByLand ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: groupByLand ? '#EBF8FF' : '#F8FAFC',
-            color: groupByLand ? '#004487' : '#4A5568',
-            fontSize: '11px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          By Land
-        </button>
+        {categoryTab === 'rides' && (
+          <button
+            type="button"
+            onClick={() => setGroupByLand(prev => !prev)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '12px',
+              border: groupByLand ? '2px solid #004487' : '1px solid #E2E8F0',
+              background: groupByLand ? '#EBF8FF' : '#F8FAFC',
+              color: groupByLand ? '#004487' : '#4A5568',
+              fontSize: '11px',
+              fontWeight: '800',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            By Land
+          </button>
+        )}
 
         <button
           type="button"
@@ -417,34 +505,36 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           {sortField === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (sortField === 'wait') {
-              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-            } else {
-              setSortField('wait');
-              setSortOrder('asc');
-            }
-          }}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '12px',
-            border: sortField === 'wait' ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: sortField === 'wait' ? '#EBF8FF' : '#F8FAFC',
-            color: sortField === 'wait' ? '#004487' : '#4A5568',
-            fontSize: '11px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
-        </button>
+        {categoryTab === 'rides' && (
+          <button
+            type="button"
+            onClick={() => {
+              if (sortField === 'wait') {
+                setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortField('wait');
+                setSortOrder('asc');
+              }
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '12px',
+              border: sortField === 'wait' ? '2px solid #004487' : '1px solid #E2E8F0',
+              background: sortField === 'wait' ? '#EBF8FF' : '#F8FAFC',
+              color: sortField === 'wait' ? '#004487' : '#4A5568',
+              fontSize: '11px',
+              fontWeight: '800',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
+          </button>
+        )}
       </div>
 
       {/* RIDE / SHOW LIST RENDERER */}
-      {loading ? (
+      {initialLoading ? (
         <div style={{ textAlign: 'center', color: '#A0AEC0', fontStyle: 'italic', padding: '20px' }}>
           Fetching live times from {parkName}...
         </div>
@@ -452,7 +542,52 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         <div style={{ textAlign: 'center', color: '#A0AEC0', fontStyle: 'italic', padding: '20px' }}>
           No attractions found matching your active filter options.
         </div>
+      ) : categoryTab === 'shows' ? (
+        /* SHOWS CARDS WITH SHOWTIME PILLS */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {filteredItems.map(show => (
+            <div
+              key={show.id}
+              style={{
+                background: '#F8FAFC',
+                borderRadius: '16px',
+                border: '1px solid #EDF2F7',
+                padding: '12px 14px'
+              }}
+            >
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A202C', marginBottom: '8px' }}>
+                {show.name}
+              </div>
+
+              {show.showtimes && show.showtimes.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {show.showtimes.map((st, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        background: '#EBF8FF',
+                        color: '#004487',
+                        border: '1px solid #BEE3F8',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: '800'
+                      }}
+                    >
+                      {formatShowtimeLabel(st.startTime)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ fontSize: '11px', color: '#718096', fontStyle: 'italic' }}>
+                  No remaining showtimes today.
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       ) : (
+        /* RIDES LIST RENDERER */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {Object.entries(groupedItems).map(([land, landItems]) => {
             if (landItems.length === 0) return null;
@@ -476,7 +611,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {landItems.map(r => {
                     const isFav = favorites.includes(r.name);
-                    const pillStyle = getWaitTimePillStyle(r.waitTime, r.isClosed, r.isOpenState);
+                    const pillStyle = getWaitTimeStyle(r.isOperating, r.waitTime);
                     const hasActiveAlert = activeAlerts.some(a => a.rideName.toLowerCase() === r.name.toLowerCase());
 
                     return (
@@ -486,7 +621,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '8px 12px',
+                          padding: '10px 12px',
                           borderRadius: '12px',
                           background: '#F8FAFC',
                           border: '1px solid #EDF2F7',
@@ -527,14 +662,15 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                           </div>
                         </div>
 
-                        {/* WAIT / SHOW TIME PILL */}
+                        {/* REVERTED WAIT TIME PILL */}
                         <div
                           onClick={() => setAlertModalRide(r)}
                           style={{
                             padding: '4px 10px',
-                            borderRadius: '12px',
+                            borderRadius: '10px',
                             background: pillStyle.bg,
                             color: pillStyle.color,
+                            border: `1px solid ${pillStyle.border}`,
                             fontSize: '12px',
                             fontWeight: '900',
                             flexShrink: 0,
@@ -557,8 +693,8 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       {alertModalRide && (
         <WaitTimeAlertModal
           rideName={alertModalRide.name}
-          currentWait={alertModalRide.waitTime}
-          isClosed={alertModalRide.isClosed}
+          currentWait={alertModalRide.waitTime ?? 0}
+          isClosed={!alertModalRide.isOperating}
           onSaveAlert={handleSaveAlert}
           onClose={() => setAlertModalRide(null)}
         />
