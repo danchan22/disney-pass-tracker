@@ -93,7 +93,7 @@ export const PARK_ATTRACTIONS_BY_LAND: Record<string, Record<string, string[]>> 
     ],
     'World Showcase': [
       'Beauty and the Beast Sing-Along',
-      'Canada Circle-Vision 360',
+      'Canada Far and Wide in Circle-Vision 360',
       'Frozen Ever After',
       'Gran Fiesta Tour Starring The Three Caballeros',
       'Impressions de France',
