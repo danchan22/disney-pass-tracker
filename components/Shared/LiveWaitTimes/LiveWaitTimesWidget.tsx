@@ -22,7 +22,15 @@ interface LiveWaitTimesWidgetProps {
 const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
-// Exact wait time color thresholding
+// ThemeParks.wiki Entity UUIDs
+const WDW_PARK_ENTITY_IDS: Record<string, string> = {
+  'Magic Kingdom': '75ea578a-adc8-4116-a54d-dccb60765ef9',
+  'Epcot': '47f935e4-3274-42a2-8682-f8f2e2ee9966',
+  'Hollywood Studios': '288747d1-8b4f-4a64-867e-ea7c923263a3',
+  'Animal Kingdom': '1c84b24b-abed-431c-92a4-321ac142c709',
+};
+
+// Color threshold styling
 const getWaitTimePillStyle = (wait: number, isClosed: boolean, isOpenState?: boolean) => {
   if (isClosed) {
     return { bg: '#718096', color: '#FFFFFF', label: 'CLOSED' };
@@ -100,14 +108,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   const fetchLiveWaitTimes = async () => {
     setLoading(true);
     try {
-      const entityMap: Record<string, string> = {
-        'Magic Kingdom': '754884ae-34b5-4304-b78e-3c07264f0be5',
-        'Epcot': '47f935e4-3274-42a2-8682-f8f2e2ee9966',
-        'Hollywood Studios': '288747d1-8b4f-4a64-867e-ea7c923263a3',
-        'Animal Kingdom': '1c84b24b-abed-431c-92a4-321ac142c709',
-      };
-
-      const entityId = entityMap[parkName];
+      const entityId = WDW_PARK_ENTITY_IDS[parkName];
       if (!entityId) {
         setRides([]);
         setShows([]);
@@ -118,7 +119,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`);
       const data = await res.json();
 
-      // Robust array extraction handling all API response shapes
       const liveList: any[] = Array.isArray(data)
         ? data
         : (data?.liveData || data?.live || []);
@@ -130,10 +130,12 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         const type = (item.entityType || '').toUpperCase();
         const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
 
+        const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? item.waitTime ?? 0;
+
         const parsedItem: RideItem = {
           id: item.id || item.name,
           name: item.name,
-          waitTime: item.queue?.STANDBY?.waitTime ?? 0,
+          waitTime: wait,
           isClosed: item.status !== 'OPERATING',
           isOpenState: item.status === 'OPERATING' && (item.queue?.STANDBY?.waitTime === null || item.queue?.STANDBY?.waitTime === undefined),
           showtimes: item.showtimes || []
@@ -346,7 +348,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          {favoritesOnly ? '★ Favs' : '☆ Favs'}
+          {favoritesOnly ? '★ Favorites' : '☆ Favorites'}
         </button>
 
         <button
@@ -364,8 +366,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          {hideRidden ? '✓ Hide Ridden' : 'Hide Ridden'}
+          Hide Today's Rides
         </button>
+      </div>
+
+      {/* SORT BUTTON ROW */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+        <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
 
         <button
           type="button"
@@ -382,13 +389,8 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          🗺️ By Land
+          By Land
         </button>
-      </div>
-
-      {/* SORT BUTTON ROW */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-        <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
 
         <button
           type="button"
@@ -412,7 +414,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          {sortField === 'name' ? (sortOrder === 'asc' ? 'Name A-Z' : 'Name Z-A') : 'A-Z'}
+          {sortField === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
         </button>
 
         <button
@@ -437,7 +439,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          {sortField === 'wait' ? (sortOrder === 'asc' ? 'Wait Low-High' : 'Wait High-Low') : 'Low to High'}
+          {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
         </button>
       </div>
 
