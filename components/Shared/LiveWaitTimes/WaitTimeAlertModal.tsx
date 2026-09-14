@@ -14,7 +14,9 @@ interface WaitTimeAlertModalProps {
   rideName: string;
   currentWait: number;
   isClosed: boolean;
+  existingAlert?: AlertRule;
   onSaveAlert: (rule: Omit<AlertRule, 'id'>) => void;
+  onRemoveAlert?: (rideName: string) => void;
   onClose: () => void;
 }
 
@@ -22,13 +24,21 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
   rideName,
   currentWait,
   isClosed,
+  existingAlert,
   onSaveAlert,
+  onRemoveAlert,
   onClose,
 }) => {
   const [targetWait, setTargetWait] = useState<string>(
-    currentWait > 0 ? Math.max(5, currentWait - 10).toString() : '20'
+    existingAlert
+      ? existingAlert.targetWait.toString()
+      : currentWait > 0
+      ? Math.max(5, currentWait - 10).toString()
+      : '20'
   );
-  const [alertOnOpen, setAlertOnOpen] = useState<boolean>(isClosed);
+  const [alertOnOpen, setAlertOnOpen] = useState<boolean>(
+    existingAlert ? existingAlert.alertOnOpen : isClosed
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,16 +64,25 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
     }}>
       <div style={{
         background: '#FFF',
-        borderRadius: '20px',
-        padding: '20px',
+        borderRadius: '24px',
+        padding: '22px',
         maxWidth: '380px',
         width: '100%',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+        boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+        boxSizing: 'border-box'
       }}>
-        <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: '900', color: '#004487' }}>
-          🔔 Set Wait Time Alert
-        </h3>
-        <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#4A5568', fontWeight: '700' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#004487' }}>
+            🔔 Wait Time Alert
+          </h3>
+          {existingAlert && (
+            <span style={{ fontSize: '10px', fontWeight: '800', background: '#FEFCBF', color: '#744210', padding: '2px 8px', borderRadius: '8px' }}>
+              Active
+            </span>
+          )}
+        </div>
+
+        <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#1A202C', fontWeight: '800' }}>
           {rideName}
         </p>
 
@@ -107,22 +126,47 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '12px',
-                border: '1px solid #CBD5E0',
-                background: '#EDF2F7',
-                color: '#4A5568',
-                fontWeight: '800',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
+            {existingAlert && onRemoveAlert ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onRemoveAlert(rideName);
+                  onClose();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #FEB2B2',
+                  background: '#FFF5F5',
+                  color: '#9B2C2C',
+                  fontWeight: '800',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                Clear Alert
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #CBD5E0',
+                  background: '#EDF2F7',
+                  color: '#4A5568',
+                  fontWeight: '800',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            )}
+
             <button
               type="submit"
               style={{
@@ -133,10 +177,11 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
                 background: '#004487',
                 color: '#FFF',
                 fontWeight: '800',
+                fontSize: '13px',
                 cursor: 'pointer'
               }}
             >
-              Save Alert
+              {existingAlert ? 'Update Alert' : 'Save Alert'}
             </button>
           </div>
         </form>
@@ -145,17 +190,16 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
   );
 };
 
-// TRIGGERED ALERT POPUP (WHITE RABBIT DESIGN)
+// WHITE RABBIT ALERT TRIGGER POPUP
 export const AlertTriggeredModal: React.FC<{
   rideName: string;
   waitTime: number | null;
   isOperating: boolean;
   onClose: () => void;
 }> = ({ rideName, waitTime, isOperating, onClose }) => {
-  // Pill styling helper for popup
   const getPillStyle = () => {
     if (!isOperating) return { bg: '#FFF5F5', color: '#9B2C2C', border: '#FEB2B2', label: 'DOWN' };
-    if (waitTime === null || waitTime === 0) return { bg: '#FEFCBF', color: '#B7791F', border: '#F6E05E', label: '0m' };
+    if (waitTime === null || waitTime === 0) return { bg: '#E6FFFA', color: '#22543D', border: '#B2F5EA', label: '0m' };
     if (waitTime <= 29) return { bg: '#E6FFFA', color: '#22543D', border: '#B2F5EA', label: `${waitTime}m` };
     if (waitTime <= 44) return { bg: '#FEFCBF', color: '#744210', border: '#F6E05E', label: `${waitTime}m` };
     if (waitTime <= 59) return { bg: '#FEEBC8', color: '#7B341E', border: '#FBD38D', label: `${waitTime}m` };
@@ -185,7 +229,7 @@ export const AlertTriggeredModal: React.FC<{
         boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
         boxSizing: 'border-box'
       }}>
-        {/* WHITE RABBIT + WAIT TIME BADGE */}
+        {/* RABBIT + WAIT TIME BADGE */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
           <img
             src="/rabbit.gif"
