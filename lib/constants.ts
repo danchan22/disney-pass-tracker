@@ -54,10 +54,10 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Toy Story Mania!', 'Vacation Fun', 'Walt Disney Presents'
   ],
   'Animal Kingdom': [
-    'Avatar Flight of Passage', 'Expedition Everest', 'Feathered Friends in Flight!',
+    'Avatar Flight of Passage', 'Bluey’s Wild World at Conservation Station', 'Expedition Everest', 'Feathered Friends in Flight!',
     'Festival of the Lion King', 'Finding Nemo: The Big Blue... and Beyond!', 'Gorilla Falls Exploration Trail',
     'Kali River Rapids', 'Kilimanjaro Safaris', 'Maharajah Jungle Trek',
-    'Na’vi River Journey', 'Bluey’s Wild World at Conservation Station', 'Wildlife Express Train',
+    'Na’vi River Journey', 'Wildlife Express Train',
     'Zootopia: Better Together'
   ]
 };
