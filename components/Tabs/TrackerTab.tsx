@@ -7,7 +7,7 @@ import { formatDisplayDate, format12Hour, parseAttendees, formatMinutes } from '
 import { ParkingSubtab } from './ParkingSubtab';
 import { TimesTrackerSubTab } from './Tracker/TimesTrackerSubTab';
 import { AddPersonModal } from '../Modals/AddPersonModal';
-import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimesWidget';
+import { LiveWaitTimesWidget } from '../Shared/LiveWaitTimes/LiveWaitTimesWidget';
 import { ParkIcon } from '../Shared/ParkIcon';
 
 const PARK_BANNERS: Record<string, string> = {
