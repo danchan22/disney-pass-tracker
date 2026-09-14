@@ -8,7 +8,6 @@ import { ParkIcon } from '../ParkIcon';
 
 interface Showtime {
   startTime: string;
-  endTime?: string;
 }
 
 interface RideItem {
@@ -27,17 +26,19 @@ interface LiveWaitTimesWidgetProps {
 const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
-// Official ThemeParks.wiki Entity UUIDs
-const WDW_PARK_ENTITY_IDS: Record<string, string> = {
-  'Magic Kingdom': '75ea578a-adc8-4116-a54d-dccb60765ef9',
-  'Epcot': '47f935e4-3274-42a2-8682-f8f2e2ee9966',
-  'Hollywood Studios': '288747d1-8b4f-4a64-867e-ea7c923263a3',
-  'Animal Kingdom': '1c84b24b-abed-431c-92a4-321ac142c709',
+const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[’'"]/g, '').replace(/[^a-z0-9]/g, '');
+
+// Fuzzy lookup for park Entity UUIDs
+const getParkEntityId = (park: string): string => {
+  const c = cleanStr(park);
+  if (c.includes('magic') || c.includes('kingdom')) return '75ea578a-adc8-4116-a54d-dccb60765ef9';
+  if (c.includes('epcot')) return '47f90d2c-e191-4239-a466-5892ef59a88b';
+  if (c.includes('hollywood') || c.includes('studios')) return '288747d1-8b4f-4a64-867e-ea7c9b27bad8';
+  if (c.includes('animal') || c.includes('ak')) return '1c84a229-8862-4648-9c71-378ddd2c7693';
+  return '75ea578a-adc8-4116-a54d-dccb60765ef9';
 };
 
-const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-// Reverted wait time pill color styling (exact user palette)
+// Reverted wait time style mapping
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
   if (!isOperating) {
     return {
@@ -86,13 +87,10 @@ const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
   }
 };
 
-// Helper: Format showtime string to 12-hour AM/PM
 const formatShowtimeLabel = (timeStr: string): string => {
   try {
     const date = new Date(timeStr);
-    if (isNaN(date.getTime())) {
-      return timeStr;
-    }
+    if (isNaN(date.getTime())) return timeStr;
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   } catch {
     return timeStr;
@@ -106,25 +104,24 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   const [rides, setRides] = useState<RideItem[]>([]);
   const [shows, setShows] = useState<RideItem[]>([]);
   const [categoryTab, setCategoryTab] = useState<'rides' | 'shows'>('rides');
-  const [initialLoading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
 
-  // Favorites & Filters state
+  // Favorites & Filters
   const [favorites, setFavorites] = useState<string[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState<boolean>(false);
   const [hideRidden, setHideRidden] = useState<boolean>(false);
   const [groupByLand, setGroupByLand] = useState<boolean>(true);
 
-  // Sorting state
+  // Sorting
   const [sortField, setSortField] = useState<'name' | 'wait'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Alert state
+  // Alerts
   const [alertModalRide, setAlertModalRide] = useState<RideItem | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertRule[]>([]);
   const [triggeredNotification, setTriggeredNotification] = useState<{ rideName: string; message: string } | null>(null);
 
-  // Load Favorites and Active Alerts on mount
   useEffect(() => {
     try {
       const savedFavs = localStorage.getItem(FAVORITES_STORAGE_KEY);
@@ -137,7 +134,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     }
   }, []);
 
-  // Save Favorites to LocalStorage
   const toggleFavorite = (rideName: string) => {
     setFavorites(prev => {
       const updated = prev.includes(rideName)
@@ -150,21 +146,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     });
   };
 
-  // Fetch Live Wait & Show Times from API
-  const fetchLiveWaitTimes = async (isBackgroundRefresh = false) => {
-    if (!isBackgroundRefresh && rides.length === 0) {
+  const fetchLiveWaitTimes = async (isBackground = false) => {
+    if (!isBackground && rides.length === 0 && shows.length === 0) {
       setLoading(true);
     }
 
     try {
-      const entityId = WDW_PARK_ENTITY_IDS[parkName];
-      if (!entityId) {
-        setRides([]);
-        setShows([]);
-        setLoading(false);
-        return;
-      }
-
+      const entityId = getParkEntityId(parkName);
       const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`);
       const data = await res.json();
 
@@ -188,7 +176,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
 
         if (isShow) {
-          // Parse and filter out past showtimes
           const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
           const upcomingShowtimes: Showtime[] = rawShowtimes
             .map(s => ({ startTime: s.startTime || s }))
@@ -207,13 +194,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             });
           }
         } else {
-          // STRICT FILTERING: Only include if it matches our constants file
-let matchedConstantName: string | undefined = undefined;
-allowedCleanMap.forEach((cName, cKey) => {
-  if (!matchedConstantName && (itemClean.includes(cKey) || cKey.includes(itemClean))) {
-    matchedConstantName = cName;
-  }
-});
+          // STRICT FILTERING against constants file
+          let matchedConstantName: string | undefined = undefined;
+          allowedCleanMap.forEach((cName, cKey) => {
+            if (!matchedConstantName && (itemClean.includes(cKey) || cKey.includes(itemClean))) {
+              matchedConstantName = cName;
+            }
+          });
 
           if (matchedConstantName) {
             const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
@@ -228,7 +215,6 @@ allowedCleanMap.forEach((cName, cKey) => {
         }
       });
 
-      // Deduplicate rides by matched constant name
       const uniqueRides = Array.from(new Map(parsedRides.map(r => [r.name, r])).values());
 
       setRides(uniqueRides);
@@ -243,7 +229,6 @@ allowedCleanMap.forEach((cName, cKey) => {
     }
   };
 
-  // Real-time alert threshold checker
   const checkAlerts = (currentItems: RideItem[]) => {
     if (activeAlerts.length === 0) return;
 
@@ -281,7 +266,7 @@ allowedCleanMap.forEach((cName, cKey) => {
 
   useEffect(() => {
     fetchLiveWaitTimes(false);
-    const interval = setInterval(() => fetchLiveWaitTimes(true), 60000); // Background refresh without layout shift
+    const interval = setInterval(() => fetchLiveWaitTimes(true), 60000);
     return () => clearInterval(interval);
   }, [parkName]);
 
@@ -296,7 +281,6 @@ allowedCleanMap.forEach((cName, cKey) => {
 
   const activeSourceList = categoryTab === 'rides' ? rides : shows;
 
-  // Filter & Sort Logic
   const filteredItems = useMemo(() => {
     return activeSourceList.filter(r => {
       if (favoritesOnly && !favorites.includes(r.name)) return false;
@@ -315,7 +299,6 @@ allowedCleanMap.forEach((cName, cKey) => {
     });
   }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder]);
 
-  // Grouping by Land
   const groupedItems = useMemo(() => {
     if (!groupByLand || categoryTab === 'shows') return { 'All Attractions': filteredItems };
 
@@ -331,7 +314,7 @@ allowedCleanMap.forEach((cName, cKey) => {
   return (
     <div style={{ background: '#FFF', borderRadius: '24px', padding: '18px', border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
       
-      {/* HEADER WITH PARK ICON, TIMESTAMP & REFRESH BUTTON */}
+      {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '900', color: '#004487', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -359,15 +342,14 @@ allowedCleanMap.forEach((cName, cKey) => {
             fontSize: '12px',
             fontWeight: '800',
             color: '#004487',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           <span>↻</span>
         </button>
       </div>
 
-      {/* RIDES vs SHOWS SUB-NAVIGATION BAR */}
+      {/* RIDES vs SHOWS SUB-NAV */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
@@ -388,8 +370,7 @@ allowedCleanMap.forEach((cName, cKey) => {
             color: categoryTab === 'rides' ? '#FFF' : '#2D3748',
             fontSize: '13px',
             fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           Rides ({rides.length})
@@ -406,15 +387,14 @@ allowedCleanMap.forEach((cName, cKey) => {
             color: categoryTab === 'shows' ? '#FFF' : '#2D3748',
             fontSize: '13px',
             fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           Shows ({shows.length})
         </button>
       </div>
 
-      {/* FILTER BUTTON ROW */}
+      {/* FILTER ROW */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
         <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Filter:</span>
 
@@ -429,8 +409,7 @@ allowedCleanMap.forEach((cName, cKey) => {
             color: favoritesOnly ? '#004487' : '#4A5568',
             fontSize: '11px',
             fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           {favoritesOnly ? '★ Favorites' : '☆ Favorites'}
@@ -447,15 +426,14 @@ allowedCleanMap.forEach((cName, cKey) => {
             color: hideRidden ? '#004487' : '#4A5568',
             fontSize: '11px',
             fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           Hide Today's Rides
         </button>
       </div>
 
-      {/* SORT BUTTON ROW */}
+      {/* SORT ROW */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
         <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
 
@@ -471,8 +449,7 @@ allowedCleanMap.forEach((cName, cKey) => {
               color: groupByLand ? '#004487' : '#4A5568',
               fontSize: '11px',
               fontWeight: '800',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              cursor: 'pointer'
             }}
           >
             By Land
@@ -497,8 +474,7 @@ allowedCleanMap.forEach((cName, cKey) => {
             color: sortField === 'name' ? '#004487' : '#4A5568',
             fontSize: '11px',
             fontWeight: '800',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
+            cursor: 'pointer'
           }}
         >
           {sortField === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
@@ -523,8 +499,7 @@ allowedCleanMap.forEach((cName, cKey) => {
               color: sortField === 'wait' ? '#004487' : '#4A5568',
               fontSize: '11px',
               fontWeight: '800',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              cursor: 'pointer'
             }}
           >
             {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
@@ -532,8 +507,8 @@ allowedCleanMap.forEach((cName, cKey) => {
         )}
       </div>
 
-      {/* RIDE / SHOW LIST RENDERER */}
-      {initialLoading ? (
+      {/* LIST RENDERER */}
+      {loading ? (
         <div style={{ textAlign: 'center', color: '#A0AEC0', fontStyle: 'italic', padding: '20px' }}>
           Fetching live times from {parkName}...
         </div>
@@ -628,7 +603,6 @@ allowedCleanMap.forEach((cName, cKey) => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                          {/* FAVORITE STAR BUTTON */}
                           <button
                             type="button"
                             onClick={() => toggleFavorite(r.name)}
@@ -646,7 +620,6 @@ allowedCleanMap.forEach((cName, cKey) => {
                             {isFav ? '★' : '☆'}
                           </button>
 
-                          {/* ATTRACTION NAME & ALERT ICON */}
                           <div
                             onClick={() => setAlertModalRide(r)}
                             style={{ cursor: 'pointer', minWidth: 0, flex: 1 }}
@@ -666,7 +639,7 @@ allowedCleanMap.forEach((cName, cKey) => {
                           onClick={() => setAlertModalRide(r)}
                           style={{
                             padding: '4px 10px',
-                            borderRadius: '10px',
+                            borderRadius: '8px',
                             background: pillStyle.bg,
                             color: pillStyle.color,
                             border: `1px solid ${pillStyle.border}`,
@@ -688,7 +661,7 @@ allowedCleanMap.forEach((cName, cKey) => {
         </div>
       )}
 
-      {/* ALERT CREATION MODAL */}
+      {/* MODALS */}
       {alertModalRide && (
         <WaitTimeAlertModal
           rideName={alertModalRide.name}
@@ -699,7 +672,6 @@ allowedCleanMap.forEach((cName, cKey) => {
         />
       )}
 
-      {/* REALTIME ALERT POPUP NOTIFICATION */}
       {triggeredNotification && (
         <AlertTriggeredModal
           rideName={triggeredNotification.rideName}
