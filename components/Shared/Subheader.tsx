@@ -70,22 +70,22 @@ export const Subheader: React.FC<SubheaderProps> = ({
       )}
     </button>
   );
+if (mainTab === 'tracker' && trackerSubTab && setTrackerSubTab) {
+  const tabs: { label: string; value: TrackerSubTab }[] = [
+    { label: 'Today', value: 'Today' },
+    { label: 'Times', value: 'Times' },
+    { label: 'Parking', value: 'Parking' },
+    { label: 'History', value: 'History' }
+  ];
 
-  if (mainTab === 'tracker' && trackerSubTab && setTrackerSubTab) {
-    const tabs: { label: string; value: TrackerSubTab }[] = [
-      { label: 'Today', value: 'Today' },
-      { label: 'History', value: 'History' },
-      { label: 'Parking', value: 'Parking' }
-    ];
-
-    return (
-      <div style={containerStyle}>
-        {tabs.map(tab =>
-          renderTextTab(tab.label, trackerSubTab === tab.value, () => setTrackerSubTab(tab.value))
-        )}
-      </div>
-    );
-  }
+  return (
+    <div style={containerStyle}>
+      {tabs.map(tab =>
+        renderTextTab(tab.label, trackerSubTab === tab.value, () => setTrackerSubTab(tab.value))
+      )}
+    </div>
+  );
+}
 
   if (mainTab === 'analytics' && analyticsSubTab && setAnalyticsSubTab) {
     const tabs: { label: string; value: AnalyticsSubTab }[] = [
