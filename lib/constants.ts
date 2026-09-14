@@ -57,7 +57,7 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
     'Avatar Flight of Passage', 'Expedition Everest', 'Feathered Friends in Flight!',
     'Festival of the Lion King', 'Finding Nemo: The Big Blue... and Beyond!', 'Gorilla Falls Exploration Trail',
     'Kali River Rapids', 'Kilimanjaro Safaris', 'Maharajah Jungle Trek',
-    'Na’vi River Journey', 'The Animation Experience at Conservation Station', 'Wildlife Express Train',
+    'Na’vi River Journey', 'Bluey’s Wild World at Conservation Station', 'Wildlife Express Train',
     'Zootopia: Better Together'
   ]
 };
