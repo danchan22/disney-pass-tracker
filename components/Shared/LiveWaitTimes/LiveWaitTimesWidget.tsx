@@ -28,14 +28,31 @@ const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
 const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[’'"]/g, '').replace(/[^a-z0-9]/g, '');
 
-// Fuzzy lookup for park Entity UUIDs
+const tokenize = (s: string) =>
+  (s || '').toLowerCase().replace(/[’'"]/g, '').split(/[^a-z0-9]+/).filter(t => t.length > 2);
+
+// Token-based fuzzy matching
+const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
+  const c1 = cleanStr(apiName);
+  const c2 = cleanStr(constantName);
+  if (!c1 || !c2) return false;
+  if (c1.includes(c2) || c2.includes(c1)) return true;
+
+  const t1 = tokenize(apiName);
+  const t2 = tokenize(constantName);
+  if (t1.length === 0 || t2.length === 0) return false;
+
+  const matches = t1.filter(t => t2.includes(t));
+  return matches.length >= Math.min(2, t2.length);
+};
+
+// Fixed Park UUID Lookup (Animal Kingdom checked FIRST to avoid 'kingdom' collision)
 const getParkEntityId = (park: string): string => {
   const c = cleanStr(park);
-  if (c.includes('magic') || c.includes('kingdom')) return '75ea578a-adc8-4116-a54d-dccb60765ef9';
-  if (c.includes('epcot')) return '47f90d2c-e191-4239-a466-5892ef59a88b';
-  if (c.includes('hollywood') || c.includes('studios')) return '288747d1-8b4f-4a64-867e-ea7c9b27bad8';
   if (c.includes('animal') || c.includes('ak')) return '1c84a229-8862-4648-9c71-378ddd2c7693';
-  return '75ea578a-adc8-4116-a54d-dccb60765ef9';
+  if (c.includes('epcot')) return '47f90d2c-e191-4239-a466-5892ef59a88b';
+  if (c.includes('hollywood') || c.includes('studios')) return '288747d1-8b4f-4a64-867e-ea7c923263a3';
+  return '75ea578a-adc8-4116-a54d-dccb60765ef9'; // Magic Kingdom default
 };
 
 // Reverted wait time style mapping
@@ -161,8 +178,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         : (data?.liveData || data?.live || []);
 
       const allowedAttractions = PARK_ATTRACTIONS[parkName] || [];
-      const allowedCleanMap = new Map<string, string>();
-      allowedAttractions.forEach(att => allowedCleanMap.set(cleanStr(att), att));
 
       const parsedRides: RideItem[] = [];
       const parsedShows: RideItem[] = [];
@@ -171,7 +186,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       liveList.forEach((item: any) => {
         const type = (item.entityType || '').toUpperCase();
         const rawName = item.name || '';
-        const itemClean = cleanStr(rawName);
 
         const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
 
@@ -194,13 +208,14 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             });
           }
         } else {
-          // STRICT FILTERING against constants file
+          // FUZZY TOKEN MATCHING against constants file
           let matchedConstantName: string | undefined = undefined;
-          allowedCleanMap.forEach((cName, cKey) => {
-            if (!matchedConstantName && (itemClean.includes(cKey) || cKey.includes(itemClean))) {
+          for (const cName of allowedAttractions) {
+            if (isFuzzyMatch(rawName, cName)) {
               matchedConstantName = cName;
+              break;
             }
-          });
+          }
 
           if (matchedConstantName) {
             const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
