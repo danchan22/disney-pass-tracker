@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { PARK_ATTRACTIONS } from '../../../lib/constants';
+import { PARK_ATTRACTIONS, PARK_ATTRACTIONS_BY_LAND } from '../../../lib/constants';
 import { getLandForRide } from './landMappings';
 import { WaitTimeAlertModal, AlertTriggeredModal, AlertRule } from './WaitTimeAlertModal';
 import { ParkIcon } from '../ParkIcon';
@@ -27,10 +27,21 @@ const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
 const cleanStr = (s: string) =>
-  (s || '').toLowerCase().replace(/&/g, 'and').replace(/[’'"]/g, '').replace(/[^a-z0-9]/g, '');
+  (s || '')
+    .toLowerCase()
+    .replace(/&amp;/g, 'and')
+    .replace(/&/g, 'and')
+    .replace(/[’'"]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 
 const tokenize = (s: string) =>
-  (s || '').toLowerCase().replace(/&/g, 'and').replace(/[’'"]/g, '').split(/[^a-z0-9]+/).filter(t => t.length > 2);
+  (s || '')
+    .toLowerCase()
+    .replace(/&amp;/g, 'and')
+    .replace(/&/g, 'and')
+    .replace(/[’'"]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length > 2);
 
 const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   const c1 = cleanStr(apiName);
@@ -54,7 +65,7 @@ const getParkEntityId = (park: string): string => {
   return '75ea578a-adc8-4116-a54d-dccb60765ef9';
 };
 
-// Updated wait time style mapping (0m wait times are now light green)
+// 0m wait times styled light green (#E6FFFA)
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
   if (!isOperating) {
     return {
@@ -65,19 +76,12 @@ const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
     };
   }
 
-  if (waitTime === null) {
-    return {
-      bg: '#FEFCBF',
-      color: '#B7791F',
-      border: '#F6E05E',
-      label: '0m',
-    };
-  } else if (waitTime <= 29) {
+  if (waitTime === null || waitTime <= 29) {
     return {
       bg: '#E6FFFA', // Light Green for 0m - 29m
       color: '#22543D',
       border: '#B2F5EA',
-      label: `${waitTime}m`,
+      label: `${waitTime ?? 0}m`,
     };
   } else if (waitTime <= 44) {
     return {
@@ -243,13 +247,19 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     }
   };
 
+  // Safe multi-park alert checking
   const checkAlerts = (currentItems: RideItem[]) => {
     if (activeAlerts.length === 0) return;
 
     const remainingAlerts: AlertRule[] = [];
 
     activeAlerts.forEach(alert => {
-      const match = currentItems.find(r => r.name.toLowerCase().includes(alert.rideName.toLowerCase()));
+      if (alert.park && cleanStr(alert.park) !== cleanStr(parkName)) {
+        remainingAlerts.push(alert);
+        return;
+      }
+
+      const match = currentItems.find(r => cleanStr(r.name).includes(cleanStr(alert.rideName)) || cleanStr(alert.rideName).includes(cleanStr(r.name)));
       if (match) {
         let triggered = false;
 
@@ -273,10 +283,12 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       }
     });
 
-    setActiveAlerts(remainingAlerts);
-    try {
-      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(remainingAlerts));
-    } catch (e) {}
+    if (remainingAlerts.length !== activeAlerts.length) {
+      setActiveAlerts(remainingAlerts);
+      try {
+        localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(remainingAlerts));
+      } catch (e) {}
+    }
   };
 
   useEffect(() => {
@@ -287,7 +299,16 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
 
   const handleSaveAlert = (rule: Omit<AlertRule, 'id'>) => {
     const newRule: AlertRule = { ...rule, park: parkName, id: Date.now().toString() };
-    const updated = [...activeAlerts, newRule];
+    const filtered = activeAlerts.filter(a => cleanStr(a.rideName) !== cleanStr(rule.rideName));
+    const updated = [...filtered, newRule];
+    setActiveAlerts(updated);
+    try {
+      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  const handleRemoveAlert = (rideName: string) => {
+    const updated = activeAlerts.filter(a => cleanStr(a.rideName) !== cleanStr(rideName));
     setActiveAlerts(updated);
     try {
       localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated));
@@ -299,7 +320,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   const filteredItems = useMemo(() => {
     return activeSourceList.filter(r => {
       if (favoritesOnly && !favorites.includes(r.name)) return false;
-      if (hideRidden && riddenRideNamesToday.some(rr => r.name.toLowerCase().includes(rr.toLowerCase()))) return false;
+      if (hideRidden && riddenRideNamesToday.some(rr => cleanStr(r.name).includes(cleanStr(rr)))) return false;
       return true;
     }).sort((a, b) => {
       if (sortField === 'name') {
@@ -314,15 +335,25 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     });
   }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder]);
 
+  // CANONICAL LAND ORDERING: Initializes groups in constants land order so sorting doesn't jump
   const groupedItems = useMemo(() => {
     if (!groupByLand || categoryTab === 'shows') return { 'All Attractions': filteredItems };
 
     const groups: Record<string, RideItem[]> = {};
+
+    const parkLands = PARK_ATTRACTIONS_BY_LAND[parkName];
+    if (parkLands) {
+      Object.keys(parkLands).forEach(land => {
+        groups[land] = [];
+      });
+    }
+
     filteredItems.forEach(r => {
       const land = getLandForRide(parkName, r.name);
       if (!groups[land]) groups[land] = [];
       groups[land].push(r);
     });
+
     return groups;
   }, [filteredItems, groupByLand, parkName, categoryTab]);
 
@@ -533,7 +564,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           No attractions found matching your active filter options.
         </div>
       ) : categoryTab === 'shows' ? (
-        /* SHOWS CARDS WITH SHOWTIME PILLS */
+        /* SHOWS CARDS */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredItems.map(show => (
             <div
@@ -577,7 +608,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           ))}
         </div>
       ) : (
-        /* RIDES LIST RENDERER */
+        /* RIDES LIST */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {Object.entries(groupedItems).map(([land, landItems]) => {
             if (landItems.length === 0) return null;
@@ -602,7 +633,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                   {landItems.map(r => {
                     const isFav = favorites.includes(r.name);
                     const pillStyle = getWaitTimeStyle(r.isOperating, r.waitTime);
-                    const hasActiveAlert = activeAlerts.some(a => a.rideName.toLowerCase() === r.name.toLowerCase());
+                    const hasActiveAlert = activeAlerts.some(a => cleanStr(a.rideName) === cleanStr(r.name));
 
                     return (
                       <div
@@ -699,7 +730,9 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           rideName={alertModalRide.name}
           currentWait={alertModalRide.waitTime ?? 0}
           isClosed={!alertModalRide.isOperating}
+          existingAlert={activeAlerts.find(a => cleanStr(a.rideName) === cleanStr(alertModalRide.name))}
           onSaveAlert={handleSaveAlert}
+          onRemoveAlert={handleRemoveAlert}
           onClose={() => setAlertModalRide(null)}
         />
       )}
