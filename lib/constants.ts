@@ -47,10 +47,10 @@ export const PARK_ATTRACTIONS: Record<string, string[]> = {
   'Hollywood Studios': [
     'Alien Swirling Saucers', 'Beauty and the Beast Live on Stage', 'Disney Junior Play & Dance!',
     'Disney Villains: Unfairly Ever After', 'Fantasmic',
-    'For the First Time in Forever: A Frozen Sing-Along Celebration', 'Indiana Jones Epic Stunt Spectacular!',
+    'For the First Time in Forever: A Frozen Sing-Along Celebration', 'Indiana Jones Epic Stunt Spectacular!', 
     'Mickey & Minnie’s Runaway Railway', 'Millennium Falcon: Smugglers Run',
     'Rock ’n’ Roller Coaster', 'Slinky Dog Dash', 'Star Tours – The Adventures Continue',
-    'Star Wars: Rise of the Resistance', 'The Twilight Zone Tower of Terror', 'The Little Mermaid: A Musical Adventure',
+    'Star Wars: Rise of the Resistance', 'The Twilight Zone Tower of Terror', 'The Little Mermaid: A Musical Adventure', 'The Magic of Disney Animation',
     'Toy Story Mania!', 'Vacation Fun', 'Walt Disney Presents'
   ],
   'Animal Kingdom': [
