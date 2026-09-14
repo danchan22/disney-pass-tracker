@@ -33,7 +33,7 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveAlert({
-      park: '', // Handled by caller
+      park: '',
       rideName,
       targetWait: parseInt(targetWait, 10) || 15,
       alertOnOpen,
@@ -75,8 +75,10 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={targetWait}
-                onChange={(e) => setTargetWait(e.target.value)}
+                onChange={(e) => setTargetWait(e.target.value.replace(/[^0-9]/g, ''))}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -143,7 +145,6 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
   );
 };
 
-// POP-UP NOTIFICATION WHEN AN ALERT IS TRIGGERED REALTIME
 export const AlertTriggeredModal: React.FC<{
   rideName: string;
   message: string;
