@@ -208,13 +208,12 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           }
         } else {
           // STRICT FILTERING: Only include if it matches our constants file
-          let matchedConstantName: string | undefined = undefined;
-          for (const [cKey, cName] of allowedCleanMap.entries()) {
-            if (itemClean.includes(cKey) || cKey.includes(itemClean)) {
-              matchedConstantName = cName;
-              break;
-            }
-          }
+let matchedConstantName: string | undefined = undefined;
+allowedCleanMap.forEach((cName, cKey) => {
+  if (!matchedConstantName && (itemClean.includes(cKey) || cKey.includes(itemClean))) {
+    matchedConstantName = cName;
+  }
+});
 
           if (matchedConstantName) {
             const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
@@ -364,7 +363,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             transition: 'all 0.15s ease'
           }}
         >
-          <span>↻</span> Refresh
+          <span>↻</span>
         </button>
       </div>
 
