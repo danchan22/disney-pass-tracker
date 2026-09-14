@@ -13,22 +13,17 @@ interface TimesTrackerSubTabProps {
 }
 
 export const TimesTrackerSubTab: React.FC<TimesTrackerSubTabProps> = ({ activeVisit }) => {
-  // Default to currently checked-in park if active, otherwise default to Magic Kingdom
   const [selectedPark, setSelectedPark] = useState<ParkName>(
     (activeVisit?.parkName as ParkName) || 'Magic Kingdom'
   );
 
-  // Sync selected park if activeVisit changes while on this tab
   useEffect(() => {
     if (activeVisit?.parkName) {
       setSelectedPark(activeVisit.parkName as ParkName);
     }
   }, [activeVisit?.parkName]);
 
-  const handleSelectPark = (park: ParkName) => {
-    // Single selection rule: clicking the active park keeps it selected
-    setSelectedPark(park);
-  };
+  const activeVisitRideNames = activeVisit ? activeVisit.activities.map(a => a.rideName) : [];
 
   return (
     <div>
@@ -44,7 +39,7 @@ export const TimesTrackerSubTab: React.FC<TimesTrackerSubTabProps> = ({ activeVi
               <button
                 key={park}
                 type="button"
-                onClick={() => handleSelectPark(park as ParkName)}
+                onClick={() => setSelectedPark(park as ParkName)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -71,8 +66,11 @@ export const TimesTrackerSubTab: React.FC<TimesTrackerSubTabProps> = ({ activeVi
         </div>
       </div>
 
-      {/* LIVE WAIT & SHOW TIMES FOR SELECTED PARK */}
-      <LiveWaitTimesWidget parkName={selectedPark} />
+      {/* LIVE WAIT & SHOW TIMES */}
+      <LiveWaitTimesWidget
+        parkName={selectedPark}
+        riddenRideNamesToday={activeVisitRideNames}
+      />
     </div>
   );
 };
