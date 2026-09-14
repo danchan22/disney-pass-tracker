@@ -26,10 +26,11 @@ interface LiveWaitTimesWidgetProps {
 const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
-const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[’'"]/g, '').replace(/[^a-z0-9]/g, '');
+const cleanStr = (s: string) =>
+  (s || '').toLowerCase().replace(/&/g, 'and').replace(/[’'"]/g, '').replace(/[^a-z0-9]/g, '');
 
 const tokenize = (s: string) =>
-  (s || '').toLowerCase().replace(/[’'"]/g, '').split(/[^a-z0-9]+/).filter(t => t.length > 2);
+  (s || '').toLowerCase().replace(/&/g, 'and').replace(/[’'"]/g, '').split(/[^a-z0-9]+/).filter(t => t.length > 2);
 
 const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   const c1 = cleanStr(apiName);
@@ -53,6 +54,7 @@ const getParkEntityId = (park: string): string => {
   return '75ea578a-adc8-4116-a54d-dccb60765ef9';
 };
 
+// Updated wait time style mapping (0m wait times are now light green)
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
   if (!isOperating) {
     return {
@@ -63,7 +65,7 @@ const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
     };
   }
 
-  if (waitTime === null || waitTime === 0) {
+  if (waitTime === null) {
     return {
       bg: '#FEFCBF',
       color: '#B7791F',
@@ -72,7 +74,7 @@ const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
     };
   } else if (waitTime <= 29) {
     return {
-      bg: '#E6FFFA',
+      bg: '#E6FFFA', // Light Green for 0m - 29m
       color: '#22543D',
       border: '#B2F5EA',
       label: `${waitTime}m`,
@@ -184,7 +186,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         const type = (item.entityType || '').toUpperCase();
         const rawName = item.name || '';
 
-        // Check if item matches constant RIDES list FIRST!
+        // Match constant RIDES list first
         let matchedConstantName: string | undefined = undefined;
         for (const cName of allowedAttractions) {
           if (isFuzzyMatch(rawName, cName)) {
@@ -203,7 +205,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             isOperating: item.status === 'OPERATING',
           });
         } else {
-          // If not in rides, check if it's a show/entertainment
           const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
 
           if (isShow) {
@@ -342,7 +343,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           )}
         </div>
 
-        {/* JUST ↻ ICON REFRESH BUTTON */}
         <button
           type="button"
           onClick={() => fetchLiveWaitTimes(false)}
@@ -618,6 +618,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                           gap: '8px'
                         }}
                       >
+                        {/* LEFT: STAR + RIDE TITLE (SINGLE-LINE TRUNCATION) */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                           <button
                             type="button"
@@ -638,35 +639,50 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
 
                           <div
                             onClick={() => setAlertModalRide(r)}
-                            style={{ cursor: 'pointer', minWidth: 0, flex: 1 }}
+                            style={{ cursor: 'pointer', minWidth: 0, flex: 1, overflow: 'hidden' }}
                             title="Click to set wait time alert"
                           >
-                            <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A202C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>
+                            <span style={{
+                              fontSize: '13px',
+                              fontWeight: '800',
+                              color: '#1A202C',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: 'block',
+                              maxWidth: '100%'
+                            }}>
                               {r.name}
                             </span>
-                            {hasActiveAlert && (
-                              <span style={{ fontSize: '10px', color: '#D69E2E', marginLeft: '6px' }}>🔔</span>
-                            )}
                           </div>
                         </div>
 
-                        {/* REVERTED WAIT TIME PILL */}
+                        {/* RIGHT: ALERT BELL + WAIT TIME PILL */}
                         <div
                           onClick={() => setAlertModalRide(r)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            background: pillStyle.bg,
-                            color: pillStyle.color,
-                            border: `1px solid ${pillStyle.border}`,
-                            fontSize: '12px',
-                            fontWeight: '900',
-                            flexShrink: 0,
-                            cursor: 'pointer'
-                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, cursor: 'pointer' }}
+                          title="Click to set wait time alert"
                         >
-                          {pillStyle.label}
+                          {hasActiveAlert && (
+                            <span style={{ fontSize: '13px', lineHeight: 1 }}>🔔</span>
+                          )}
+
+                          <div
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              background: pillStyle.bg,
+                              color: pillStyle.color,
+                              border: `1px solid ${pillStyle.border}`,
+                              fontSize: '12px',
+                              fontWeight: '900',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {pillStyle.label}
+                          </div>
                         </div>
+
                       </div>
                     );
                   })}
