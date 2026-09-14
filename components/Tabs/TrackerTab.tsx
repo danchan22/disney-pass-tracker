@@ -1051,10 +1051,10 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
         </div>
       )}
 
-      {/* Subtab: Times */}
-      {trackerSubTab === ('Times' as TrackerSubTab) && (
-        <TimesTrackerSubTab />
-      )}
+{/* Subtab: Times */}
+{trackerSubTab === ('Times' as TrackerSubTab) && (
+  <TimesTrackerSubTab activeVisit={activeVisit} />
+)}
 
       {/* Subtab: History */}
       {trackerSubTab === 'History' && (
