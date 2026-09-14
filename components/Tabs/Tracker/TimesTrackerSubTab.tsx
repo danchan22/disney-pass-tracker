@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Visit } from '../../../lib/types';
 import { PARK_NAMES } from '../../../lib/constants';
-import { LiveWaitTimesWidget } from '../../Shared/LiveWaitTimesWidget';
+import { LiveWaitTimesWidget } from '../../Shared/LiveWaitTimes/LiveWaitTimesWidget';
 import { ParkIcon } from '../../Shared/ParkIcon';
 
 type ParkName = 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
