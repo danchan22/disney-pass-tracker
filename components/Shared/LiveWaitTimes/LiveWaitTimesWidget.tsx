@@ -31,7 +31,6 @@ const cleanStr = (s: string) => (s || '').toLowerCase().replace(/[’'"]/g, '').
 const tokenize = (s: string) =>
   (s || '').toLowerCase().replace(/[’'"]/g, '').split(/[^a-z0-9]+/).filter(t => t.length > 2);
 
-// Token-based fuzzy matching
 const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   const c1 = cleanStr(apiName);
   const c2 = cleanStr(constantName);
@@ -46,16 +45,14 @@ const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   return matches.length >= Math.min(2, t2.length);
 };
 
-// Fixed Park UUID Lookup (Animal Kingdom checked FIRST to avoid 'kingdom' collision)
 const getParkEntityId = (park: string): string => {
   const c = cleanStr(park);
   if (c.includes('animal') || c.includes('ak')) return '1c84a229-8862-4648-9c71-378ddd2c7693';
   if (c.includes('epcot')) return '47f90d2c-e191-4239-a466-5892ef59a88b';
-  if (c.includes('hollywood') || c.includes('studios')) return '288747d1-8b4f-4a64-867e-ea7c923263a3';
-  return '75ea578a-adc8-4116-a54d-dccb60765ef9'; // Magic Kingdom default
+  if (c.includes('hollywood') || c.includes('studios')) return '288747d1-8b4f-4a64-867e-ea7c9b27bad8';
+  return '75ea578a-adc8-4116-a54d-dccb60765ef9';
 };
 
-// Reverted wait time style mapping
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
   if (!isOperating) {
     return {
@@ -137,7 +134,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   // Alerts
   const [alertModalRide, setAlertModalRide] = useState<RideItem | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertRule[]>([]);
-  const [triggeredNotification, setTriggeredNotification] = useState<{ rideName: string; message: string } | null>(null);
+  const [triggeredNotification, setTriggeredNotification] = useState<{ rideName: string; waitTime: number | null; isOperating: boolean } | null>(null);
 
   useEffect(() => {
     try {
@@ -187,45 +184,46 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         const type = (item.entityType || '').toUpperCase();
         const rawName = item.name || '';
 
-        const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
-
-        if (isShow) {
-          const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
-          const upcomingShowtimes: Showtime[] = rawShowtimes
-            .map(s => ({ startTime: s.startTime || s }))
-            .filter(s => {
-              const showDate = new Date(s.startTime);
-              return !isNaN(showDate.getTime()) && showDate > now;
-            });
-
-          if (upcomingShowtimes.length > 0) {
-            parsedShows.push({
-              id: item.id || rawName,
-              name: rawName,
-              waitTime: null,
-              isOperating: item.status === 'OPERATING',
-              showtimes: upcomingShowtimes
-            });
+        // Check if item matches constant RIDES list FIRST!
+        let matchedConstantName: string | undefined = undefined;
+        for (const cName of allowedAttractions) {
+          if (isFuzzyMatch(rawName, cName)) {
+            matchedConstantName = cName;
+            break;
           }
+        }
+
+        if (matchedConstantName) {
+          const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
+
+          parsedRides.push({
+            id: item.id || matchedConstantName,
+            name: matchedConstantName,
+            waitTime: wait,
+            isOperating: item.status === 'OPERATING',
+          });
         } else {
-          // FUZZY TOKEN MATCHING against constants file
-          let matchedConstantName: string | undefined = undefined;
-          for (const cName of allowedAttractions) {
-            if (isFuzzyMatch(rawName, cName)) {
-              matchedConstantName = cName;
-              break;
+          // If not in rides, check if it's a show/entertainment
+          const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
+
+          if (isShow) {
+            const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
+            const upcomingShowtimes: Showtime[] = rawShowtimes
+              .map(s => ({ startTime: s.startTime || s }))
+              .filter(s => {
+                const showDate = new Date(s.startTime);
+                return !isNaN(showDate.getTime()) && showDate > now;
+              });
+
+            if (upcomingShowtimes.length > 0) {
+              parsedShows.push({
+                id: item.id || rawName,
+                name: rawName,
+                waitTime: null,
+                isOperating: item.status === 'OPERATING',
+                showtimes: upcomingShowtimes
+              });
             }
-          }
-
-          if (matchedConstantName) {
-            const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
-
-            parsedRides.push({
-              id: item.id || matchedConstantName,
-              name: matchedConstantName,
-              waitTime: wait,
-              isOperating: item.status === 'OPERATING',
-            });
           }
         }
       });
@@ -253,18 +251,19 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       const match = currentItems.find(r => r.name.toLowerCase().includes(alert.rideName.toLowerCase()));
       if (match) {
         let triggered = false;
-        let msg = '';
 
         if (match.isOperating && match.waitTime !== null && match.waitTime <= alert.targetWait) {
           triggered = true;
-          msg = `Wait time is now ${match.waitTime} mins (target was ≤ ${alert.targetWait}m)!`;
         } else if (alert.alertOnOpen && match.isOperating) {
           triggered = true;
-          msg = `Attraction is now OPEN!`;
         }
 
         if (triggered) {
-          setTriggeredNotification({ rideName: match.name, message: msg });
+          setTriggeredNotification({
+            rideName: match.name,
+            waitTime: match.waitTime,
+            isOperating: match.isOperating
+          });
         } else {
           remainingAlerts.push(alert);
         }
@@ -343,24 +342,26 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           )}
         </div>
 
+        {/* JUST ↻ ICON REFRESH BUTTON */}
         <button
           type="button"
           onClick={() => fetchLiveWaitTimes(false)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
-            padding: '6px 12px',
+            justifyContent: 'center',
+            padding: '6px 10px',
             borderRadius: '12px',
             border: '1px solid #BEE3F8',
             background: '#EBF8FF',
-            fontSize: '12px',
+            fontSize: '14px',
             fontWeight: '800',
             color: '#004487',
             cursor: 'pointer'
           }}
+          title="Refresh"
         >
-          <span>↻</span>
+          ↻
         </button>
       </div>
 
@@ -690,7 +691,8 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       {triggeredNotification && (
         <AlertTriggeredModal
           rideName={triggeredNotification.rideName}
-          message={triggeredNotification.message}
+          waitTime={triggeredNotification.waitTime}
+          isOperating={triggeredNotification.isOperating}
           onClose={() => setTriggeredNotification(null)}
         />
       )}
