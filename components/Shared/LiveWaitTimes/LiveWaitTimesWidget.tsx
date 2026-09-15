@@ -37,11 +37,16 @@ const HALLOWEEN_PARTY_SHOWS = [
   "The Cadaver Dans Barbershop Quartet at Mickey’s Not-So-Scary Halloween Party",
   "Mickey's Boo-to-You Halloween Parade",
   "Disney's Not-So-Spooky Fireworks Spectacular",
-  "Hocus Pocus Villain Spellsacular",
+  "Hocus Pocus Villain Spelltacular",
   "Cadaver Dans Barbershop Quartet",
   "Rusty Cutlass Pirate Band",
   "Disney Junior Jam",
-  "Monster Charge Dance Party"
+  "Monster Charge Dance Party",
+  "Meet Festive Disney Pals at Mickey’s Not-So-Scary Halloween Party",
+  "Meet Jack Skellington and Sally at Mickey's Not-So-Scary Halloween Party",
+  "Disney Enchantment at Disney After Hours at Magic Kingdom",
+  "Jessie's Roundup: A Rip-Roarin Revue!",
+  
 ];
 
 const cleanStr = (s: string) =>
