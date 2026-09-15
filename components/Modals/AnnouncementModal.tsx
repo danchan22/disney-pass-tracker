@@ -108,6 +108,7 @@ export const AnnouncementModal: React.FC = () => {
         </button>
 
         {/* HEADER ICON + TITLE */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingRight: '28px' }}>
 
           <div>
             <h3 style={{ margin: '2px 0 0 0', fontSize: '16px', fontWeight: '900', color: '#004487' }}>
