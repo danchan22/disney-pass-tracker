@@ -124,9 +124,6 @@ export const AnnouncementModal: React.FC = () => {
             📢
           </div>
           <div>
-            <span style={{ fontSize: '10px', fontWeight: '900', color: '#D4AF37', letterSpacing: '0.8px', display: 'block' }}>
-              ANNOUNCEMENT
-            </span>
             <h3 style={{ margin: '2px 0 0 0', fontSize: '16px', fontWeight: '900', color: '#004487' }}>
               {announcement.title}
             </h3>
@@ -137,7 +134,6 @@ export const AnnouncementModal: React.FC = () => {
         {announcement.image_url && (
           <div style={{
             width: '100%',
-            maxHeight: '180px',
             borderRadius: '16px',
             overflow: 'hidden',
             border: '1px solid #E2E8F0',
