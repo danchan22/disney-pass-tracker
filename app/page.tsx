@@ -30,6 +30,7 @@ import { FunTab } from '../components/Tabs/FunTab';
 
 import { EditVisitModal } from '../components/Modals/EditVisitModal';
 import { CheckoutModal } from '../components/Modals/CheckoutModal';
+import { AnnouncementModal } from '../components/Modals/AnnouncementModal';
 
 // Global Alert Modal Imports
 import { AlertRule, AlertTriggeredModal } from '../components/Shared/LiveWaitTimes/WaitTimeAlertModal';
@@ -1073,7 +1074,9 @@ export default function DisneyTracker() {
         toggleDepartingMember={toggleDepartingMember}
         processCheckout={processCheckout}
       />
-
+{/* GLOBAL ANNOUNCEMENT POPUP */}
+      <AnnouncementModal />
+      
       {/* GLOBAL WHITE RABBIT ALERT POPUP */}
       {triggeredGlobalNotification && (
         <AlertTriggeredModal
