@@ -212,3 +212,99 @@ export const WaitTimeAlertModal: React.FC<WaitTimeAlertModalProps> = ({
     </div>
   );
 };
+
+// WHITE RABBIT ALERT TRIGGER POPUP
+export const AlertTriggeredModal: React.FC<{
+  rideName: string;
+  waitTime: number | null;
+  isOperating: boolean;
+  onClose: () => void;
+}> = ({ rideName, waitTime, isOperating, onClose }) => {
+  const getPillStyle = () => {
+    if (!isOperating) return { bg: '#FFF5F5', color: '#9B2C2C', border: '#FEB2B2', label: 'DOWN' };
+    if (waitTime === null || waitTime === 0) return { bg: '#E6FFFA', color: '#22543D', border: '#B2F5EA', label: '0m' };
+    if (waitTime <= 29) return { bg: '#E6FFFA', color: '#22543D', border: '#B2F5EA', label: `${waitTime}m` };
+    if (waitTime <= 44) return { bg: '#FEFCBF', color: '#744210', border: '#F6E05E', label: `${waitTime}m` };
+    if (waitTime <= 59) return { bg: '#FEEBC8', color: '#7B341E', border: '#FBD38D', label: `${waitTime}m` };
+    return { bg: '#FFF5F5', color: '#9B2C2C', border: '#FEB2B2', label: `${waitTime}m` };
+  };
+
+  const pill = getPillStyle();
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0, 0, 0, 0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px'
+    }}>
+      <div style={{
+        background: '#FFFDF7',
+        borderRadius: '28px',
+        padding: '24px 20px',
+        maxWidth: '340px',
+        width: '100%',
+        border: '3px solid #D4AF37',
+        boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
+        boxSizing: 'border-box'
+      }}>
+        {/* RABBIT + WAIT TIME BADGE */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
+          <img
+            src="/rabbit.gif"
+            alt="White Rabbit"
+            style={{ height: '110px', width: 'auto', objectFit: 'contain' }}
+          />
+          <div style={{
+            padding: '8px 16px',
+            borderRadius: '12px',
+            background: pill.bg,
+            color: pill.color,
+            border: `1px solid ${pill.border}`,
+            fontSize: '18px',
+            fontWeight: '900',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+          }}>
+            {pill.label}
+          </div>
+        </div>
+
+        {/* ATTRACTION NAME */}
+        <h3 style={{
+          margin: '0 0 20px 0',
+          fontSize: '20px',
+          fontWeight: '800',
+          color: '#4A5568',
+          textAlign: 'center',
+          lineHeight: '1.3'
+        }}>
+          {rideName}
+        </h3>
+
+        {/* GOT IT BUTTON */}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '16px',
+            border: 'none',
+            background: '#D4AF37',
+            color: '#1A202C',
+            fontWeight: '900',
+            fontSize: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)'
+          }}
+        >
+          Got It!
+        </button>
+      </div>
+    </div>
+  );
+};
