@@ -198,8 +198,8 @@ export const AnnouncementModal: React.FC = () => {
             onClick={handleDismiss}
             style={{
               width: '100%',
-              background: '#D4AF37',
-              color: '#003366',
+              background: '#004487',
+              color: '#ffffff',
               fontWeight: '900',
               padding: '12px',
               borderRadius: '14px',
@@ -209,7 +209,7 @@ export const AnnouncementModal: React.FC = () => {
               boxShadow: '0 2px 6px rgba(212, 175, 55, 0.3)'
             }}
           >
-            Got it! ✨
+            Got it!
           </button>
         </div>
       </div>
