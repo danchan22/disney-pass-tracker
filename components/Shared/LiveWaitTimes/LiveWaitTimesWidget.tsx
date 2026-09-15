@@ -33,7 +33,7 @@ const HALLOWEEN_PARTY_SHOWS = [
   "Disney’s Not-So-Spooky Spectacular at Mickey's Not-So-Scary Halloween Party",
   "Meet Mickey Mouse and Minnie Mouse at Mickey's Not-So-Scary Halloween Party",
   "Mickey’s Boo-To-You Halloween Parade at Mickey's Not-So-Scary Halloween Party",
-  "Stitch’s Masquerade Mashup at Mickey’s Not-So-Scary Halloween Party"
+  "Stitch’s Masquerade Mashup at Mickey’s Not-So-Scary Halloween Party",
   "The Cadaver Dans Barbershop Quartet at Mickey’s Not-So-Scary Halloween Party",
   "Mickey's Boo-to-You Halloween Parade",
   "Disney's Not-So-Spooky Fireworks Spectacular",
