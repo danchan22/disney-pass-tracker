@@ -68,10 +68,12 @@ const normalizeApiName = (name: string) => {
   if (lower.includes('nemo') && lower.includes('seas')) return 'The Seas with Nemo & Friends';
   if (lower.includes('mission') && lower.includes('space')) {
     if (lower.includes('green')) return 'Mission: SPACE (Green)';
-    return 'Mission: SPACE (Orange)'; // Defaults to Orange if API merges the queue
+    return 'Mission: SPACE (Orange)';
   }
   if (lower.includes('canada') && (lower.includes('far and wide') || lower.includes('circle'))) return 'Canada Circle-Vision 360';
   // HS
+  if (lower.includes('toy story mania')) return 'Toy Story Mania!';
+  if (lower.includes('walt disney presents')) return 'Walt Disney Presents';
   if (lower.includes('rise of the resistance')) return 'Star Wars: Rise of the Resistance';
   if (lower.includes('vacation fun')) return 'Vacation Fun';
   if (lower.includes('beauty and the beast') && lower.includes('stage')) return 'Beauty and the Beast Live on Stage';
@@ -88,7 +90,7 @@ const normalizeApiName = (name: string) => {
   return name;
 };
 
-// Force shows that API misclassifies as rides
+// Force live stage performances and parades into the Shows tab
 const KNOWN_SHOWS = [
   'Beauty and the Beast Live on Stage',
   'Disney Villains: Unfairly Ever After',
@@ -99,15 +101,7 @@ const KNOWN_SHOWS = [
   'Feathered Friends in Flight!',
   'Festival of the Lion King',
   'Finding Nemo: The Big Blue... and Beyond!',
-  'Walt Disney Presents',
-  'Disney Junior Play & Dance!',
-  'Awesome Planet',
-  'Beauty and the Beast Sing-Along',
-  'Canada Circle-Vision 360',
-  'Disney and Pixar Short Film Festival',
-  'Impressions de France',
-  'Reflections of China',
-  'Turtle Talk with Crush'
+  'Disney Junior Play & Dance!'
 ];
 
 const getParkEntityId = (park: string): string => {
@@ -181,7 +175,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     if (!isBackground && rides.length === 0 && shows.length === 0) setLoading(true);
 
     try {
-      // Build a set of parks to fetch (current park + any parks that have an active alert)
       const parksToFetch = new Set<string>([parkName]);
       activeAlerts.forEach(a => { if (a.park) parksToFetch.add(a.park); });
 
@@ -208,40 +201,39 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             const rawName = item.name || '';
             const normalizedName = normalizeApiName(rawName);
 
-            let matchedConstantName: string | undefined = undefined;
-            if (allowedAttractions.includes(normalizedName)) {
-              matchedConstantName = normalizedName;
+            const isApiShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
+            const isForceShow = KNOWN_SHOWS.includes(normalizedName);
+
+            if (isApiShow || isForceShow) {
+              const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
+              const upcomingShowtimes: Showtime[] = rawShowtimes
+                .map(s => ({ startTime: s.startTime || s }))
+                .filter(s => {
+                  const showDate = new Date(s.startTime);
+                  return !isNaN(showDate.getTime()) && showDate > now;
+                });
+
+              parsedShows.push({
+                id: item.id || normalizedName,
+                name: normalizedName,
+                waitTime: null,
+                isOperating: item.status === 'OPERATING',
+                showtimes: upcomingShowtimes
+              });
             } else {
-              for (const cName of allowedAttractions) {
-                if (isFuzzyMatch(normalizedName, cName)) {
-                  matchedConstantName = cName;
-                  break;
+              let matchedConstantName: string | undefined = undefined;
+              if (allowedAttractions.includes(normalizedName)) {
+                matchedConstantName = normalizedName;
+              } else {
+                for (const cName of allowedAttractions) {
+                  if (isFuzzyMatch(normalizedName, cName)) {
+                    matchedConstantName = cName;
+                    break;
+                  }
                 }
               }
-            }
 
-            if (matchedConstantName) {
-              const isApiShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
-              const isForceShow = KNOWN_SHOWS.includes(matchedConstantName);
-
-              if (isApiShow || isForceShow) {
-                const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
-                const upcomingShowtimes: Showtime[] = rawShowtimes
-                  .map(s => ({ startTime: s.startTime || s }))
-                  .filter(s => {
-                    const showDate = new Date(s.startTime);
-                    return !isNaN(showDate.getTime()) && showDate > now;
-                  });
-
-                // Always add shows, even if past, to show "No remaining showtimes today"
-                parsedShows.push({
-                  id: item.id || matchedConstantName,
-                  name: matchedConstantName,
-                  waitTime: null,
-                  isOperating: item.status === 'OPERATING',
-                  showtimes: upcomingShowtimes
-                });
-              } else {
+              if (matchedConstantName) {
                 const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
                 parsedRides.push({
                   id: item.id || matchedConstantName,
