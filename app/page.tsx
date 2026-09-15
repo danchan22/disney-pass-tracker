@@ -31,6 +31,9 @@ import { FunTab } from '../components/Tabs/FunTab';
 import { EditVisitModal } from '../components/Modals/EditVisitModal';
 import { CheckoutModal } from '../components/Modals/CheckoutModal';
 
+// Global Alert Modal Imports
+import { AlertRule, AlertTriggeredModal } from '../components/Shared/LiveWaitTimes/WaitTimeAlertModal';
+
 export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
@@ -84,6 +87,13 @@ export default function DisneyTracker() {
   // Rainbow State
   const [photoGrids, setPhotoGrids] = useState<PhotoGridRecord[]>([]);
   const [photoLoading, setPhotoLoading] = useState<boolean>(false);
+
+  // Global Wait Time Notification Popup State
+  const [triggeredGlobalNotification, setTriggeredGlobalNotification] = useState<{
+    rideName: string;
+    waitTime: number | null;
+    isOperating: boolean;
+  } | null>(null);
 
   const activePartyList = useMemo(() => {
     if (!activeVisit) return [];
@@ -161,6 +171,85 @@ export default function DisneyTracker() {
   useEffect(() => {
     fetchCloudVisits();
     fetchPhotoGrids();
+  }, []);
+
+  // GLOBAL BACKGROUND ALERT POLLING (Runs regardless of active tab)
+  useEffect(() => {
+    const checkGlobalWaitTimeAlerts = async () => {
+      try {
+        const savedAlertsStr = localStorage.getItem('disney_pass_tracker_alerts_v1');
+        if (!savedAlertsStr) return;
+
+        const activeAlerts: AlertRule[] = JSON.parse(savedAlertsStr);
+        if (!activeAlerts || activeAlerts.length === 0) return;
+
+        const WDW_PARK_ENTITY_IDS: Record<string, string> = {
+          'Magic Kingdom': '75ea578a-adc8-4116-a54d-dccb60765ef9',
+          'Epcot': '47f90d2c-e191-4239-a466-5892ef59a88b',
+          'Hollywood Studios': '288747d1-8b4f-4a64-867e-ea7c9b27bad8',
+          'Animal Kingdom': '1c84a229-8862-4648-9c71-378ddd2c7693',
+        };
+
+        const parksToFetch = new Set<string>();
+        activeAlerts.forEach(a => { if (a.park) parksToFetch.add(a.park); });
+
+        const remainingAlerts: AlertRule[] = [...activeAlerts];
+        let newlyTriggered: { rideName: string; waitTime: number | null; isOperating: boolean } | null = null;
+
+        await Promise.all(
+          Array.from(parksToFetch).map(async (pName) => {
+            const entityId = WDW_PARK_ENTITY_IDS[pName];
+            if (!entityId) return;
+
+            try {
+              const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`);
+              const data = await res.json();
+              const liveList: any[] = Array.isArray(data) ? data : (data?.liveData || data?.live || []);
+
+              liveList.forEach((item: any) => {
+                const rawName = item.name || '';
+                const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
+                const isOperating = item.status === 'OPERATING';
+
+                const alertIdx = remainingAlerts.findIndex(a =>
+                  rawName.toLowerCase().includes(a.rideName.toLowerCase()) ||
+                  a.rideName.toLowerCase().includes(rawName.toLowerCase())
+                );
+
+                if (alertIdx !== -1) {
+                  const alert = remainingAlerts[alertIdx];
+                  let triggered = false;
+
+                  if (isOperating && wait !== null && wait <= alert.targetWait) {
+                    triggered = true;
+                  } else if (alert.alertOnOpen && isOperating) {
+                    triggered = true;
+                  }
+
+                  if (triggered && !newlyTriggered) {
+                    newlyTriggered = { rideName: alert.rideName, waitTime: wait, isOperating };
+                    remainingAlerts.splice(alertIdx, 1);
+                  }
+                }
+              });
+            } catch (e) {
+              console.warn(`Error background checking alerts for ${pName}:`, e);
+            }
+          })
+        );
+
+        if (newlyTriggered) {
+          setTriggeredGlobalNotification(newlyTriggered);
+          localStorage.setItem('disney_pass_tracker_alerts_v1', JSON.stringify(remainingAlerts));
+        }
+      } catch (e) {
+        console.error("Global alert poll error:", e);
+      }
+    };
+
+    checkGlobalWaitTimeAlerts();
+    const interval = setInterval(checkGlobalWaitTimeAlerts, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Network Recovery Sync Listener: Pushes pending local timer to cloud when cell service returns
@@ -247,28 +336,27 @@ export default function DisneyTracker() {
         setActiveVisit(active);
         setVisits(formattedVisits.filter(v => v.endTime));
 
-    // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud, Clear if Ended
-const localStart = localStorage.getItem('disney_queue_start_ts');
-const localStr = localStorage.getItem('disney_queue_start_str');
-const localRide = localStorage.getItem('disney_queue_ride_name');
+        // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud, Clear if Ended
+        const localStart = localStorage.getItem('disney_queue_start_ts');
+        const localStr = localStorage.getItem('disney_queue_start_str');
+        const localRide = localStorage.getItem('disney_queue_ride_name');
 
-if (localStart && localStr) {
-  setQueueStartTimestamp(Number(localStart));
-  setQueueStartTimeStr(localStr);
-  if (localRide) setRideName(localRide);
-} else if (active && (active as any).queue_start_ts) {
-  setQueueStartTimestamp(Number((active as any).queue_start_ts));
-  setQueueStartTimeStr((active as any).queue_start_str || null);
-  if ((active as any).queue_ride_name) {
-    setRideName((active as any).queue_ride_name);
-  }
-} else {
-  // Cloud and localStorage agree there is no running timer -> reset state for all devices
-  setQueueStartTimestamp(null);
-  setQueueStartTimeStr(null);
-  setRideTrivia(null);
-  setHiddenMickey(null);
-}
+        if (localStart && localStr) {
+          setQueueStartTimestamp(Number(localStart));
+          setQueueStartTimeStr(localStr);
+          if (localRide) setRideName(localRide);
+        } else if (active && (active as any).queue_start_ts) {
+          setQueueStartTimestamp(Number((active as any).queue_start_ts));
+          setQueueStartTimeStr((active as any).queue_start_str || null);
+          if ((active as any).queue_ride_name) {
+            setRideName((active as any).queue_ride_name);
+          }
+        } else {
+          setQueueStartTimestamp(null);
+          setQueueStartTimeStr(null);
+          setRideTrivia(null);
+          setHiddenMickey(null);
+        }
       }
     } catch (err: any) {
       setErrorMessage("Could not load cloud visits. " + (err.message || ''));
@@ -290,7 +378,7 @@ if (localStart && localStr) {
       if (data) setPhotoGrids(data as PhotoGridRecord[]);
     } catch (err) {
       console.warn("Could not fetch photo grids:", err);
-} finally {
+    } finally {
       setPhotoLoading(false);
     }
   };
@@ -511,53 +599,49 @@ if (localStart && localStr) {
     }
   };
 
-const fetchRideTrivia = async (attractionName: string, park: string) => {
-  setTriviaLoading(true);
-  try {
-    const supabase = await getSupabase();
-    // Query facts matching the ride name
-    const { data, error } = await supabase
-      .from('fun_facts')
-      .select('fun_fact')
-      .ilike('ride', `%${attractionName}%`);
+  const fetchRideTrivia = async (attractionName: string, park: string) => {
+    setTriviaLoading(true);
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from('fun_facts')
+        .select('fun_fact')
+        .ilike('ride', `%${attractionName}%`);
 
-    if (error || !data || data.length === 0) {
-      setRideTrivia(null); // Hide card if no fact exists in database
-    } else {
-      // Pick a random fact from all entries for this ride
-      const randomIndex = Math.floor(Math.random() * data.length);
-      setRideTrivia(data[randomIndex].fun_fact);
+      if (error || !data || data.length === 0) {
+        setRideTrivia(null);
+      } else {
+        const randomIndex = Math.floor(Math.random() * data.length);
+        setRideTrivia(data[randomIndex].fun_fact);
+      }
+    } catch (err) {
+      setRideTrivia(null);
+    } finally {
+      setTriviaLoading(false);
     }
-  } catch (err) {
-    setRideTrivia(null);
-  } finally {
-    setTriviaLoading(false);
-  }
-};
+  };
 
-const fetchHiddenMickey = async (attractionName: string, park: string) => {
-  setMickeyLoading(true);
-  try {
-    const supabase = await getSupabase();
-    // Query Hidden Mickeys matching the ride name
-    const { data, error } = await supabase
-      .from('hidden_mickeys')
-      .select('hidden_mickey')
-      .ilike('ride', `%${attractionName}%`);
+  const fetchHiddenMickey = async (attractionName: string, park: string) => {
+    setMickeyLoading(true);
+    try {
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from('hidden_mickeys')
+        .select('hidden_mickey')
+        .ilike('ride', `%${attractionName}%`);
 
-    if (error || !data || data.length === 0) {
-      setHiddenMickey(null); // Hide card if no Hidden Mickey exists in database
-    } else {
-      // Pick a random Hidden Mickey from all entries for this ride
-      const randomIndex = Math.floor(Math.random() * data.length);
-      setHiddenMickey(data[randomIndex].hidden_mickey);
+      if (error || !data || data.length === 0) {
+        setHiddenMickey(null);
+      } else {
+        const randomIndex = Math.floor(Math.random() * data.length);
+        setHiddenMickey(data[randomIndex].hidden_mickey);
+      }
+    } catch (err) {
+      setHiddenMickey(null);
+    } finally {
+      setMickeyLoading(false);
     }
-  } catch (err) {
-    setHiddenMickey(null);
-  } finally {
-    setMickeyLoading(false);
-  }
-};
+  };
 
   const handleStartQueueTimer = async () => {
     if (!activeVisit) return;
@@ -566,7 +650,6 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
     const timeString = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
     const ts = now.getTime();
 
-    // Local Write (100% offline safe)
     localStorage.setItem('disney_queue_start_ts', ts.toString());
     localStorage.setItem('disney_queue_start_str', timeString);
     localStorage.setItem('disney_queue_ride_name', rideName);
@@ -574,7 +657,6 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
     setQueueStartTimestamp(ts);
     setQueueStartTimeStr(timeString);
 
-    // Best-effort Background Push to Cloud
     try {
       const supabase = await getSupabase();
       await supabase
@@ -640,7 +722,6 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
       setRideTrivia(null);
       setHiddenMickey(null);
 
-      // Clear Cloud Timer
       await supabase
         .from('visits')
         .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
@@ -804,19 +885,16 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= acts.length) return;
 
-    // Swap in array
     const temp = acts[idx];
     acts[idx] = acts[swapIdx];
     acts[swapIdx] = temp;
 
-    // Update local state immediately
     if (visitId === null && activeVisit) {
       setActiveVisit({ ...activeVisit, activities: acts });
     } else {
       setVisits(prev => prev.map(v => v.id === visitId ? { ...v, activities: acts } : v));
     }
 
-    // Persist ordered timestamps to Supabase
     try {
       const supabase = await getSupabase();
       const baseTime = new Date((targetVisit.visitDate || '2026-01-01') + 'T12:00:00Z').getTime();
@@ -844,19 +922,20 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         </div>
       )}
 
-{/* SUBHEADER NAV */}
-<Subheader
-  mainTab={mainTab}
-  trackerSubTab={trackerSubTab}
-  setTrackerSubTab={setTrackerSubTab}
-  analyticsSubTab={analyticsSubTab}
-  setAnalyticsSubTab={setAnalyticsSubTab}
-  funSubTab={funSubTab}
-  setFunSubTab={setFunSubTab}
-/>
-{mainTab === 'checklist' && (
-  <AttendeeFilter selectedAttendee={selectedAttendee} setSelectedAttendee={setSelectedAttendee} />
-)}
+      {/* SUBHEADER NAV */}
+      <Subheader
+        mainTab={mainTab}
+        trackerSubTab={trackerSubTab}
+        setTrackerSubTab={setTrackerSubTab}
+        analyticsSubTab={analyticsSubTab}
+        setAnalyticsSubTab={setAnalyticsSubTab}
+        funSubTab={funSubTab}
+        setFunSubTab={setFunSubTab}
+      />
+
+      {mainTab === 'checklist' && (
+        <AttendeeFilter selectedAttendee={selectedAttendee} setSelectedAttendee={setSelectedAttendee} />
+      )}
 
       {mainTab === 'tracker' && (
         <TrackerTab
@@ -962,15 +1041,15 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         />
       )}
 
-{/* FUN TAB CONTENT */}
-{mainTab === ('rainbow' as MainTab) && (
-  <FunTab
-    funSubTab={funSubTab}
-    photoGrids={photoGrids}
-    photoLoading={photoLoading}
-    fetchPhotoGrids={fetchPhotoGrids}
-  />
-)}
+      {/* FUN TAB CONTENT */}
+      {mainTab === ('rainbow' as MainTab) && (
+        <FunTab
+          funSubTab={funSubTab}
+          photoGrids={photoGrids}
+          photoLoading={photoLoading}
+          fetchPhotoGrids={fetchPhotoGrids}
+        />
+      )}
 
       <EditVisitModal
         editingVisit={editingVisit}
@@ -994,6 +1073,16 @@ const fetchHiddenMickey = async (attractionName: string, park: string) => {
         toggleDepartingMember={toggleDepartingMember}
         processCheckout={processCheckout}
       />
+
+      {/* GLOBAL WHITE RABBIT ALERT POPUP */}
+      {triggeredGlobalNotification && (
+        <AlertTriggeredModal
+          rideName={triggeredGlobalNotification.rideName}
+          waitTime={triggeredGlobalNotification.waitTime}
+          isOperating={triggeredGlobalNotification.isOperating}
+          onClose={() => setTriggeredGlobalNotification(null)}
+        />
+      )}
 
     </div>
   );
