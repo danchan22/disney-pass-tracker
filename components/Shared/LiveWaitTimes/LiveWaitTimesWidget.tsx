@@ -26,6 +26,24 @@ interface LiveWaitTimesWidgetProps {
 const FAVORITES_STORAGE_KEY = 'disney_pass_tracker_favorites_v1';
 const ALERTS_STORAGE_KEY = 'disney_pass_tracker_alerts_v1';
 
+// BLOCK MNSSHP & AFTER-HOURS EXCLUSIVE SHOWS
+const HALLOWEEN_PARTY_SHOWS = [
+  "Captain Jack’s Buccaneer Bash at Mickey’s Not-So-Scary Halloween Party",
+  "Destination DescenDANCE Party at Mickey’s Not-So-Scary Halloween Party",
+  "Disney’s Not-So-Spooky Spectacular at Mickey's Not-So-Scary Halloween Party",
+  "Meet Mickey Mouse and Minnie Mouse at Mickey's Not-So-Scary Halloween Party",
+  "Mickey’s Boo-To-You Halloween Parade at Mickey's Not-So-Scary Halloween Party",
+  "Stitch’s Masquerade Mashup at Mickey’s Not-So-Scary Halloween Party"
+  "The Cadaver Dans Barbershop Quartet at Mickey's Not-So-Scary Halloween Party",
+  "Mickey's Boo-to-You Halloween Parade",
+  "Disney's Not-So-Spooky Fireworks Spectacular",
+  "Hocus Pocus Villain Spellsacular",
+  "Cadaver Dans Barbershop Quartet",
+  "Rusty Cutlass Pirate Band",
+  "Disney Junior Jam",
+  "Monster Charge Dance Party"
+];
+
 const cleanStr = (s: string) =>
   (s || '')
     .toLowerCase()
@@ -57,7 +75,6 @@ const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   return matches.length >= Math.min(2, t2.length);
 };
 
-// Map weird API names securely back to our Constants
 const normalizeApiName = (name: string) => {
   const lower = name.toLowerCase();
   // MK
@@ -90,7 +107,6 @@ const normalizeApiName = (name: string) => {
   return name;
 };
 
-// Force live stage performances and parades into the Shows tab
 const KNOWN_SHOWS = [
   'Beauty and the Beast Live on Stage',
   'Disney Villains: Unfairly Ever After',
@@ -200,6 +216,12 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
             const type = (item.entityType || '').toUpperCase();
             const rawName = item.name || '';
             const normalizedName = normalizeApiName(rawName);
+
+            // Filter out Halloween Party / After Hours Exclusive events
+            const isHalloweenShow = HALLOWEEN_PARTY_SHOWS.some(hShow => 
+              cleanStr(normalizedName).includes(cleanStr(hShow)) || cleanStr(hShow).includes(cleanStr(normalizedName))
+            );
+            if (isHalloweenShow) return;
 
             const isApiShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
             const isForceShow = KNOWN_SHOWS.includes(normalizedName);
@@ -333,11 +355,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
 
   const filteredItems = useMemo(() => {
     return activeSourceList.filter(r => {
-      if (favoritesOnly && !favorites.includes(r.name)) return false;
-      if (hideRidden && riddenRideNamesToday.some(rr => cleanStr(r.name).includes(cleanStr(rr)))) return false;
+      if (categoryTab === 'rides') {
+        if (favoritesOnly && !favorites.includes(r.name)) return false;
+        if (hideRidden && riddenRideNamesToday.some(rr => cleanStr(r.name).includes(cleanStr(rr)))) return false;
+      }
       return true;
     }).sort((a, b) => {
-      if (sortField === 'name') {
+      if (sortField === 'name' || categoryTab === 'shows') {
         return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       } else {
         if (!a.isOperating && b.isOperating) return 1;
@@ -347,7 +371,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         return sortOrder === 'asc' ? waitA - waitB : waitB - waitA;
       }
     });
-  }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder]);
+  }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder, categoryTab]);
 
   const groupedItems = useMemo(() => {
     if (!groupByLand || categoryTab === 'shows') return { 'All Attractions': filteredItems };
@@ -415,7 +439,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         borderRadius: '16px',
         border: '1px solid #EDF2F7',
         padding: '4px',
-        marginBottom: '14px'
+        marginBottom: categoryTab === 'rides' ? '14px' : '16px'
       }}>
         <button
           type="button"
@@ -452,118 +476,119 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
         </button>
       </div>
 
-      {/* FILTER ROW */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Filter:</span>
+      {/* FILTER & SORT ROWS (ONLY VISIBLE FOR RIDES TAB) */}
+      {categoryTab === 'rides' && (
+        <>
+          {/* FILTER ROW */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Filter:</span>
 
-        <button
-          type="button"
-          onClick={() => setFavoritesOnly(prev => !prev)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '12px',
-            border: favoritesOnly ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: favoritesOnly ? '#EBF8FF' : '#F8FAFC',
-            color: favoritesOnly ? '#004487' : '#4A5568',
-            fontSize: '11px',
-            fontWeight: '800',
-            cursor: 'pointer'
-          }}
-        >
-          {favoritesOnly ? '★ Favorites' : '☆ Favorites'}
-        </button>
+            <button
+              type="button"
+              onClick={() => setFavoritesOnly(prev => !prev)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: favoritesOnly ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: favoritesOnly ? '#EBF8FF' : '#F8FAFC',
+                color: favoritesOnly ? '#004487' : '#4A5568',
+                fontSize: '11px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              {favoritesOnly ? '★ Favorites' : '☆ Favorites'}
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setHideRidden(prev => !prev)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '12px',
-            border: hideRidden ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: hideRidden ? '#EBF8FF' : '#F8FAFC',
-            color: hideRidden ? '#004487' : '#4A5568',
-            fontSize: '11px',
-            fontWeight: '800',
-            cursor: 'pointer'
-          }}
-        >
-          Hide Today's Rides
-        </button>
-      </div>
+            <button
+              type="button"
+              onClick={() => setHideRidden(prev => !prev)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: hideRidden ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: hideRidden ? '#EBF8FF' : '#F8FAFC',
+                color: hideRidden ? '#004487' : '#4A5568',
+                fontSize: '11px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              Hide Today's Rides
+            </button>
+          </div>
 
-      {/* SORT ROW */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-        <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
+          {/* SORT ROW */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+            <span style={{ fontSize: '11px', fontWeight: '800', color: '#718096', marginRight: '2px' }}>Sort:</span>
 
-        {categoryTab === 'rides' && (
-          <button
-            type="button"
-            onClick={() => setGroupByLand(prev => !prev)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '12px',
-              border: groupByLand ? '2px solid #004487' : '1px solid #E2E8F0',
-              background: groupByLand ? '#EBF8FF' : '#F8FAFC',
-              color: groupByLand ? '#004487' : '#4A5568',
-              fontSize: '11px',
-              fontWeight: '800',
-              cursor: 'pointer'
-            }}
-          >
-            By Land
-          </button>
-        )}
+            <button
+              type="button"
+              onClick={() => setGroupByLand(prev => !prev)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: groupByLand ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: groupByLand ? '#EBF8FF' : '#F8FAFC',
+                color: groupByLand ? '#004487' : '#4A5568',
+                fontSize: '11px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              By Land
+            </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (sortField === 'name') {
-              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-            } else {
-              setSortField('name');
-              setSortOrder('asc');
-            }
-          }}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '12px',
-            border: sortField === 'name' ? '2px solid #004487' : '1px solid #E2E8F0',
-            background: sortField === 'name' ? '#EBF8FF' : '#F8FAFC',
-            color: sortField === 'name' ? '#004487' : '#4A5568',
-            fontSize: '11px',
-            fontWeight: '800',
-            cursor: 'pointer'
-          }}
-        >
-          {sortField === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
-        </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (sortField === 'name') {
+                  setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setSortField('name');
+                  setSortOrder('asc');
+                }
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: sortField === 'name' ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: sortField === 'name' ? '#EBF8FF' : '#F8FAFC',
+                color: sortField === 'name' ? '#004487' : '#4A5568',
+                fontSize: '11px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              {sortField === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
+            </button>
 
-        {categoryTab === 'rides' && (
-          <button
-            type="button"
-            onClick={() => {
-              if (sortField === 'wait') {
-                setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortField('wait');
-                setSortOrder('asc');
-              }
-            }}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '12px',
-              border: sortField === 'wait' ? '2px solid #004487' : '1px solid #E2E8F0',
-              background: sortField === 'wait' ? '#EBF8FF' : '#F8FAFC',
-              color: sortField === 'wait' ? '#004487' : '#4A5568',
-              fontSize: '11px',
-              fontWeight: '800',
-              cursor: 'pointer'
-            }}
-          >
-            {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
-          </button>
-        )}
-      </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (sortField === 'wait') {
+                  setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setSortField('wait');
+                  setSortOrder('asc');
+                }
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: sortField === 'wait' ? '2px solid #004487' : '1px solid #E2E8F0',
+                background: sortField === 'wait' ? '#EBF8FF' : '#F8FAFC',
+                color: sortField === 'wait' ? '#004487' : '#4A5568',
+                fontSize: '11px',
+                fontWeight: '800',
+                cursor: 'pointer'
+              }}
+            >
+              {sortField === 'wait' ? (sortOrder === 'asc' ? 'Low-High' : 'High-Low') : 'Low-High'}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* LIST RENDERER */}
       {loading ? (
@@ -660,7 +685,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
                           gap: '8px'
                         }}
                       >
-                        {/* LEFT: STAR + RIDE TITLE (SINGLE-LINE TRUNCATION) */}
+                        {/* LEFT: STAR + RIDE TITLE */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                           <button
                             type="button"
