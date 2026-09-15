@@ -57,6 +57,59 @@ const isFuzzyMatch = (apiName: string, constantName: string): boolean => {
   return matches.length >= Math.min(2, t2.length);
 };
 
+// Map weird API names securely back to our Constants
+const normalizeApiName = (name: string) => {
+  const lower = name.toLowerCase();
+  // MK
+  if (lower.includes('pooh')) return 'The Many Adventures of Winnie the Pooh';
+  if (lower.includes('mermaid') && lower.includes('journey')) return 'Under the Sea ~ Journey of The Little Mermaid';
+  if (lower.includes('tiki room')) return 'Walt Disney Enchanted Tiki Room';
+  // Epcot
+  if (lower.includes('nemo') && lower.includes('seas')) return 'The Seas with Nemo & Friends';
+  if (lower.includes('mission') && lower.includes('space')) {
+    if (lower.includes('green')) return 'Mission: SPACE (Green)';
+    return 'Mission: SPACE (Orange)'; // Defaults to Orange if API merges the queue
+  }
+  if (lower.includes('canada') && (lower.includes('far and wide') || lower.includes('circle'))) return 'Canada Circle-Vision 360';
+  // HS
+  if (lower.includes('rise of the resistance')) return 'Star Wars: Rise of the Resistance';
+  if (lower.includes('vacation fun')) return 'Vacation Fun';
+  if (lower.includes('beauty and the beast') && lower.includes('stage')) return 'Beauty and the Beast Live on Stage';
+  if (lower.includes('frozen') && lower.includes('sing')) return 'For the First Time in Forever: A Frozen Sing-Along Celebration';
+  if (lower.includes('indiana jones')) return 'Indiana Jones Epic Stunt Spectacular!';
+  if (lower.includes('mermaid') && lower.includes('musical')) return 'The Little Mermaid: A Musical Adventure';
+  if (lower.includes('villains') && lower.includes('unfairly')) return 'Disney Villains: Unfairly Ever After';
+  if (lower.includes('fantasmic')) return 'Fantasmic';
+  // AK
+  if (lower.includes('feathered friends')) return 'Feathered Friends in Flight!';
+  if (lower.includes('lion king')) return 'Festival of the Lion King';
+  if (lower.includes('nemo') && lower.includes('big blue')) return 'Finding Nemo: The Big Blue... and Beyond!';
+
+  return name;
+};
+
+// Force shows that API misclassifies as rides
+const KNOWN_SHOWS = [
+  'Beauty and the Beast Live on Stage',
+  'Disney Villains: Unfairly Ever After',
+  'Fantasmic',
+  'For the First Time in Forever: A Frozen Sing-Along Celebration',
+  'Indiana Jones Epic Stunt Spectacular!',
+  'The Little Mermaid: A Musical Adventure',
+  'Feathered Friends in Flight!',
+  'Festival of the Lion King',
+  'Finding Nemo: The Big Blue... and Beyond!',
+  'Walt Disney Presents',
+  'Disney Junior Play & Dance!',
+  'Awesome Planet',
+  'Beauty and the Beast Sing-Along',
+  'Canada Circle-Vision 360',
+  'Disney and Pixar Short Film Festival',
+  'Impressions de France',
+  'Reflections of China',
+  'Turtle Talk with Crush'
+];
+
 const getParkEntityId = (park: string): string => {
   const c = cleanStr(park);
   if (c.includes('animal') || c.includes('ak')) return '1c84a229-8862-4648-9c71-378ddd2c7693';
@@ -65,46 +118,12 @@ const getParkEntityId = (park: string): string => {
   return '75ea578a-adc8-4116-a54d-dccb60765ef9';
 };
 
-// 0m wait times styled light green (#E6FFFA)
 const getWaitTimeStyle = (isOperating: boolean, waitTime: number | null) => {
-  if (!isOperating) {
-    return {
-      bg: '#FFF5F5',
-      color: '#9B2C2C',
-      border: '#FEB2B2',
-      label: 'DOWN',
-    };
-  }
-
-  if (waitTime === null || waitTime <= 29) {
-    return {
-      bg: '#E6FFFA', // Light Green for 0m - 29m
-      color: '#22543D',
-      border: '#B2F5EA',
-      label: `${waitTime ?? 0}m`,
-    };
-  } else if (waitTime <= 44) {
-    return {
-      bg: '#FEFCBF',
-      color: '#744210',
-      border: '#F6E05E',
-      label: `${waitTime}m`,
-    };
-  } else if (waitTime <= 59) {
-    return {
-      bg: '#FEEBC8',
-      color: '#7B341E',
-      border: '#FBD38D',
-      label: `${waitTime}m`,
-    };
-  } else {
-    return {
-      bg: '#FFF5F5',
-      color: '#9B2C2C',
-      border: '#FEB2B2',
-      label: `${waitTime}m`,
-    };
-  }
+  if (!isOperating) return { bg: '#FFF5F5', color: '#9B2C2C', border: '#FEB2B2', label: 'DOWN' };
+  if (waitTime === null || waitTime <= 29) return { bg: '#E6FFFA', color: '#22543D', border: '#B2F5EA', label: `${waitTime ?? 0}m` };
+  if (waitTime <= 44) return { bg: '#FEFCBF', color: '#744210', border: '#F6E05E', label: `${waitTime}m` };
+  if (waitTime <= 59) return { bg: '#FEEBC8', color: '#7B341E', border: '#FBD38D', label: `${waitTime}m` };
+  return { bg: '#FFF5F5', color: '#9B2C2C', border: '#FEB2B2', label: `${waitTime}m` };
 };
 
 const formatShowtimeLabel = (timeStr: string): string => {
@@ -127,17 +146,14 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
 
-  // Favorites & Filters
   const [favorites, setFavorites] = useState<string[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState<boolean>(false);
   const [hideRidden, setHideRidden] = useState<boolean>(false);
   const [groupByLand, setGroupByLand] = useState<boolean>(true);
 
-  // Sorting
   const [sortField, setSortField] = useState<'name' | 'wait'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Alerts
   const [alertModalRide, setAlertModalRide] = useState<RideItem | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<AlertRule[]>([]);
   const [triggeredNotification, setTriggeredNotification] = useState<{ rideName: string; waitTime: number | null; isOperating: boolean } | null>(null);
@@ -146,7 +162,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     try {
       const savedFavs = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (savedFavs) setFavorites(JSON.parse(savedFavs));
-
       const savedAlerts = localStorage.getItem(ALERTS_STORAGE_KEY);
       if (savedAlerts) setActiveAlerts(JSON.parse(savedAlerts));
     } catch (e) {
@@ -156,90 +171,107 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
 
   const toggleFavorite = (rideName: string) => {
     setFavorites(prev => {
-      const updated = prev.includes(rideName)
-        ? prev.filter(r => r !== rideName)
-        : [...prev, rideName];
-      try {
-        localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {}
+      const updated = prev.includes(rideName) ? prev.filter(r => r !== rideName) : [...prev, rideName];
+      try { localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
   };
 
   const fetchLiveWaitTimes = async (isBackground = false) => {
-    if (!isBackground && rides.length === 0 && shows.length === 0) {
-      setLoading(true);
-    }
+    if (!isBackground && rides.length === 0 && shows.length === 0) setLoading(true);
 
     try {
-      const entityId = getParkEntityId(parkName);
-      const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`);
-      const data = await res.json();
+      // Build a set of parks to fetch (current park + any parks that have an active alert)
+      const parksToFetch = new Set<string>([parkName]);
+      activeAlerts.forEach(a => { if (a.park) parksToFetch.add(a.park); });
 
-      const liveList: any[] = Array.isArray(data)
-        ? data
-        : (data?.liveData || data?.live || []);
-
-      const allowedAttractions = PARK_ATTRACTIONS[parkName] || [];
-
-      const parsedRides: RideItem[] = [];
-      const parsedShows: RideItem[] = [];
+      const allFetchedItems: RideItem[] = [];
+      let currentParkRides: RideItem[] = [];
+      let currentParkShows: RideItem[] = [];
       const now = new Date();
 
-      liveList.forEach((item: any) => {
-        const type = (item.entityType || '').toUpperCase();
-        const rawName = item.name || '';
+      await Promise.all(Array.from(parksToFetch).map(async (pName) => {
+        const entityId = getParkEntityId(pName);
+        if (!entityId) return;
 
-        // Match constant RIDES list first
-        let matchedConstantName: string | undefined = undefined;
-        for (const cName of allowedAttractions) {
-          if (isFuzzyMatch(rawName, cName)) {
-            matchedConstantName = cName;
-            break;
-          }
-        }
+        try {
+          const res = await fetch(`https://api.themeparks.wiki/v1/entity/${entityId}/live`);
+          const data = await res.json();
+          const liveList: any[] = Array.isArray(data) ? data : (data?.liveData || data?.live || []);
 
-        if (matchedConstantName) {
-          const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
+          const allowedAttractions = PARK_ATTRACTIONS[pName] || [];
+          const parsedRides: RideItem[] = [];
+          const parsedShows: RideItem[] = [];
 
-          parsedRides.push({
-            id: item.id || matchedConstantName,
-            name: matchedConstantName,
-            waitTime: wait,
-            isOperating: item.status === 'OPERATING',
-          });
-        } else {
-          const isShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
+          liveList.forEach((item: any) => {
+            const type = (item.entityType || '').toUpperCase();
+            const rawName = item.name || '';
+            const normalizedName = normalizeApiName(rawName);
 
-          if (isShow) {
-            const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
-            const upcomingShowtimes: Showtime[] = rawShowtimes
-              .map(s => ({ startTime: s.startTime || s }))
-              .filter(s => {
-                const showDate = new Date(s.startTime);
-                return !isNaN(showDate.getTime()) && showDate > now;
-              });
-
-            if (upcomingShowtimes.length > 0) {
-              parsedShows.push({
-                id: item.id || rawName,
-                name: rawName,
-                waitTime: null,
-                isOperating: item.status === 'OPERATING',
-                showtimes: upcomingShowtimes
-              });
+            let matchedConstantName: string | undefined = undefined;
+            if (allowedAttractions.includes(normalizedName)) {
+              matchedConstantName = normalizedName;
+            } else {
+              for (const cName of allowedAttractions) {
+                if (isFuzzyMatch(normalizedName, cName)) {
+                  matchedConstantName = cName;
+                  break;
+                }
+              }
             }
+
+            if (matchedConstantName) {
+              const isApiShow = type === 'SHOW' || type === 'MEET_AND_GREET' || type === 'ENTERTAINMENT' || (Array.isArray(item.showtimes) && item.showtimes.length > 0);
+              const isForceShow = KNOWN_SHOWS.includes(matchedConstantName);
+
+              if (isApiShow || isForceShow) {
+                const rawShowtimes: any[] = Array.isArray(item.showtimes) ? item.showtimes : [];
+                const upcomingShowtimes: Showtime[] = rawShowtimes
+                  .map(s => ({ startTime: s.startTime || s }))
+                  .filter(s => {
+                    const showDate = new Date(s.startTime);
+                    return !isNaN(showDate.getTime()) && showDate > now;
+                  });
+
+                // Always add shows, even if past, to show "No remaining showtimes today"
+                parsedShows.push({
+                  id: item.id || matchedConstantName,
+                  name: matchedConstantName,
+                  waitTime: null,
+                  isOperating: item.status === 'OPERATING',
+                  showtimes: upcomingShowtimes
+                });
+              } else {
+                const wait = item.queue?.STANDBY?.waitTime ?? item.queue?.SINGLE_RIDER?.waitTime ?? (typeof item.waitTime === 'number' ? item.waitTime : 0);
+                parsedRides.push({
+                  id: item.id || matchedConstantName,
+                  name: matchedConstantName,
+                  waitTime: wait,
+                  isOperating: item.status === 'OPERATING',
+                });
+              }
+            }
+          });
+
+          const uniqueRides = Array.from(new Map(parsedRides.map(r => [r.name, r])).values());
+          const uniqueShows = Array.from(new Map(parsedShows.map(s => [s.name, s])).values());
+
+          allFetchedItems.push(...uniqueRides, ...uniqueShows);
+
+          if (pName === parkName) {
+            currentParkRides = uniqueRides;
+            currentParkShows = uniqueShows;
           }
+        } catch (e) {
+          console.error(`Error fetching ${pName}:`, e);
         }
-      });
+      }));
 
-      const uniqueRides = Array.from(new Map(parsedRides.map(r => [r.name, r])).values());
-
-      setRides(uniqueRides);
-      setShows(parsedShows);
+      setRides(currentParkRides);
+      setShows(currentParkShows);
       setLastRefreshed(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }));
 
-      checkAlerts([...uniqueRides, ...parsedShows]);
+      checkAlerts(allFetchedItems);
     } catch (err) {
       console.error("Failed to fetch live wait times:", err);
     } finally {
@@ -247,19 +279,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     }
   };
 
-  // Safe multi-park alert checking
   const checkAlerts = (currentItems: RideItem[]) => {
     if (activeAlerts.length === 0) return;
 
     const remainingAlerts: AlertRule[] = [];
 
     activeAlerts.forEach(alert => {
-      if (alert.park && cleanStr(alert.park) !== cleanStr(parkName)) {
-        remainingAlerts.push(alert);
-        return;
-      }
-
-      const match = currentItems.find(r => cleanStr(r.name).includes(cleanStr(alert.rideName)) || cleanStr(alert.rideName).includes(cleanStr(r.name)));
+      const match = currentItems.find(r => r.name === alert.rideName);
       if (match) {
         let triggered = false;
 
@@ -302,17 +328,13 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     const filtered = activeAlerts.filter(a => cleanStr(a.rideName) !== cleanStr(rule.rideName));
     const updated = [...filtered, newRule];
     setActiveAlerts(updated);
-    try {
-      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    try { localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated)); } catch (e) {}
   };
 
   const handleRemoveAlert = (rideName: string) => {
     const updated = activeAlerts.filter(a => cleanStr(a.rideName) !== cleanStr(rideName));
     setActiveAlerts(updated);
-    try {
-      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    try { localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updated)); } catch (e) {}
   };
 
   const activeSourceList = categoryTab === 'rides' ? rides : shows;
@@ -335,12 +357,10 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
     });
   }, [activeSourceList, favoritesOnly, favorites, hideRidden, riddenRideNamesToday, sortField, sortOrder]);
 
-  // CANONICAL LAND ORDERING: Initializes groups in constants land order so sorting doesn't jump
   const groupedItems = useMemo(() => {
     if (!groupByLand || categoryTab === 'shows') return { 'All Attractions': filteredItems };
 
     const groups: Record<string, RideItem[]> = {};
-
     const parkLands = PARK_ATTRACTIONS_BY_LAND[parkName];
     if (parkLands) {
       Object.keys(parkLands).forEach(land => {
@@ -353,7 +373,6 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
       if (!groups[land]) groups[land] = [];
       groups[land].push(r);
     });
-
     return groups;
   }, [filteredItems, groupByLand, parkName, categoryTab]);
 
@@ -564,7 +583,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           No attractions found matching your active filter options.
         </div>
       ) : categoryTab === 'shows' ? (
-        /* SHOWS CARDS */
+        /* SHOWS CARDS WITH SHOWTIME PILLS */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredItems.map(show => (
             <div
@@ -608,7 +627,7 @@ export const LiveWaitTimesWidget: React.FC<LiveWaitTimesWidgetProps> = ({
           ))}
         </div>
       ) : (
-        /* RIDES LIST */
+        /* RIDES LIST RENDERER */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {Object.entries(groupedItems).map(([land, landItems]) => {
             if (landItems.length === 0) return null;
