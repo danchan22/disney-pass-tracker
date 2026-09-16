@@ -61,6 +61,7 @@ interface TrackerTabProps {
   totalActivities: number;
   totalParkMinutes: number;
   totalWaitMinutes: number;
+  topActivity?: { name: string; count: number; totalWait?: number; avgWait?: number };
   avgActivitiesPerDay: string;
   avgParkMinutesPerDay: number;
   avgWaitPerActivity: number;
