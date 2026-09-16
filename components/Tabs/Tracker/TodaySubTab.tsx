@@ -176,6 +176,7 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
   const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
   const [isLogExpanded, setIsLogExpanded] = useState<boolean>(true);
   const [elapsedParkTime, setElapsedParkTime] = useState<string>('');
+  const [showParkHopForm, setShowParkHopForm] = useState<boolean>(false);
 
   const activeCoasterSongs = getCoasterSongs(rideName);
 
@@ -242,9 +243,9 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
         }
       `}</style>
 
-      {activeVisit ? (
+      {activeVisit && (
         <>
-          <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
+          <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '14px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
             {PARK_BANNERS[activeVisit.parkName] && (
               <img
                 src={PARK_BANNERS[activeVisit.parkName]}
@@ -633,11 +634,42 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             </div>
           </div>
 
+          {/* PARK HOPPING TOGGLE BUTTON */}
+          <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowParkHopForm(prev => !prev)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '14px',
+                border: '2px dashed #004487',
+                background: showParkHopForm ? '#EBF8FF' : '#FFF',
+                color: '#004487',
+                fontSize: '13px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {showParkHopForm ? '✕ Close Park Hop Check-In' : 'Not joining this group? Check into another park.'}
+            </button>
+          </div>
+
           <LiveWaitTimesWidget parkName={activeVisit.parkName} />
         </>
-      ) : (
-        /* VISIT A PARK FORM */
-        <form onSubmit={handleCheckIn} style={{ background: '#FFF', padding: '22px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' }}>
+      )}
+
+      {/* CHECK-IN FORM: Renders if no active visit OR if park hop toggle is open */}
+      {(!activeVisit || showParkHopForm) && (
+        <form onSubmit={(e) => {
+          handleCheckIn(e);
+          setShowParkHopForm(false);
+        }} style={{ background: '#FFF', padding: '22px', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #E2E8F0' }}>
           <h2 style={{ marginTop: 0, fontSize: '19px', fontWeight: '800', color: '#004487', marginBottom: '15px', textAlign: 'center' }}>Visit a Park</h2>
 
           <div style={{ marginBottom: '16px' }}>
