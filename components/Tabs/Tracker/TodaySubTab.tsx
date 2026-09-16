@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Visit, Activity } from '../../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES, PARK_NAMES } from '../../../lib/constants';
-import { format12Hour, parseAttendees, formatMinutes } from '../../../lib/helpers';
+import { format12Hour, parseAttendees, formatMinutes, parseTimeToMinutes } from '../../../lib/helpers';
 import { LiveWaitTimesWidget } from '../../Shared/LiveWaitTimes/LiveWaitTimesWidget';
 import { ParkIcon } from '../../Shared/ParkIcon';
 import { AddPersonModal } from '../../Modals/AddPersonModal';
@@ -177,24 +177,52 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
   const [isLogExpanded, setIsLogExpanded] = useState<boolean>(true);
   const activeCoasterSongs = getCoasterSongs(rideName);
 
-  // Helper to compute total elapsed minutes in park today
+  // FIXED: Computes total elapsed time in park accurately using parseTimeToMinutes
   const getElapsedParkTime = (): string => {
     if (!activeVisit?.startTime) return '0m';
-    const [h, m] = activeVisit.startTime.split(':').map(Number);
-    const start = new Date();
-    start.setHours(h, m, 0, 0);
+    const startMins = parseTimeToMinutes(activeVisit.startTime);
     const now = new Date();
-    const diffMins = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 60000));
-    return formatMinutes(diffMins);
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    let diff = currentMins - startMins;
+    if (diff < 0) diff += 1440; // Handle overnight edge cases
+    return formatMinutes(diff);
   };
 
   return (
     <div>
-      {/* CSS KEYFRAMES FOR GOLD BUTTON SHIMMER */}
+      {/* CSS KEYFRAMES FOR ANIMATED SVG BORDER */}
       <style>{`
-        @keyframes goldShimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
+        @keyframes borderDash {
+          from {
+            stroke-dashoffset: 400;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+        .animated-border-btn {
+          position: relative;
+          width: 100%;
+          border: none;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+        }
+        .animated-border-svg {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+        }
+        .animated-border-rect {
+          fill: none;
+          stroke: #D4AF37;
+          stroke-width: 3;
+          stroke-dasharray: 60 180;
+          animation: borderDash 3s linear infinite;
+          rx: 12;
         }
       `}</style>
 
@@ -660,25 +688,22 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             </div>
           </div>
 
-          {/* HERE WE GO BUTTON WITH GOLD SHIMMER EFFECT */}
-          <button
-            type="submit"
-            style={{
-              width: '100%',
+          {/* HERE WE GO BUTTON WITH ANIMATED DASHED SVG BORDER */}
+          <button type="submit" className="animated-border-btn">
+            <svg className="animated-border-svg" rx="12" ry="12">
+              <rect className="animated-border-rect" width="100%" height="100%" />
+            </svg>
+            <div style={{
               padding: '14px',
-              border: 'none',
               borderRadius: '12px',
               fontSize: '16px',
               fontWeight: 'bold',
               color: '#FFF',
-              cursor: 'pointer',
-              background: 'linear-gradient(90deg, #38A169 0%, #38A169 35%, #ECC94B 50%, #38A169 65%, #38A169 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'goldShimmer 3s infinite linear',
+              background: '#38A169',
               boxShadow: '0 4px 12px rgba(56, 161, 105, 0.35)'
-            }}
-          >
-            Here we go...🧚✨
+            }}>
+              Here we go...🧚✨
+            </div>
           </button>
         </form>
       )}
