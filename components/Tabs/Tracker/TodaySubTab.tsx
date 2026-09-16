@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Visit, Activity } from '../../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES, PARK_NAMES } from '../../../lib/constants';
-import { formatDisplayDate, format12Hour, parseAttendees } from '../../../lib/helpers';
+import { format12Hour, parseAttendees, formatMinutes } from '../../../lib/helpers';
 import { LiveWaitTimesWidget } from '../../Shared/LiveWaitTimes/LiveWaitTimesWidget';
 import { ParkIcon } from '../../Shared/ParkIcon';
 import { AddPersonModal } from '../../Modals/AddPersonModal';
@@ -174,10 +174,30 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
   handleReorderActivity,
 }) => {
   const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
+  const [isLogExpanded, setIsLogExpanded] = useState<boolean>(true);
   const activeCoasterSongs = getCoasterSongs(rideName);
+
+  // Helper to compute total elapsed minutes in park today
+  const getElapsedParkTime = (): string => {
+    if (!activeVisit?.startTime) return '0m';
+    const [h, m] = activeVisit.startTime.split(':').map(Number);
+    const start = new Date();
+    start.setHours(h, m, 0, 0);
+    const now = new Date();
+    const diffMins = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 60000));
+    return formatMinutes(diffMins);
+  };
 
   return (
     <div>
+      {/* CSS KEYFRAMES FOR GOLD BUTTON SHIMMER */}
+      <style>{`
+        @keyframes goldShimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
+
       {activeVisit ? (
         <>
           <div style={{ background: 'linear-gradient(135deg, #0056b3 0%, #003366 100%)', color: '#FFF', borderRadius: '24px', marginBottom: '25px', boxShadow: '0 8px 24px rgba(0, 51, 102, 0.25)', border: '2px solid #D4AF37', overflow: 'hidden' }}>
@@ -190,20 +210,21 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             )}
 
             <div style={{ padding: '20px' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <span style={{ background: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', letterSpacing: '0.5px' }}>
-                  CURRENTLY AT
+              {/* ARRIVED AT PILL + ELAPSED PARK TIME */}
+              <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', letterSpacing: '0.3px' }}>
+                  Arrived at: {format12Hour(activeVisit.startTime)}
+                </span>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: '#D4AF37' }}>
+                  {getElapsedParkTime()}
                 </span>
               </div>
 
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* PARK NAME HEADER */}
+              <h2 style={{ margin: '0 0 12px 0', fontSize: '25px', fontWeight: '900', letterSpacing: '-0.3px', width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <ParkIcon parkName={activeVisit.parkName} size={28} />
                 <span>{activeVisit.parkName}</span>
               </h2>
-
-              <div style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '12px', fontWeight: '600' }}>
-                {formatDisplayDate(activeVisit.visitDate)} &nbsp;•&nbsp; Arrived: <strong>{format12Hour(activeVisit.startTime)}</strong>
-              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div style={{ fontSize: '14px', color: '#F7FAFC' }}>
@@ -330,218 +351,231 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
                   )}
                 </div>
 
-                {/* TODAY'S LOG LIST */}
+                {/* COLLAPSIBLE TODAY'S LOG LIST */}
                 {activeVisit.activities.length > 0 && (
                   <div style={{ marginTop: '15px', borderTop: '2px dashed #E2E8F0', paddingTop: '12px' }}>
-                    <strong style={{ fontSize: '11px', color: '#718096', display: 'block', marginBottom: '8px' }}>TODAY'S LOG ({activeVisit.activities.length}):</strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {activeVisit.activities.map((act, idx) => {
-                        const isEditingThis = editingActivityId === act.id && editingVisitId === null;
-                        const actRidersList = parseAttendees(act.riders);
-                        const editCoasterSongs = getCoasterSongs(editRideName);
+                    <div 
+                      onClick={() => setIsLogExpanded(!isLogExpanded)} 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <strong style={{ fontSize: '11px', color: '#718096' }}>
+                        TODAY'S LOG ({activeVisit.activities.length})
+                      </strong>
+                      <span style={{ fontSize: '12px', color: '#004487', fontWeight: '800' }}>
+                        {isLogExpanded ? '▲ Hide' : '▼ Expand'}
+                      </span>
+                    </div>
 
-                        return isEditingThis ? (
-                          <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
-                            <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
-                              <optgroup label="Park Rides & Shows">
-                                {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
-                                  <option key={attraction} value={attraction}>{attraction}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Events & Activities">
-                                {UNIVERSAL_ACTIVITIES.map((action) => (
-                                  <option key={action} value={action}>{action}</option>
-                                ))}
-                              </optgroup>
-                            </select>
+                    {isLogExpanded && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                        {activeVisit.activities.map((act, idx) => {
+                          const isEditingThis = editingActivityId === act.id && editingVisitId === null;
+                          const actRidersList = parseAttendees(act.riders);
+                          const editCoasterSongs = getCoasterSongs(editRideName);
 
-                            {editCoasterSongs && (
-                              <div style={{ marginBottom: '8px', background: '#F3E8FF', padding: '8px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
-                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#6B21A8', display: 'block', marginBottom: '4px' }}>🎵 WHICH SONG DID YOU GET?</label>
-                                <select
-                                  value={editCoasterSongs.find(s => editNotes.includes(s)) || ''}
-                                  onChange={(e) => {
-                                    const chosen = e.target.value;
-                                    let cleanNotes = editNotes;
-                                    editCoasterSongs.forEach(s => {
-                                      cleanNotes = cleanNotes.replace(`🎵 Song: ${s}`, '').replace(`🎵 ${s}`, '').replace(s, '').trim();
-                                    });
-                                    if (chosen) {
-                                      cleanNotes = cleanNotes ? `${cleanNotes} • 🎵 ${chosen}` : `🎵 ${chosen}`;
-                                    }
-                                    setEditNotes(cleanNotes);
-                                  }}
-                                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #D8B4FE', fontSize: '12px', background: '#FFF', color: '#581C87', fontWeight: '700' }}
-                                >
-                                  <option value="">-- Select Song --</option>
-                                  {editCoasterSongs.map(song => <option key={song} value={song}>{song}</option>)}
-                                </select>
-                              </div>
-                            )}
+                          return isEditingThis ? (
+                            <div key={act.id} style={{ background: '#F7FAFC', border: '1px solid #CBD5E0', padding: '10px', borderRadius: '10px', boxSizing: 'border-box', width: '100%' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#004487', marginBottom: '6px' }}>EDIT ENTRY</div>
+                              <select value={editRideName} onChange={(e) => setEditRideName(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', marginBottom: '6px' }}>
+                                <optgroup label="Park Rides & Shows">
+                                  {PARK_ATTRACTIONS[activeVisit.parkName].map((attraction) => (
+                                    <option key={attraction} value={attraction}>{attraction}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Events & Activities">
+                                  {UNIVERSAL_ACTIVITIES.map((action) => (
+                                    <option key={action} value={action}>{action}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
 
-                            {isSmugglersRun(editRideName) && (
-                              <div style={{ marginBottom: '8px', background: '#EBF8FF', padding: '8px', borderRadius: '8px', border: '1px solid #BEE3F8' }}>
-                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#2B6CB0', display: 'block', marginBottom: '6px' }}>🚀 SELECT ROLES PER RIDER:</label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {editRiders.map(rider => {
-                                    const currentRole = editNotes.match(new RegExp(`${rider}:\\s*(Pilot|Gunner|Engineer)`))?.[1] || '';
-                                    return (
-                                      <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
-                                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
-                                        <div style={{ display: 'flex', gap: '4px' }}>
-                                          {SMUGGLERS_ROLES.map(role => {
-                                            const isSelected = currentRole === role;
-                                            return (
-                                              <button
-                                                key={role}
-                                                type="button"
-                                                onClick={() => {
-                                                  let updatedNotes = editNotes;
-                                                  SMUGGLERS_ROLES.forEach(r => {
-                                                    updatedNotes = updatedNotes.replace(new RegExp(`\\s*•?\\s*🚀\\s*${rider}:\\s*${r}`), '').trim();
-                                                  });
-                                                  if (!isSelected) {
-                                                    updatedNotes = updatedNotes ? `${updatedNotes} • 🚀 ${rider}: ${role}` : `🚀 ${rider}: ${role}`;
-                                                  }
-                                                  setEditNotes(updatedNotes);
-                                                }}
-                                                style={{
-                                                  padding: '3px 8px',
-                                                  borderRadius: '4px',
-                                                  border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
-                                                  background: isSelected ? '#004487' : '#F7FAFC',
-                                                  color: isSelected ? '#FFF' : '#4A5568',
-                                                  fontSize: '10px',
-                                                  fontWeight: '800',
-                                                  cursor: 'pointer'
-                                                }}
-                                              >
-                                                {role}
-                                              </button>
-                                            );
-                                          })}
+                              {editCoasterSongs && (
+                                <div style={{ marginBottom: '8px', background: '#F3E8FF', padding: '8px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#6B21A8', display: 'block', marginBottom: '4px' }}>🎵 WHICH SONG DID YOU GET?</label>
+                                  <select
+                                    value={editCoasterSongs.find(s => editNotes.includes(s)) || ''}
+                                    onChange={(e) => {
+                                      const chosen = e.target.value;
+                                      let cleanNotes = editNotes;
+                                      editCoasterSongs.forEach(s => {
+                                        cleanNotes = cleanNotes.replace(`🎵 Song: ${s}`, '').replace(`🎵 ${s}`, '').replace(s, '').trim();
+                                      });
+                                      if (chosen) {
+                                        cleanNotes = cleanNotes ? `${cleanNotes} • 🎵 ${chosen}` : `🎵 ${chosen}`;
+                                      }
+                                      setEditNotes(cleanNotes);
+                                    }}
+                                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #D8B4FE', fontSize: '12px', background: '#FFF', color: '#581C87', fontWeight: '700' }}
+                                  >
+                                    <option value="">-- Select Song --</option>
+                                    {editCoasterSongs.map(song => <option key={song} value={song}>{song}</option>)}
+                                  </select>
+                                </div>
+                              )}
+
+                              {isSmugglersRun(editRideName) && (
+                                <div style={{ marginBottom: '8px', background: '#EBF8FF', padding: '8px', borderRadius: '8px', border: '1px solid #BEE3F8' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#2B6CB0', display: 'block', marginBottom: '6px' }}>🚀 SELECT ROLES PER RIDER:</label>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {editRiders.map(rider => {
+                                      const currentRole = editNotes.match(new RegExp(`${rider}:\\s*(Pilot|Gunner|Engineer)`))?.[1] || '';
+                                      return (
+                                        <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+                                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+                                          <div style={{ display: 'flex', gap: '4px' }}>
+                                            {SMUGGLERS_ROLES.map(role => {
+                                              const isSelected = currentRole === role;
+                                              return (
+                                                <button
+                                                  key={role}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    let updatedNotes = editNotes;
+                                                    SMUGGLERS_ROLES.forEach(r => {
+                                                      updatedNotes = updatedNotes.replace(new RegExp(`\\s*•?\\s*🚀\\s*${rider}:\\s*${r}`), '').trim();
+                                                    });
+                                                    if (!isSelected) {
+                                                      updatedNotes = updatedNotes ? `${updatedNotes} • 🚀 ${rider}: ${role}` : `🚀 ${rider}: ${role}`;
+                                                    }
+                                                    setEditNotes(updatedNotes);
+                                                  }}
+                                                  style={{
+                                                    padding: '3px 8px',
+                                                    borderRadius: '4px',
+                                                    border: isSelected ? '1px solid #004487' : '1px solid #E2E8F0',
+                                                    background: isSelected ? '#004487' : '#F7FAFC',
+                                                    color: isSelected ? '#FFF' : '#4A5568',
+                                                    fontSize: '10px',
+                                                    fontWeight: '800',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  {role}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {isShooterRide(editRideName) && (
-                              <div style={{ marginBottom: '8px', background: '#FFF5F7', padding: '8px', borderRadius: '8px', border: '1px solid #FED7E2' }}>
-                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#9B2C2C', display: 'block', marginBottom: '6px' }}>🎯 ENTER SCORES PER RIDER:</label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {editRiders.map(rider => {
-                                    const currentScore = editNotes.match(new RegExp(`${rider}:\\s*(\\d+)`))?.[1] || '';
+                              {isShooterRide(editRideName) && (
+                                <div style={{ marginBottom: '8px', background: '#FFF5F7', padding: '8px', borderRadius: '8px', border: '1px solid #FED7E2' }}>
+                                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#9B2C2C', display: 'block', marginBottom: '6px' }}>🎯 ENTER SCORES PER RIDER:</label>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {editRiders.map(rider => {
+                                      const currentScore = editNotes.match(new RegExp(`${rider}:\\s*(\\d+)`))?.[1] || '';
+                                      return (
+                                        <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
+                                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
+                                          <input
+                                            type="number"
+                                            placeholder="Score"
+                                            value={currentScore}
+                                            onChange={(e) => {
+                                              const newScore = e.target.value;
+                                              let updatedNotes = editNotes.replace(new RegExp(`\\s*•?\\s*🎯\\s*${rider}:\\s*\\d+`), '').trim();
+                                              if (newScore) {
+                                                updatedNotes = updatedNotes ? `${updatedNotes} • 🎯 ${rider}: ${newScore}` : `🎯 ${rider}: ${newScore}`;
+                                              }
+                                              setEditNotes(updatedNotes);
+                                            }}
+                                            style={{ width: '90px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #CBD5E0', fontSize: '12px', fontWeight: '700', textAlign: 'right' }}
+                                          />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div style={{ marginBottom: '6px' }}>
+                                <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {parseAttendees(activeVisit.attendees).map((m) => {
+                                    const checked = editRiders.includes(m);
                                     return (
-                                      <div key={rider} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FFF', padding: '4px 8px', borderRadius: '6px', border: '1px solid #CBD5E0' }}>
-                                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#2D3748' }}>{rider}</span>
-                                        <input
-                                          type="number"
-                                          placeholder="Score"
-                                          value={currentScore}
-                                          onChange={(e) => {
-                                            const newScore = e.target.value;
-                                            let updatedNotes = editNotes.replace(new RegExp(`\\s*•?\\s*🎯\\s*${rider}:\\s*\\d+`), '').trim();
-                                            if (newScore) {
-                                              updatedNotes = updatedNotes ? `${updatedNotes} • 🎯 ${rider}: ${newScore}` : `🎯 ${rider}: ${newScore}`;
-                                            }
-                                            setEditNotes(updatedNotes);
-                                          }}
-                                          style={{ width: '90px', padding: '4px 6px', borderRadius: '4px', border: '1px solid #CBD5E0', fontSize: '12px', fontWeight: '700', textAlign: 'right' }}
-                                        />
-                                      </div>
+                                      <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                        {m}
+                                      </button>
                                     );
                                   })}
                                 </div>
                               </div>
-                            )}
 
-                            <div style={{ marginBottom: '6px' }}>
-                              <label style={{ fontSize: '10px', fontWeight: '800', color: '#4A5568', display: 'block', marginBottom: '4px' }}>WHO RODE THIS?</label>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                {parseAttendees(activeVisit.attendees).map((m) => {
-                                  const checked = editRiders.includes(m);
-                                  return (
-                                    <button key={m} type="button" onClick={() => toggleEditRiderSelection(m)} style={{ padding: '4px 8px', borderRadius: '6px', border: checked ? '1px solid #004487' : '1px solid #CBD5E0', background: checked ? '#004487' : '#FFF', color: checked ? '#FFF' : '#4A5568', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
-                                      {m}
-                                    </button>
-                                  );
-                                })}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
+                                  <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditWaitTime('0');
+                                      if (!editNotes.includes('[Walk On]')) {
+                                        setEditNotes(`${editNotes} [Walk On]`.trim());
+                                      }
+                                    }}
+                                    style={{ padding: '8px 10px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+                                  >
+                                    ⚡ Walk On
+                                  </button>
+                                </div>
+                                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => deleteActivity(act.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
+                                <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
                               </div>
                             </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px' }}>
-                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
-                                <input type="number" value={editWaitTime} onChange={(e) => setEditWaitTime(e.target.value)} placeholder="Wait (mins)" style={{ flex: '1 1 auto', minWidth: 0, padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditWaitTime('0');
-                                    if (!editNotes.includes('[Walk On]')) {
-                                      setEditNotes(`${editNotes} [Walk On]`.trim());
-                                    }
-                                  }}
-                                  style={{ padding: '8px 10px', background: '#D69E2E', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
-                                >
-                                  ⚡ Walk On
+                          ) : (
+                            <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
+                              <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{act.rideName}</div>
+                                <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
+                                  {act.isWalkOn || act.notes?.includes('[Walk On]') ? (
+                                    <span style={{ color: '#D69E2E', fontWeight: '800' }}>⚡ Walk On (0m wait)</span>
+                                  ) : (
+                                    `⏱️ ${act.waitTimeMinutes} mins wait`
+                                  )}
+                                  {act.notes && (
+                                    (() => {
+                                      const displayNotes = act.notes.replace(/\[Walk On\]\s*•?\s*/g, '').trim();
+                                      return displayNotes ? ` • ${displayNotes}` : '';
+                                    })()
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
+                                  👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => handleReorderActivity(null, act.id, 'up')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Up"
+                                  >▲</button>
+                                  <button
+                                    disabled={idx === activeVisit.activities.length - 1}
+                                    onClick={() => handleReorderActivity(null, act.id, 'down')}
+                                    style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === activeVisit.activities.length - 1 ? 'default' : 'pointer', opacity: idx === activeVisit.activities.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Move Down"
+                                  >▼</button>
+                                </div>
+                                <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
+                                  Edit
                                 </button>
                               </div>
-                              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Notes (optional)" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E0', fontSize: '13px', boxSizing: 'border-box' }} />
                             </div>
-
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                              <button onClick={() => deleteActivity(act.id)} style={{ background: '#E53E3E', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Delete</button>
-                              <button onClick={cancelEditing} style={{ background: '#CBD5E0', color: '#2D3748', border: 'none', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Cancel</button>
-                              <button onClick={saveEditedActivity} style={{ background: '#38A169', color: '#FFF', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '8px 10px', borderRadius: '8px', border: '1px solid #EDF2F7' }}>
-                            <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1A202C' }}>{act.rideName}</div>
-                              <div style={{ fontSize: '11px', color: '#718096', marginTop: '2px' }}>
-                                {act.isWalkOn || act.notes?.includes('[Walk On]') ? (
-                                  <span style={{ color: '#D69E2E', fontWeight: '800' }}>⚡ Walk On (0m wait)</span>
-                                ) : (
-                                  `⏱️ ${act.waitTimeMinutes} mins wait`
-                                )}
-                                {act.notes && (
-                                  (() => {
-                                    const displayNotes = act.notes.replace(/\[Walk On\]\s*•?\s*/g, '').trim();
-                                    return displayNotes ? ` • ${displayNotes}` : '';
-                                  })()
-                                )}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#4A5568', fontWeight: '700', marginTop: '3px' }}>
-                                👥 {actRidersList.length > 0 ? actRidersList.join(', ') : 'Everyone'}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button
-                                  disabled={idx === 0}
-                                  onClick={() => handleReorderActivity(null, act.id, 'up')}
-                                  style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                  title="Move Up"
-                                >▲</button>
-                                <button
-                                  disabled={idx === activeVisit.activities.length - 1}
-                                  onClick={() => handleReorderActivity(null, act.id, 'down')}
-                                  style={{ background: '#E2E8F0', border: 'none', borderRadius: '4px', width: '22px', height: '18px', fontSize: '10px', cursor: idx === activeVisit.activities.length - 1 ? 'default' : 'pointer', opacity: idx === activeVisit.activities.length - 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                  title="Move Down"
-                                >▼</button>
-                              </div>
-                              <button onClick={() => startEditing(act, null)} style={{ background: 'none', border: 'none', color: '#2B6CB0', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '2px 6px' }}>
-                                Edit
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -626,9 +660,23 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             </div>
           </div>
 
+          {/* HERE WE GO BUTTON WITH GOLD SHIMMER EFFECT */}
           <button
             type="submit"
-            style={{ width: '100%', padding: '14px', background: '#38A169', color: '#FFF', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 6px rgba(56,161,105,0.3)' }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#FFF',
+              cursor: 'pointer',
+              background: 'linear-gradient(90deg, #38A169 0%, #38A169 35%, #ECC94B 50%, #38A169 65%, #38A169 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'goldShimmer 3s infinite linear',
+              boxShadow: '0 4px 12px rgba(56, 161, 105, 0.35)'
+            }}
           >
             Here we go...🧚✨
           </button>
