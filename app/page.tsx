@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Visit, Activity, PhotoGridRecord, MainTab, TrackerSubTab, AnalyticsSubTab, RainbowSubTab } from '../lib/types';
+import { Visit, Activity, PhotoGridRecord, MainTab, TrackerSubTab, AnalyticsSubTab } from '../lib/types';
 import { PARK_ATTRACTIONS } from '../lib/constants';
 import { getSupabase } from '../lib/supabase';
 import {
@@ -11,11 +11,8 @@ import {
   getPersonEndTime,
   parseTimeToMinutes,
   isPersonRider,
-  getRideTriviaFact,
-  getHiddenMickeyFact,
   format12Hour,
   encodeVisitAttendeesPayload,
-  fetchGeminiQueueHint,
   getVisitTimestamp
 } from '../lib/helpers';
 
@@ -111,6 +108,28 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
+  // SYNC LOCAL TIMER STATE WITH SUPABASE REALTIME VISIT CHANGES
+  useEffect(() => {
+    if (activeVisit) {
+      if (!activeVisit.queue_start_ts) {
+        setQueueStartTimestamp(null);
+        setQueueStartTimeStr(null);
+        setRideTrivia(null);
+        setHiddenMickey(null);
+        clearQueueTimerStorage();
+      } else {
+        setQueueStartTimestamp(activeVisit.queue_start_ts);
+        setQueueStartTimeStr(activeVisit.queue_start_str || null);
+        if (activeVisit.queue_ride_name) {
+          setRideName(activeVisit.queue_ride_name);
+        }
+      }
+    } else {
+      setQueueStartTimestamp(null);
+      setQueueStartTimeStr(null);
+    }
+  }, [activeVisit?.queue_start_ts, activeVisit?.queue_start_str, activeVisit?.id]);
+
   // OFFLINE DEAD ZONE HELPER: Updates local React state instantly & queues cloud sync
   const queueOrSyncAction = async (visitId: string, actionData: Record<string, any>) => {
     setActiveVisits(prev => prev.map(v => v.id === visitId ? { ...v, ...actionData } : v));
@@ -161,6 +180,13 @@ export default function DisneyTracker() {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'visits' },
+          () => {
+            fetchCloudVisits();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'activities' },
           () => {
             fetchCloudVisits();
           }
@@ -354,14 +380,12 @@ export default function DisneyTracker() {
         setActiveVisits(activeList);
         setVisits(formattedVisits.filter(v => v.endTime));
 
-        // Retain focused park tab if still active, otherwise default to first active park
         if (activeList.length > 0) {
           setFocusedVisitId(prev => (prev && activeList.some(v => v.id === prev)) ? prev : activeList[0].id);
         } else {
           setFocusedVisitId(null);
         }
 
-        // Timer Hydration for focused visit
         const currentActive = activeList.find(v => v.id === focusedVisitId) || activeList[0] || null;
         const localStart = localStorage.getItem('disney_queue_start_ts');
         const localStr = localStorage.getItem('disney_queue_start_str');
@@ -715,46 +739,81 @@ export default function DisneyTracker() {
   };
 
   const handleEndQueueTimer = async (isWalkOn = false) => {
-    if (!activeVisit || !queueStartTimestamp || submittingRide) return;
-    const diffMs = Date.now() - queueStartTimestamp;
-    let calculatedWait = isWalkOn ? 0 : Math.max(1, Math.round(diffMs / 60000));
+    if (!activeVisit) return;
+
+    const now = Date.now();
+    const elapsedMinutes = queueStartTimestamp 
+      ? Math.max(1, Math.round((now - queueStartTimestamp) / 60000))
+      : 0;
+    const finalWait = isWalkOn ? 0 : elapsedMinutes;
+
     const notesBase = rideName === 'Character Meeting' && characterName ? characterName : '';
     const notesVal = isWalkOn ? `${notesBase} [Walk On]`.trim() : (notesBase || undefined);
+    const ridersList = selectedRiders.length > 0 ? selectedRiders : activePartyList;
 
-    setSubmittingRide(true);
+    const newActivity: Activity = {
+      id: `act_${Date.now()}`,
+      visit_id: activeVisit.id,
+      rideName: rideName,
+      waitTimeMinutes: finalWait,
+      isWalkOn: isWalkOn,
+      riders: ridersList,
+      notes: notesVal,
+    };
+
+    // Optimistically clear local timer UI immediately
+    clearQueueTimerStorage();
+    setQueueStartTimestamp(null);
+    setQueueStartTimeStr(null);
+    setRideTrivia(null);
+    setHiddenMickey(null);
+    setCharacterName('');
+    setWaitTime('');
+
+    // Optimistically update active visit state locally
+    const updatedVisit: Visit = {
+      ...activeVisit,
+      queue_start_ts: null,
+      queue_start_str: null,
+      queue_ride_name: null,
+      activities: [...activeVisit.activities, newActivity]
+    };
+
+    setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? updatedVisit : v));
+
     try {
       const supabase = await getSupabase();
-      const { data, error } = await supabase
+
+      // Clear timer state on visit
+      await supabase
+        .from('visits')
+        .update({
+          queue_start_ts: null,
+          queue_start_str: null,
+          queue_ride_name: null
+        })
+        .eq('id', activeVisit.id);
+
+      // Insert new activity
+      const { error: actErr } = await supabase
         .from('activities')
-        .insert({ visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders.join(', ') })
-        .select()
-        .single();
+        .insert({
+          visit_id: activeVisit.id,
+          rideName: newActivity.rideName,
+          waitTimeMinutes: newActivity.waitTimeMinutes,
+          notes: newActivity.notes,
+          riders: ridersList.join(', ')
+        });
 
-      if (error) throw error;
+      if (actErr) throw actErr;
+      await fetchCloudVisits();
+    } catch (err) {
+      console.warn("Network offline or dead zone detected. Queueing activity locally:", err);
 
-      setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? {
-        ...v,
-        activities: [...v.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders, isWalkOn }]
-      } : v));
-
-      clearQueueTimerStorage();
-      setQueueStartTimestamp(null);
-      setQueueStartTimeStr(null);
-      setCharacterName('');
-      setWaitTime('');
-      setRideTrivia(null);
-      setHiddenMickey(null);
-
-      await queueOrSyncAction(activeVisit.id, {
-        queue_start_ts: null,
-        queue_start_str: null,
-        queue_ride_name: null,
-      });
-
-    } catch (err: any) {
-      alert("Error logging timer activity: " + (err.message || err));
-    } finally {
-      setSubmittingRide(false);
+      // Store pending offline activity for auto-flush on reconnection
+      const pending = JSON.parse(localStorage.getItem('pending_offline_activities') || '[]');
+      pending.push(newActivity);
+      localStorage.setItem('pending_offline_activities', JSON.stringify(pending));
     }
   };
 
