@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Visit, Activity } from '../../../lib/types';
 import { FIXED_FAMILY_MEMBERS, PARK_ATTRACTIONS, UNIVERSAL_ACTIVITIES, PARK_NAMES } from '../../../lib/constants';
 import { format12Hour, parseAttendees, formatMinutes, parseTimeToMinutes } from '../../../lib/helpers';
@@ -175,54 +175,70 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
 }) => {
   const [showAddPersonModal, setShowAddPersonModal] = useState<boolean>(false);
   const [isLogExpanded, setIsLogExpanded] = useState<boolean>(true);
+  const [elapsedParkTime, setElapsedParkTime] = useState<string>('');
+
   const activeCoasterSongs = getCoasterSongs(rideName);
 
-  // FIXED: Computes total elapsed time in park accurately using parseTimeToMinutes
-  const getElapsedParkTime = (): string => {
-    if (!activeVisit?.startTime) return '0m';
-    const startMins = parseTimeToMinutes(activeVisit.startTime);
-    const now = new Date();
-    const currentMins = now.getHours() * 60 + now.getMinutes();
-    let diff = currentMins - startMins;
-    if (diff < 0) diff += 1440; // Handle overnight edge cases
-    return formatMinutes(diff);
-  };
+  // REAL-TIME PARK DURATION TIMER
+  useEffect(() => {
+    if (!activeVisit?.startTime) return;
+
+    const updateDuration = () => {
+      const startMins = parseTimeToMinutes(activeVisit.startTime);
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      let diff = currentMins - startMins;
+      if (diff < 0) diff += 1440;
+      setElapsedParkTime(formatMinutes(diff));
+    };
+
+    updateDuration();
+    const timer = setInterval(updateDuration, 30000); // Updates automatically every 30 seconds
+
+    return () => clearInterval(timer);
+  }, [activeVisit?.startTime]);
 
   return (
     <div>
-      {/* CSS KEYFRAMES FOR ANIMATED SVG BORDER */}
+      {/* DISNEY GATEWAY BUTTON ANIMATIONS */}
       <style>{`
-        @keyframes borderDash {
-          from {
-            stroke-dashoffset: 400;
+        @keyframes disneyGlowPulse {
+          0% {
+            box-shadow: 0 4px 14px rgba(56, 161, 105, 0.4), 0 0 0 0 rgba(212, 175, 55, 0.3);
           }
-          to {
-            stroke-dashoffset: 0;
+          50% {
+            box-shadow: 0 6px 20px rgba(56, 161, 105, 0.5), 0 0 14px 3px rgba(212, 175, 55, 0.5);
+          }
+          100% {
+            box-shadow: 0 4px 14px rgba(56, 161, 105, 0.4), 0 0 0 0 rgba(212, 175, 55, 0.3);
           }
         }
-        .animated-border-btn {
-          position: relative;
+        @keyframes subtleGradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .disney-gateway-btn {
           width: 100%;
-          border: none;
-          background: transparent;
-          padding: 0;
+          padding: 15px;
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 14px;
+          font-size: 16px;
+          font-weight: 800;
+          color: #FFFFFF;
           cursor: pointer;
+          background: linear-gradient(135deg, #276749 0%, #38A169 50%, #2F855A 100%);
+          background-size: 200% 200%;
+          animation: disneyGlowPulse 3.5s infinite ease-in-out, subtleGradientShift 6s ease infinite;
+          transition: transform 0.15s ease, filter 0.15s ease;
+          letter-spacing: 0.3px;
         }
-        .animated-border-svg {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
+        .disney-gateway-btn:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.08);
         }
-        .animated-border-rect {
-          fill: none;
-          stroke: #D4AF37;
-          stroke-width: 3;
-          stroke-dasharray: 60 180;
-          animation: borderDash 3s linear infinite;
-          rx: 12;
+        .disney-gateway-btn:active {
+          transform: translateY(1px);
         }
       `}</style>
 
@@ -238,13 +254,13 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             )}
 
             <div style={{ padding: '20px' }}>
-              {/* ARRIVED AT PILL + ELAPSED PARK TIME */}
-              <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* ARRIVED AT PILL + REAL-TIME ELAPSED PARK TIME */}
+              <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{ background: 'transparent', color: '#FFFFFF', border: '1px solid #FFFFFF', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', letterSpacing: '0.3px' }}>
                   Arrived at: {format12Hour(activeVisit.startTime)}
                 </span>
                 <span style={{ fontSize: '12px', fontWeight: '800', color: '#D4AF37' }}>
-                  {getElapsedParkTime()}
+                  Here for {elapsedParkTime}
                 </span>
               </div>
 
@@ -688,22 +704,9 @@ export const TodaySubTab: React.FC<TodaySubTabProps> = ({
             </div>
           </div>
 
-          {/* HERE WE GO BUTTON WITH ANIMATED DASHED SVG BORDER */}
-          <button type="submit" className="animated-border-btn">
-            <svg className="animated-border-svg" rx="12" ry="12">
-              <rect className="animated-border-rect" width="100%" height="100%" />
-            </svg>
-            <div style={{
-              padding: '14px',
-              borderRadius: '12px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              color: '#FFF',
-              background: '#38A169',
-              boxShadow: '0 4px 12px rgba(56, 161, 105, 0.35)'
-            }}>
-              Here we go...🧚✨
-            </div>
+          {/* DISNEY GATEWAY BUTTON WITH MAGICAL AMBIENT PULSE */}
+          <button type="submit" className="disney-gateway-btn">
+            Here we go...🧚✨
           </button>
         </form>
       )}
