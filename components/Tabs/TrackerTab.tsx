@@ -10,6 +10,9 @@ import { HistorySubTab } from './Tracker/HistorySubTab';
 interface TrackerTabProps {
   trackerSubTab: TrackerSubTab;
   activeVisit: Visit | null;
+  activeVisits: Visit[];
+  focusedVisitId: string | null;
+  setFocusedVisitId: (id: string | null) => void;
   parkName: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom';
   setParkName: (park: 'Magic Kingdom' | 'Epcot' | 'Hollywood Studios' | 'Animal Kingdom') => void;
   selectedAttendees: string[];
@@ -75,6 +78,9 @@ interface TrackerTabProps {
 export const TrackerTab: React.FC<TrackerTabProps> = ({
   trackerSubTab,
   activeVisit,
+  activeVisits,
+  focusedVisitId,
+  setFocusedVisitId,
   parkName,
   setParkName,
   selectedAttendees,
@@ -135,61 +141,106 @@ export const TrackerTab: React.FC<TrackerTabProps> = ({
     <div>
       {/* Subtab: Today */}
       {trackerSubTab === 'Today' && (
-        <TodaySubTab
-          activeVisit={activeVisit}
-          parkName={parkName}
-          setParkName={setParkName}
-          selectedAttendees={selectedAttendees}
-          toggleCheckInAttendee={toggleCheckInAttendee}
-          handleCheckIn={handleCheckIn}
-          activePartyList={activePartyList}
-          rideName={rideName}
-          setRideName={setRideName}
-          waitTime={waitTime}
-          setWaitTime={setWaitTime}
-          characterName={characterName}
-          setCharacterName={setCharacterName}
-          selectedRiders={selectedRiders}
-          toggleRiderSelection={toggleRiderSelection}
-          queueStartTimestamp={queueStartTimestamp}
-          queueStartTimeStr={queueStartTimeStr}
-          getElapsedQueueTimeString={getElapsedQueueTimeString}
-          rideTrivia={rideTrivia}
-          triviaLoading={triviaLoading}
-          hiddenMickey={hiddenMickey}
-          mickeyLoading={mickeyLoading}
-          handleStartQueueTimer={handleStartQueueTimer}
-          handleEndQueueTimer={handleEndQueueTimer}
-          handleCancelQueueTimer={handleCancelQueueTimer}
-          handleAddRideLive={handleAddRideLive}
-          editingActivityId={editingActivityId}
-          editingVisitId={editingVisitId}
-          editRideName={editRideName}
-          setEditRideName={setEditRideName}
-          editWaitTime={editWaitTime}
-          setEditWaitTime={setEditWaitTime}
-          editNotes={editNotes}
-          setEditNotes={setEditNotes}
-          editRiders={editRiders}
-          toggleEditRiderSelection={toggleEditRiderSelection}
-          startEditing={startEditing}
-          cancelEditing={cancelEditing}
-          saveEditedActivity={saveEditedActivity}
-          deleteActivity={deleteActivity}
-          setDepartingMembers={setDepartingMembers}
-          setShowCheckoutModal={setShowCheckoutModal}
-          handleAddMembersToActiveVisit={handleAddMembersToActiveVisit}
-          selectedAttendee={selectedAttendee}
-          totalDays={totalDays}
-          totalActivities={totalActivities}
-          totalParkMinutes={totalParkMinutes}
-          totalWaitMinutes={totalWaitMinutes}
-          avgActivitiesPerDay={avgActivitiesPerDay}
-          avgParkMinutesPerDay={avgParkMinutesPerDay}
-          avgWaitPerActivity={avgWaitPerActivity}
-          filteredVisits={filteredVisits}
-          handleReorderActivity={handleReorderActivity}
-        />
+        <>
+          {/* MULTI-PARK PILL MENU (Renders when 2+ parks are concurrently active) */}
+          {activeVisits.length > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                overflowX: 'auto',
+                marginBottom: '14px',
+                paddingBottom: '2px',
+              }}
+            >
+              {activeVisits.map((v) => {
+                const isSelected = v.id === (focusedVisitId || activeVisit?.id);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setFocusedVisitId(v.id)}
+                    style={{
+                      flex: '1 0 auto',
+                      padding: '10px 16px',
+                      borderRadius: '14px',
+                      border: isSelected ? '2px solid #004487' : '1px solid #E2E8F0',
+                      background: isSelected ? '#004487' : '#FFFFFF',
+                      color: isSelected ? '#FFFFFF' : '#2D3748',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>{v.parkName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <TodaySubTab
+            activeVisit={activeVisit}
+            parkName={parkName}
+            setParkName={setParkName}
+            selectedAttendees={selectedAttendees}
+            toggleCheckInAttendee={toggleCheckInAttendee}
+            handleCheckIn={handleCheckIn}
+            activePartyList={activePartyList}
+            rideName={rideName}
+            setRideName={setRideName}
+            waitTime={waitTime}
+            setWaitTime={setWaitTime}
+            characterName={characterName}
+            setCharacterName={setCharacterName}
+            selectedRiders={selectedRiders}
+            toggleRiderSelection={toggleRiderSelection}
+            queueStartTimestamp={queueStartTimestamp}
+            queueStartTimeStr={queueStartTimeStr}
+            getElapsedQueueTimeString={getElapsedQueueTimeString}
+            rideTrivia={rideTrivia}
+            triviaLoading={triviaLoading}
+            hiddenMickey={hiddenMickey}
+            mickeyLoading={mickeyLoading}
+            handleStartQueueTimer={handleStartQueueTimer}
+            handleEndQueueTimer={handleEndQueueTimer}
+            handleCancelQueueTimer={handleCancelQueueTimer}
+            handleAddRideLive={handleAddRideLive}
+            editingActivityId={editingActivityId}
+            editingVisitId={editingVisitId}
+            editRideName={editRideName}
+            setEditRideName={setEditRideName}
+            editWaitTime={editWaitTime}
+            setEditWaitTime={setEditWaitTime}
+            editNotes={editNotes}
+            setEditNotes={setEditNotes}
+            editRiders={editRiders}
+            toggleEditRiderSelection={toggleEditRiderSelection}
+            startEditing={startEditing}
+            cancelEditing={cancelEditing}
+            saveEditedActivity={saveEditedActivity}
+            deleteActivity={deleteActivity}
+            setDepartingMembers={setDepartingMembers}
+            setShowCheckoutModal={setShowCheckoutModal}
+            handleAddMembersToActiveVisit={handleAddMembersToActiveVisit}
+            selectedAttendee={selectedAttendee}
+            totalDays={totalDays}
+            totalActivities={totalActivities}
+            totalParkMinutes={totalParkMinutes}
+            totalWaitMinutes={totalWaitMinutes}
+            avgActivitiesPerDay={avgActivitiesPerDay}
+            avgParkMinutesPerDay={avgParkMinutesPerDay}
+            avgWaitPerActivity={avgWaitPerActivity}
+            filteredVisits={filteredVisits}
+            handleReorderActivity={handleReorderActivity}
+          />
+        </>
       )}
 
       {/* Subtab: Times */}
