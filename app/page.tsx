@@ -37,7 +37,15 @@ import { AlertRule, AlertTriggeredModal } from '../components/Shared/LiveWaitTim
 
 export default function DisneyTracker() {
   const [visits, setVisits] = useState<Visit[]>([]);
-  const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
+  
+  // MULTI-PARK ACTIVE VISIT STATE
+  const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
+  const [focusedVisitId, setFocusedVisitId] = useState<string | null>(null);
+
+  // Derived activeVisit points to whichever pill/park tab the user has selected
+  const activeVisit = useMemo(() => {
+    return activeVisits.find(v => v.id === focusedVisitId) || (activeVisits.length > 0 ? activeVisits[0] : null);
+  }, [activeVisits, focusedVisitId]);
 
   // Nav States
   const [mainTab, setMainTab] = useState<MainTab>('tracker');
@@ -103,6 +111,44 @@ export default function DisneyTracker() {
     return allParty.filter(member => !endTimes[member]);
   }, [activeVisit]);
 
+  // OFFLINE DEAD ZONE HELPER: Updates local React state instantly & queues cloud sync
+  const queueOrSyncAction = async (visitId: string, actionData: Record<string, any>) => {
+    setActiveVisits(prev => prev.map(v => v.id === visitId ? { ...v, ...actionData } : v));
+
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.from('visits').update(actionData).eq('id', visitId);
+      if (error) throw error;
+    } catch (err) {
+      console.warn("Cell dead zone detected: Queueing update locally", err);
+      const pending = JSON.parse(localStorage.getItem('pending_sync_queue') || '[]');
+      pending.push({ visitId, actionData, timestamp: Date.now() });
+      localStorage.setItem('pending_sync_queue', JSON.stringify(pending));
+    }
+  };
+
+  // Background listener: Syncs pending offline queue when cellular signal returns
+  useEffect(() => {
+    const syncPendingQueue = async () => {
+      const pending = JSON.parse(localStorage.getItem('pending_sync_queue') || '[]');
+      if (pending.length === 0) return;
+
+      try {
+        const supabase = await getSupabase();
+        for (const item of pending) {
+          await supabase.from('visits').update(item.actionData).eq('id', item.visitId);
+        }
+        localStorage.removeItem('pending_sync_queue');
+        fetchCloudVisits();
+      } catch (err) {
+        console.warn("Sync retry failed, will retry on next connection:", err);
+      }
+    };
+
+    window.addEventListener('online', syncPendingQueue);
+    return () => window.removeEventListener('online', syncPendingQueue);
+  }, []);
+
   // Realtime Supabase Subscription & Mobile PWA Focus Listener
   useEffect(() => {
     let channel: any;
@@ -116,7 +162,7 @@ export default function DisneyTracker() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'visits' },
           () => {
-            fetchCloudVisits(); // Auto-refreshes state instantly when anyone checks in or updates
+            fetchCloudVisits();
           }
         )
         .subscribe();
@@ -124,7 +170,6 @@ export default function DisneyTracker() {
 
     setupRealtimeSubscription();
 
-    // Re-fetch when Sam or anyone re-opens the app shortcut on mobile
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         fetchCloudVisits();
@@ -140,7 +185,7 @@ export default function DisneyTracker() {
       window.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
-  
+
   useEffect(() => {
     if (activeVisit) {
       setSelectedRiders(activePartyList);
@@ -174,7 +219,7 @@ export default function DisneyTracker() {
     fetchPhotoGrids();
   }, []);
 
-  // GLOBAL BACKGROUND ALERT POLLING (Runs regardless of active tab)
+  // GLOBAL BACKGROUND ALERT POLLING
   useEffect(() => {
     const checkGlobalWaitTimeAlerts = async () => {
       try {
@@ -253,34 +298,6 @@ export default function DisneyTracker() {
     return () => clearInterval(interval);
   }, []);
 
-  // Network Recovery Sync Listener: Pushes pending local timer to cloud when cell service returns
-  useEffect(() => {
-    const syncPendingLocalTimerToCloud = async () => {
-      const savedTs = localStorage.getItem('disney_queue_start_ts');
-      const savedStr = localStorage.getItem('disney_queue_start_str');
-      const savedRide = localStorage.getItem('disney_queue_ride_name');
-
-      if (savedTs && activeVisit) {
-        try {
-          const supabase = await getSupabase();
-          await supabase
-            .from('visits')
-            .update({
-              queue_start_ts: Number(savedTs),
-              queue_start_str: savedStr,
-              queue_ride_name: savedRide,
-            })
-            .eq('id', activeVisit.id);
-        } catch (err) {
-          console.warn("Cloud sync retry failed:", err);
-        }
-      }
-    };
-
-    window.addEventListener('online', syncPendingLocalTimerToCloud);
-    return () => window.removeEventListener('online', syncPendingLocalTimerToCloud);
-  }, [activeVisit?.id]);
-
   const clearQueueTimerStorage = () => {
     localStorage.removeItem('disney_queue_start_ts');
     localStorage.removeItem('disney_queue_start_str');
@@ -333,11 +350,19 @@ export default function DisneyTracker() {
           return tsB - tsA;
         });
 
-        const active = formattedVisits.find(v => !v.endTime) || null;
-        setActiveVisit(active);
+        const activeList = formattedVisits.filter(v => !v.endTime);
+        setActiveVisits(activeList);
         setVisits(formattedVisits.filter(v => v.endTime));
 
-        // Hybrid Timer Hydration: Check Local Device First, Fall Back to Cloud, Clear if Ended
+        // Retain focused park tab if still active, otherwise default to first active park
+        if (activeList.length > 0) {
+          setFocusedVisitId(prev => (prev && activeList.some(v => v.id === prev)) ? prev : activeList[0].id);
+        } else {
+          setFocusedVisitId(null);
+        }
+
+        // Timer Hydration for focused visit
+        const currentActive = activeList.find(v => v.id === focusedVisitId) || activeList[0] || null;
         const localStart = localStorage.getItem('disney_queue_start_ts');
         const localStr = localStorage.getItem('disney_queue_start_str');
         const localRide = localStorage.getItem('disney_queue_ride_name');
@@ -346,11 +371,11 @@ export default function DisneyTracker() {
           setQueueStartTimestamp(Number(localStart));
           setQueueStartTimeStr(localStr);
           if (localRide) setRideName(localRide);
-        } else if (active && (active as any).queue_start_ts) {
-          setQueueStartTimestamp(Number((active as any).queue_start_ts));
-          setQueueStartTimeStr((active as any).queue_start_str || null);
-          if ((active as any).queue_ride_name) {
-            setRideName((active as any).queue_ride_name);
+        } else if (currentActive && (currentActive as any).queue_start_ts) {
+          setQueueStartTimestamp(Number((currentActive as any).queue_start_ts));
+          setQueueStartTimeStr((currentActive as any).queue_start_str || null);
+          if ((currentActive as any).queue_ride_name) {
+            setRideName((currentActive as any).queue_ride_name);
           }
         } else {
           setQueueStartTimestamp(null);
@@ -514,7 +539,6 @@ export default function DisneyTracker() {
     const now = new Date();
     const localDate = now.toLocaleDateString('en-CA');
     const localTime = now.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
-
     const attendeesDbStr = selectedAttendees.join(', ');
 
     const supabase = await getSupabase();
@@ -535,7 +559,7 @@ export default function DisneyTracker() {
       return;
     }
 
-    setActiveVisit({
+    const newVisit: Visit = {
       id: data.id,
       visitDate: localDate,
       startTime: localTime,
@@ -544,8 +568,10 @@ export default function DisneyTracker() {
       attendees: selectedAttendees,
       memberEndTimes: {},
       activities: []
-    });
+    };
 
+    setActiveVisits(prev => [...prev, newVisit]);
+    setFocusedVisitId(data.id);
     setSelectedRiders(selectedAttendees);
     setDepartingMembers(selectedAttendees);
     setSelectedAttendees([]);
@@ -590,7 +616,11 @@ export default function DisneyTracker() {
 
       if (error) throw error;
 
-      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders, isWalkOn }] });
+      setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? {
+        ...v,
+        activities: [...v.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: waitMins, notes: notesVal, riders: selectedRiders, isWalkOn }]
+      } : v));
+
       setWaitTime('');
       setCharacterName('');
     } catch (err: any) {
@@ -658,42 +688,30 @@ export default function DisneyTracker() {
     setQueueStartTimestamp(ts);
     setQueueStartTimeStr(timeString);
 
-    try {
-      const supabase = await getSupabase();
-      await supabase
-        .from('visits')
-        .update({
-          queue_start_ts: ts,
-          queue_start_str: timeString,
-          queue_ride_name: rideName,
-        })
-        .eq('id', activeVisit.id);
-    } catch (err) {
-      console.warn("Dead zone detected: Timer saved locally, will sync when online.", err);
-    }
+    await queueOrSyncAction(activeVisit.id, {
+      queue_start_ts: ts,
+      queue_start_str: timeString,
+      queue_ride_name: rideName,
+    });
 
     fetchRideTrivia(rideName, activeVisit.parkName);
     fetchHiddenMickey(rideName, activeVisit.parkName);
   };
 
   const handleCancelQueueTimer = async () => {
+    if (!activeVisit) return;
+
     clearQueueTimerStorage();
     setQueueStartTimestamp(null);
     setQueueStartTimeStr(null);
     setRideTrivia(null);
     setHiddenMickey(null);
 
-    if (activeVisit) {
-      try {
-        const supabase = await getSupabase();
-        await supabase
-          .from('visits')
-          .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
-          .eq('id', activeVisit.id);
-      } catch (err) {
-        console.warn("Could not clear cloud timer:", err);
-      }
-    }
+    await queueOrSyncAction(activeVisit.id, {
+      queue_start_ts: null,
+      queue_start_str: null,
+      queue_ride_name: null,
+    });
   };
 
   const handleEndQueueTimer = async (isWalkOn = false) => {
@@ -714,7 +732,11 @@ export default function DisneyTracker() {
 
       if (error) throw error;
 
-      setActiveVisit({ ...activeVisit, activities: [...activeVisit.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders, isWalkOn }] });
+      setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? {
+        ...v,
+        activities: [...v.activities, { id: data.id, visit_id: activeVisit.id, rideName, waitTimeMinutes: calculatedWait, notes: notesVal, riders: selectedRiders, isWalkOn }]
+      } : v));
+
       clearQueueTimerStorage();
       setQueueStartTimestamp(null);
       setQueueStartTimeStr(null);
@@ -723,10 +745,11 @@ export default function DisneyTracker() {
       setRideTrivia(null);
       setHiddenMickey(null);
 
-      await supabase
-        .from('visits')
-        .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
-        .eq('id', activeVisit.id);
+      await queueOrSyncAction(activeVisit.id, {
+        queue_start_ts: null,
+        queue_start_str: null,
+        queue_ride_name: null,
+      });
 
     } catch (err: any) {
       alert("Error logging timer activity: " + (err.message || err));
@@ -854,7 +877,7 @@ export default function DisneyTracker() {
           ? { ...a, rideName: editRideName, waitTimeMinutes: waitMins, notes: notesVal || undefined, riders: editRiders }
           : a
       );
-      setActiveVisit({ ...activeVisit, activities: updatedActivities });
+      setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? { ...v, activities: updatedActivities } : v));
     } else if (editingVisitId) {
       setVisits(prev =>
         prev.map(v => {
@@ -891,7 +914,7 @@ export default function DisneyTracker() {
     acts[swapIdx] = temp;
 
     if (visitId === null && activeVisit) {
-      setActiveVisit({ ...activeVisit, activities: acts });
+      setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? { ...v, activities: acts } : v));
     } else {
       setVisits(prev => prev.map(v => v.id === visitId ? { ...v, activities: acts } : v));
     }
@@ -942,6 +965,9 @@ export default function DisneyTracker() {
         <TrackerTab
           trackerSubTab={trackerSubTab}
           activeVisit={activeVisit}
+          activeVisits={activeVisits}
+          focusedVisitId={focusedVisitId}
+          setFocusedVisitId={setFocusedVisitId}
           parkName={parkName}
           setParkName={setParkName}
           selectedAttendees={selectedAttendees}
@@ -1074,9 +1100,10 @@ export default function DisneyTracker() {
         toggleDepartingMember={toggleDepartingMember}
         processCheckout={processCheckout}
       />
-{/* GLOBAL ANNOUNCEMENT POPUP */}
+
+      {/* GLOBAL ANNOUNCEMENT POPUP */}
       <AnnouncementModal />
-      
+
       {/* GLOBAL WHITE RABBIT ALERT POPUP */}
       {triggeredGlobalNotification && (
         <AlertTriggeredModal
