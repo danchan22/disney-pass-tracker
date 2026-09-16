@@ -8,6 +8,7 @@ export interface Activity {
   riders?: string | string[];
   roles?: Record<string, 'Pilot' | 'Gunner' | 'Engineer'>; // e.g. { "Dan": "Pilot", "Mandie": "Gunner" }
   scores?: Record<string, number>;                         // e.g. { "Dan": 185000, "Mandie": 142000 }
+  created_at?: string;
 }
 
 export interface Visit {
@@ -20,6 +21,9 @@ export interface Visit {
   memberEndTimes?: Record<string, string>;
   memberStartTimes?: Record<string, string>;
   notes?: string;
+  queue_start_ts?: number | null;
+  queue_start_str?: string | null;
+  queue_ride_name?: string | null;
   activities: Activity[];
 }
 
@@ -47,5 +51,6 @@ export type MainTab = 'tracker' | 'analytics' | 'checklist' | 'rainbow';
 export type TrackerSubTab = 'Today' | 'Times' | 'Parking' | 'History';
 export type AnalyticsSubTab = 'averages' | 'cards' | 'top10' | 'visits';
 export type RainbowSubTab = 'stream' | 'badges';
+export type FunSubTab = 'rainbow' | 'trivia';
 export type PeopleSubTab = 'Cards' | 'Leaderboards' | 'Badges';
 export type RidesSubTab = 'Big Chart' | 'Leaderboards';
