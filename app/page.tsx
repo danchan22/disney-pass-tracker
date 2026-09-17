@@ -147,65 +147,59 @@ export default function DisneyTracker() {
   };
 
   // AUTOMATICALLY FLUSH PENDING OFFLINE QUEUE & ACTIVITIES WHEN CONNECTION RETURNS
-  useEffect(() => {
-    const syncPendingQueueAndActivities = async () => {
-      const supabase = await getSupabase();
+ useEffect(() => {
+  const syncPendingQueueAndActivities = async () => {
+    const supabase = await getSupabase();
 
-      // 1. Flush pending visit updates (e.g. timer start/cancel)
-      const pendingQueueRaw = localStorage.getItem('pending_sync_queue');
-      if (pendingQueueRaw) {
-        const pendingQueue = JSON.parse(pendingQueueRaw);
-        if (pendingQueue.length > 0) {
-          try {
-            for (const item of pendingQueue) {
-              await supabase.from('visits').update(item.actionData).eq('id', item.visitId);
-            }
-            localStorage.removeItem('pending_sync_queue');
-          } catch (err) {
-            console.warn("Queue sync retry failed:", err);
+    // Flush offline timer starts/clears
+    const pendingQueueRaw = localStorage.getItem('pending_sync_queue');
+    if (pendingQueueRaw) {
+      const pendingQueue = JSON.parse(pendingQueueRaw);
+      if (pendingQueue.length > 0) {
+        try {
+          for (const item of pendingQueue) {
+            await supabase.from('visits').update(item.actionData).eq('id', item.visitId);
           }
+          localStorage.removeItem('pending_sync_queue');
+        } catch (err) {
+          console.warn("Queue sync retry failed:", err);
         }
       }
+    }
 
-      // 2. Flush pending offline activities (e.g. timer end on Airplane mode)
-      const pendingActRaw = localStorage.getItem('pending_offline_activities');
-      if (pendingActRaw) {
-        const pendingActs: Activity[] = JSON.parse(pendingActRaw);
-        if (pendingActs.length > 0) {
-          try {
-            for (const act of pendingActs) {
-              // Clear timer on visit table in cloud
-              await supabase
-                .from('visits')
-                .update({
-                  queue_start_ts: null,
-                  queue_start_str: null,
-                  queue_ride_name: null
-                })
-                .eq('id', act.visit_id);
+    // Flush offline completed activities
+    const pendingActRaw = localStorage.getItem('pending_offline_activities');
+    if (pendingActRaw) {
+      const pendingActs: Activity[] = JSON.parse(pendingActRaw);
+      if (pendingActs.length > 0) {
+        try {
+          for (const act of pendingActs) {
+            await supabase
+              .from('visits')
+              .update({ queue_start_ts: null, queue_start_str: null, queue_ride_name: null })
+              .eq('id', act.visit_id);
 
-              // Save offline-logged activity to cloud
-              await supabase.from('activities').insert({
-                visit_id: act.visit_id,
-                rideName: act.rideName,
-                waitTimeMinutes: act.waitTimeMinutes,
-                notes: act.notes,
-                riders: Array.isArray(act.riders) ? act.riders.join(', ') : act.riders
-              });
-            }
-            localStorage.removeItem('pending_offline_activities');
-          } catch (err) {
-            console.warn("Activity offline sync retry failed:", err);
+            await supabase.from('activities').insert({
+              visit_id: act.visit_id,
+              rideName: act.rideName,
+              waitTimeMinutes: act.waitTimeMinutes,
+              notes: act.notes,
+              riders: Array.isArray(act.riders) ? act.riders.join(', ') : act.riders
+            });
           }
+          localStorage.removeItem('pending_offline_activities');
+        } catch (err) {
+          console.warn("Activity offline sync retry failed:", err);
         }
       }
+    }
 
-      await fetchCloudVisits();
-    };
+    await fetchCloudVisits();
+  };
 
-    window.addEventListener('online', syncPendingQueueAndActivities);
-    return () => window.removeEventListener('online', syncPendingQueueAndActivities);
-  }, []);
+  window.addEventListener('online', syncPendingQueueAndActivities);
+  return () => window.removeEventListener('online', syncPendingQueueAndActivities);
+}, []);
 
   // Realtime Supabase Subscription & Mobile PWA Focus Listener
   useEffect(() => {
@@ -782,84 +776,75 @@ export default function DisneyTracker() {
     });
   };
 
-  const handleEndQueueTimer = async (isWalkOn = false) => {
-    if (!activeVisit) return;
+const handleEndQueueTimer = async (isWalkOn = false) => {
+  if (!activeVisit) return;
 
-    const now = Date.now();
-    const elapsedMinutes = queueStartTimestamp 
-      ? Math.max(1, Math.round((now - queueStartTimestamp) / 60000))
-      : 0;
-    const finalWait = isWalkOn ? 0 : elapsedMinutes;
+  const now = Date.now();
+  const elapsedMinutes = queueStartTimestamp 
+    ? Math.max(1, Math.round((now - queueStartTimestamp) / 60000))
+    : 0;
+  const finalWait = isWalkOn ? 0 : elapsedMinutes;
 
-    const notesBase = rideName === 'Character Meeting' && characterName ? characterName : '';
-    const notesVal = isWalkOn ? `${notesBase} [Walk On]`.trim() : (notesBase || undefined);
-    const ridersList = selectedRiders.length > 0 ? selectedRiders : activePartyList;
+  const notesBase = rideName === 'Character Meeting' && characterName ? characterName : '';
+  const notesVal = isWalkOn ? `${notesBase} [Walk On]`.trim() : (notesBase || undefined);
+  const ridersList = selectedRiders.length > 0 ? selectedRiders : activePartyList;
 
-    const newActivity: Activity = {
-      id: `act_${Date.now()}`,
-      visit_id: activeVisit.id,
-      rideName: rideName,
-      waitTimeMinutes: finalWait,
-      isWalkOn: isWalkOn,
-      riders: ridersList,
-      notes: notesVal,
-    };
-
-    // Optimistically clear local timer UI immediately
-    clearQueueTimerStorage();
-    setQueueStartTimestamp(null);
-    setQueueStartTimeStr(null);
-    setRideTrivia(null);
-    setHiddenMickey(null);
-    setCharacterName('');
-    setWaitTime('');
-
-    // Optimistically update active visit state locally
-    const updatedVisit: Visit = {
-      ...activeVisit,
-      queue_start_ts: null,
-      queue_start_str: null,
-      queue_ride_name: null,
-      activities: [...activeVisit.activities, newActivity]
-    };
-
-    setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? updatedVisit : v));
-
-    try {
-      const supabase = await getSupabase();
-
-      // Clear timer state on visit
-      await supabase
-        .from('visits')
-        .update({
-          queue_start_ts: null,
-          queue_start_str: null,
-          queue_ride_name: null
-        })
-        .eq('id', activeVisit.id);
-
-      // Insert new activity
-      const { error: actErr } = await supabase
-        .from('activities')
-        .insert({
-          visit_id: activeVisit.id,
-          rideName: newActivity.rideName,
-          waitTimeMinutes: newActivity.waitTimeMinutes,
-          notes: newActivity.notes,
-          riders: ridersList.join(', ')
-        });
-
-      if (actErr) throw actErr;
-      await fetchCloudVisits();
-    } catch (err) {
-      console.warn("Network offline or dead zone detected. Queueing activity locally:", err);
-
-      // Store pending offline activity for auto-flush on reconnection
-      const pending = JSON.parse(localStorage.getItem('pending_offline_activities') || '[]');
-      pending.push(newActivity);
-      localStorage.setItem('pending_offline_activities', JSON.stringify(pending));
-    }
+  const newActivity: Activity = {
+    id: `act_${Date.now()}`,
+    visit_id: activeVisit.id,
+    rideName: rideName,
+    waitTimeMinutes: finalWait,
+    isWalkOn: isWalkOn,
+    riders: ridersList,
+    notes: notesVal,
   };
+
+  // Clear local timer UI state & local storage immediately
+  clearQueueTimerStorage();
+  setQueueStartTimestamp(null);
+  setQueueStartTimeStr(null);
+  setRideTrivia(null);
+  setHiddenMickey(null);
+  setCharacterName('');
+  setWaitTime('');
+
+  // Queue the timer clearance action locally to prevent DB resurrection on refresh
+  await queueOrSyncAction(activeVisit.id, {
+    queue_start_ts: null,
+    queue_start_str: null,
+    queue_ride_name: null,
+  });
+
+  // Optimistically insert activity into local React state
+  setActiveVisits(prev => prev.map(v => v.id === activeVisit.id ? {
+    ...v,
+    queue_start_ts: null,
+    queue_start_str: null,
+    queue_ride_name: null,
+    activities: [...v.activities, newActivity]
+  } : v));
+
+  try {
+    const supabase = await getSupabase();
+    const { error: actErr } = await supabase
+      .from('activities')
+      .insert({
+        visit_id: activeVisit.id,
+        rideName: newActivity.rideName,
+        waitTimeMinutes: newActivity.waitTimeMinutes,
+        notes: newActivity.notes,
+        riders: ridersList.join(', ')
+      });
+
+    if (actErr) throw actErr;
+    await fetchCloudVisits();
+  } catch (err) {
+    console.warn("Offline dead zone: Saved activity locally", err);
+    const pending = JSON.parse(localStorage.getItem('pending_offline_activities') || '[]');
+    pending.push(newActivity);
+    localStorage.setItem('pending_offline_activities', JSON.stringify(pending));
+  }
+};
 
   const openEditVisit = (v: Visit) => {
     setEditingVisit(v);
