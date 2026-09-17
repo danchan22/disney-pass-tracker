@@ -146,26 +146,65 @@ export default function DisneyTracker() {
     }
   };
 
-  // Background listener: Syncs pending offline queue when cellular signal returns
+  // AUTOMATICALLY FLUSH PENDING OFFLINE QUEUE & ACTIVITIES WHEN CONNECTION RETURNS
   useEffect(() => {
-    const syncPendingQueue = async () => {
-      const pending = JSON.parse(localStorage.getItem('pending_sync_queue') || '[]');
-      if (pending.length === 0) return;
+    const syncPendingQueueAndActivities = async () => {
+      const supabase = await getSupabase();
 
-      try {
-        const supabase = await getSupabase();
-        for (const item of pending) {
-          await supabase.from('visits').update(item.actionData).eq('id', item.visitId);
+      // 1. Flush pending visit updates (e.g. timer start/cancel)
+      const pendingQueueRaw = localStorage.getItem('pending_sync_queue');
+      if (pendingQueueRaw) {
+        const pendingQueue = JSON.parse(pendingQueueRaw);
+        if (pendingQueue.length > 0) {
+          try {
+            for (const item of pendingQueue) {
+              await supabase.from('visits').update(item.actionData).eq('id', item.visitId);
+            }
+            localStorage.removeItem('pending_sync_queue');
+          } catch (err) {
+            console.warn("Queue sync retry failed:", err);
+          }
         }
-        localStorage.removeItem('pending_sync_queue');
-        fetchCloudVisits();
-      } catch (err) {
-        console.warn("Sync retry failed, will retry on next connection:", err);
       }
+
+      // 2. Flush pending offline activities (e.g. timer end on Airplane mode)
+      const pendingActRaw = localStorage.getItem('pending_offline_activities');
+      if (pendingActRaw) {
+        const pendingActs: Activity[] = JSON.parse(pendingActRaw);
+        if (pendingActs.length > 0) {
+          try {
+            for (const act of pendingActs) {
+              // Clear timer on visit table in cloud
+              await supabase
+                .from('visits')
+                .update({
+                  queue_start_ts: null,
+                  queue_start_str: null,
+                  queue_ride_name: null
+                })
+                .eq('id', act.visit_id);
+
+              // Save offline-logged activity to cloud
+              await supabase.from('activities').insert({
+                visit_id: act.visit_id,
+                rideName: act.rideName,
+                waitTimeMinutes: act.waitTimeMinutes,
+                notes: act.notes,
+                riders: Array.isArray(act.riders) ? act.riders.join(', ') : act.riders
+              });
+            }
+            localStorage.removeItem('pending_offline_activities');
+          } catch (err) {
+            console.warn("Activity offline sync retry failed:", err);
+          }
+        }
+      }
+
+      await fetchCloudVisits();
     };
 
-    window.addEventListener('online', syncPendingQueue);
-    return () => window.removeEventListener('online', syncPendingQueue);
+    window.addEventListener('online', syncPendingQueueAndActivities);
+    return () => window.removeEventListener('online', syncPendingQueueAndActivities);
   }, []);
 
   // Realtime Supabase Subscription & Mobile PWA Focus Listener
@@ -391,11 +430,16 @@ export default function DisneyTracker() {
         const localStr = localStorage.getItem('disney_queue_start_str');
         const localRide = localStorage.getItem('disney_queue_ride_name');
 
+        // Check if there are pending offline activity completions for this visit
+        const pendingActsRaw = localStorage.getItem('pending_offline_activities');
+        const pendingActs: Activity[] = pendingActsRaw ? JSON.parse(pendingActsRaw) : [];
+        const hasPendingOfflineCompletion = pendingActs.some(a => a.visit_id === currentActive?.id);
+
         if (localStart && localStr) {
           setQueueStartTimestamp(Number(localStart));
           setQueueStartTimeStr(localStr);
           if (localRide) setRideName(localRide);
-        } else if (currentActive && (currentActive as any).queue_start_ts) {
+        } else if (currentActive && (currentActive as any).queue_start_ts && !hasPendingOfflineCompletion) {
           setQueueStartTimestamp(Number((currentActive as any).queue_start_ts));
           setQueueStartTimeStr((currentActive as any).queue_start_str || null);
           if ((currentActive as any).queue_ride_name) {
